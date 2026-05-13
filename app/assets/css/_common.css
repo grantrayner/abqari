@@ -1542,6 +1542,20 @@ article > header > .lede {
      get clipped and the row stays vertically inset. */
   padding: 4% 6% 6% 0;
 }
+/* Constrain the title/meta body to the stack's horizontal extent so
+   `text-align: center` (inherited from the base `.series-preview__body`
+   rule) lands at the stack's visual center rather than the tile's
+   geometric center. With the stack left-anchored at 0% and ending
+   near 86% of the tile width (cover width 58% + two cascading -44%
+   margins), capping body width to match keeps title + post-count
+   visually centred under the heroes above.
+
+   Adjacent tiles get 3rem of breathing room from the parent
+   `.series-previews` grid `gap`, so a multi-series listing is
+   already separated without further work. */
+.series-preview--posts .series-preview__body {
+  width: 86%;
+}
 .series-preview--posts .series-preview__cover {
   position: static;
   /* Match the 4:3 aspect of `.post-list__cover` so the stacked heroes
