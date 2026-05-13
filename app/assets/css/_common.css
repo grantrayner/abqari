@@ -1359,15 +1359,22 @@ article > header > .lede {
   color: var(--color-primary);
 }
 
-/* Section heading shared by Bundles + Series + "All publications".
-   Smaller than the page h1; sits above each grouping. */
+/* Section heading shared by Bundles + Series. Styled to match
+   `.home-module__heading` (small caps muted) so the publications
+   landing's grouping headings read consistently with the home-page
+   modules and the posts-landing Series row, which use the same
+   typographic pattern. */
 .pubs-grouping {
   margin: var(--space-2xl) 0 0;
 }
 .pubs-grouping__heading {
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-md);
   font-family: var(--font-heading);
-  font-size: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
 }
 
 /* Bundle previews — a stack of 2-3 covers at slight angles, like a
