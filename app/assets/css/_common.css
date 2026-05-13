@@ -1123,13 +1123,29 @@ article > header > .lede {
 .post-list__description { margin: 0 0 0.75rem; color: var(--color-muted); }
 
 .post-list__tags { margin: 0; font-size: 0.875rem; }
+/* Tag chip — themes customise via component tokens rather than
+   re-declaring the rule. Defaults: plain inline link, no chrome, no
+   prefix. Set these in a theme's `:root` to opt into chip styles:
+     --tag-prefix     — `"#"` to restore the hash, `""` to drop it
+     --tag-padding    — non-zero to add chrome (e.g. `0.125rem 0.5rem`)
+     --tag-bg         — chip background (typically `var(--color-code-bg)`)
+     --tag-radius     — corner shape (`var(--radius-pill)` for pills)
+     --tag-font       — override font-family (e.g. mono for terminal feel)
+     --tag-font-size  — override font-size for a smaller "label" look
+   Notebook layers a `border` on top of the tokens for its outline
+   variant — that's the only theme that still needs a rule of its own. */
 .post-list__tag {
   display: inline-block;
   margin-right: 0.5rem;
+  padding: var(--tag-padding, 0);
+  background: var(--tag-bg, transparent);
+  border-radius: var(--tag-radius, 0);
+  font-family: var(--tag-font, inherit);
+  font-size: var(--tag-font-size, inherit);
   color: var(--color-muted);
   text-decoration: none;
 }
-.post-list__tag::before { content: "#"; }
+.post-list__tag::before { content: var(--tag-prefix, ""); }
 .post-list__tag:hover { color: var(--color-text); }
 
 

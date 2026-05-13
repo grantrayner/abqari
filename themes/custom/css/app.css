@@ -157,10 +157,13 @@
 /* article header h1 { margin-bottom: 0.25rem; } */
 /* article header p  { margin-top: 0; font-size: 0.875rem; color: var(--color-muted); } */
 
-/* Pill-shaped tag chips on post-list cards (default is hash-prefix). */
-/* .post-list__tag {
-  padding: 0.125rem 0.5rem;
-  background: var(--color-code-bg);
-  border-radius: var(--radius-pill);
-}
-.post-list__tag::before { content: ""; } */
+/* Pill-shaped tag chips on post-list cards. The engine's default is
+   a plain inline link with no chrome; set these `--tag-*` tokens in
+   `:root` above (rather than re-declaring `.post-list__tag`) to opt
+   into the chip style. To restore the historical `#tagname` prefix,
+   set `--tag-prefix: "#";` in `:root`. */
+/* :root {
+  --tag-padding: 0.125rem 0.5rem;
+  --tag-bg:      var(--color-code-bg);
+  --tag-radius:  var(--radius-pill);
+} */

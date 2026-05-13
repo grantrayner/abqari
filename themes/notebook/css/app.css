@@ -66,6 +66,16 @@
      Reinforces the "docs vibe" without overriding the `body` rule. */
   --font-size-body:   1rem;
   --line-height-body: 1.55;
+
+  /* Tag chip — outlined rectangle in mono, "label" feel. The engine
+     default is a plain inline link; these tokens express most of the
+     chip style. A small `.post-list__tag` rule below adds the border
+     and tighter margin (the only details that aren't expressible as
+     tokens). */
+  --tag-padding:    0.0625rem 0.4375rem;
+  --tag-radius:     2px;
+  --tag-font:       var(--font-mono);
+  --tag-font-size:  0.8125rem;
 }
 
 /* Dark deltas — only values that differ from `:root`. The
@@ -166,14 +176,11 @@ pre {
 .draft-banner strong::after,
 .future-banner strong::after  { content: "]"; }
 
-/* Tag chips — outlined rectangle (not the engine default underlined
-   anchor). Mono small-caps gives them the "label" feel. */
+/* Tag chips — the bulk of the chip style (padding / radius / mono
+   font / smaller size) is driven by `--tag-*` tokens above. Only the
+   border + tighter margin live here as a rule, since they aren't
+   currently expressible as tokens. */
 .post-list__tag {
   border: 1px solid var(--color-rule);
-  padding: 0.0625rem 0.4375rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  border-radius: 2px;
   margin-right: 0.25rem;
 }
-.post-list__tag::before { content: ""; }    /* drop the engine's `#` prefix */

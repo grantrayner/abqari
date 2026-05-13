@@ -50,6 +50,13 @@
   --font-meta:    var(--font-body);
   --font-mono:    ui-monospace, "SF Mono", Menlo, monospace;
   --font-sans:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Tag chip — pill-shaped with code-bg fill (slightly wider padding
+     than minimal to suit the display serif). Engine default is a
+     plain inline link; setting these tokens opts into the chip style. */
+  --tag-padding:  0.125rem 0.625rem;
+  --tag-bg:       var(--color-code-bg);
+  --tag-radius:   var(--radius-pill);
 }
 
 /* Dark deltas — only redeclare values that differ from `:root`. The
@@ -160,14 +167,6 @@ article header p,
   font-style: italic;
 }
 
-/* Pill-shaped tag chips. */
-.post-list__tag {
-  padding: 0.125rem 0.625rem;
-  background: var(--color-code-bg);
-  border-radius: var(--radius-pill);
-}
-.post-list__tag::before { content: ""; }
-
 /* Pagination — display-serif uppercase. */
 .pagination {
   font-family: var(--font-heading);
@@ -192,9 +191,13 @@ blockquote {
   letter-spacing: 0.05em;
 }
 
-/* Italic descriptions in publications index. */
+/* Italic descriptions in publications index. (The engine already
+   routes `.publications-index__title` through `var(--font-heading)`,
+   so it inherits Playfair Display automatically — no override here.) */
 .publications-index__description { font-style: italic; }
-.publications-index__title { font-family: var(--font-heading); }
+/* Gallery card titles use the display serif — the engine default leaves
+   the font alone so each theme can decide; magazine opts in for
+   editorial consistency with publication cards. */
 .gallery-index__title { font-family: var(--font-heading); }
 .gallery-index__location {
   font-style: italic;

@@ -61,6 +61,14 @@
   --font-meta:    var(--font-body);
   --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-sans:    var(--font-body);
+
+  /* Tag chip — pill-shaped with a subtle code-bg fill. The engine's
+     default is a plain inline link with no chrome; setting these
+     three tokens opts into the chip style without re-declaring the
+     `.post-list__tag` rule. */
+  --tag-padding:  0.125rem 0.5rem;
+  --tag-bg:       var(--color-code-bg);
+  --tag-radius:   var(--radius-pill);
 }
 
 /* Dark deltas — only values that differ from `:root`. */
@@ -122,15 +130,6 @@
 /* ==========================================================================
    Theme-specific aesthetic refinements
    ========================================================================== */
-
-/* Minimal uses pill-shaped tag chips on post-list cards — a subtle
-   distinguishing detail vs the engine's default underlined tags. */
-.post-list__tag {
-  padding: 0.125rem 0.5rem;
-  background: var(--color-code-bg);
-  border-radius: var(--radius-pill);
-}
-.post-list__tag::before { content: ""; }    /* drop the "#" prefix */
 
 /* Minimal's anchors are slightly tighter underline-offset for a
    denser reading feel. */
