@@ -1,0 +1,99 @@
+---
+layout: application
+---
+<!--
+  Photos archive — the canonical full grid of every photo, newest
+  first, paginated. Pairs with `photos_index.html.erb` (the modular
+  landing). When `collections.photos.archive.enabled: true`, the
+  front photos page becomes a curated landing and this page holds
+  the full list.
+
+  Wire it up by creating `content/photos-archive.md` (NOT inside
+  `content/photos/` — that would make the page a photo itself) with:
+
+      ---
+      title: Archive
+      description: Every photo on the site, newest first.
+      layout: photos_archive
+      permalink: /photos/archive/
+      paginate: true
+      paginate_collection: photos
+      ---
+
+  `paginate: true` reads the page count from
+  `collections.photos.pagination.per_page` in config/site.yml — the
+  canonical place to tune photo pagination site-wide. Set an explicit
+  integer (`paginate: 12`) here only when you need to deviate per-page.
+
+  `paginate_collection: photos` is **required** — without it the
+  paginator falls back to the default `'posts'` collection and the
+  archive would silently show posts instead of photos. (The fall-
+  back exists because the legacy `content/posts-archive.md` predates
+  the `paginate_collection:` key.)
+
+  Card-display toggles (`show_location`, `show_date`, `show_camera`,
+  `show_caption`, `cols`, `caption_truncate`) come from
+  `collections.photos.index` — the archive uses the same visual
+  vocabulary as the landing's "Latest photos" row, just every photo
+  and paginated.
+-->
+<%
+  description = page.frontmatter['description']
+  cfg = (site.collection_config('photos')['index'] || {})
+  show_location = cfg.fetch('show_location', true)
+  show_date     = cfg.fetch('show_date',     true)
+  show_camera   = cfg.fetch('show_camera',   false)
+  show_caption  = cfg.fetch('show_caption',  false)
+  cols          = cfg['cols'].to_i
+  cols          = nil unless [2, 3, 4].include?(cols)
+
+  photos = page.paginator&.posts || site.collection('photos')
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Photos archive' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <%== page.content %>
+
+  <% if photos.any? %>
+    <ul class="gallery-index<%= " gallery-index--cols-#{cols}" if cols %>">
+      <% photos.each_with_index do |photo, idx| %>
+        <% tint = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+        <li>
+          <a href="<%= sanitized_url(photo.url) %>">
+            <div class="gallery-index__cover <%= tint %>">
+              <% if photo.frontmatter['image'] %>
+                <img src="<%= sanitized_url(bundle_asset_url_for(photo, photo.frontmatter['image'])) %>"
+                     alt="<%= photo.frontmatter['caption'] || photo.title %>"
+                     width="1200" height="1200"
+                     loading="lazy"
+                     decoding="async">
+              <% end %>
+            </div>
+            <span class="gallery-index__title"><%= photo.title %></span>
+            <% if show_location && (photo.frontmatter['city'] || photo.frontmatter['country']) %>
+              <span class="gallery-index__location">
+                <%= [photo.frontmatter['city'], photo.frontmatter['country']].compact.join(', ') %>
+              </span>
+            <% end %>
+            <% if show_date && photo.date %>
+              <span class="gallery-index__date">
+                <time datetime="<%= photo.date.iso8601 %>"><%= local_time(photo.date) %></time>
+              </span>
+            <% end %>
+            <% if show_camera && photo.frontmatter['camera'] %>
+              <span class="gallery-index__camera"><%= photo.frontmatter['camera'] %></span>
+            <% end %>
+            <% if show_caption && photo.frontmatter['caption'] %>
+              <span class="gallery-index__caption"><%= truncate(photo.frontmatter['caption'], length: cfg.fetch('caption_truncate', 100)) %></span>
+            <% end %>
+          </a>
+        </li>
+      <% end %>
+    </ul>
+    <%== render 'partials/pagination', paginator: page.paginator %>
+  <% end %>
+</article>

@@ -1,0 +1,166 @@
+/* Custom — your starting point for a site that looks like you.
+   Ships as a starter you can edit. The layout, component library,
+   and page structure all live in `app/assets/css/_common.css` and
+   load automatically — you don't need to copy that. Themes own
+   just three things:
+
+     1. PALETTE      — colour CSS variables (light + dark)
+     2. FONTS        — typography variables
+     3. REFINEMENTS  — small theme-specific aesthetic tweaks
+
+   To activate this theme: set `theme: custom` in `config/site.yml`.
+
+   Want to start from one of the other shipped themes instead?
+   Set `theme: minimal` (or magazine, notebook, sand) and your edits
+   to this file stay — switching themes just stops loading it.
+*/
+
+
+/* ============================================================
+ * Theme tokens — palette + typography.
+ *
+ * Change these CSS variables and most of your site follows. Light
+ * is declared in `:root`; dark redeclares only the values that
+ * differ.
+ *
+ * Two dark contexts:
+ *   1. @media (prefers-color-scheme: dark) :root:not([data-theme="light"])
+ *      — system-pref dark, unless the user toggled to light.
+ *   2. [data-theme="dark"] — explicit user toggle to dark.
+ *
+ * No [data-theme="light"] block — `:root` already holds light, and
+ * the `:not()` guard above lets explicit light fall through.
+ * ============================================================ */
+
+:root {
+  /* Base palette */
+  --color-text:    #1a1a1a;                  /* main body text */
+  --color-bg:      #fafafa;                  /* page background */
+  --color-muted:   #6b6b6b;                  /* dates, captions, secondary text */
+  --color-link:    #0066cc;                  /* link colour + focus-visible outline */
+  --color-rule:    rgba(127, 127, 127, 0.2); /* lines, borders */
+  --color-card-bg: #fff;                     /* card / testimonial / book-grid bg */
+  --color-code-bg: rgba(127, 127, 127, 0.08);/* inline code + pre */
+
+  /* Component palette — feeds the .btn-*, .folio-button-*, .card
+     classes in _common.css. Each colour has a paired
+     `--color-on-<name>` which is the text colour to use when that
+     colour is the background. */
+  --color-primary:        #0066cc;
+  --color-on-primary:     #fff;
+  --color-secondary:      #6b6b6b;
+  --color-on-secondary:   #fff;
+  --color-success:        #198754;
+  --color-on-success:     #fff;
+  --color-danger:         #dc3545;
+  --color-on-danger:      #fff;
+  --color-warning:        #ffc107;
+  --color-on-warning:     #1a1a1a;
+  --color-info:           #0dcaf0;
+  --color-on-info:        #1a1a1a;
+  --color-light:          #f8f9fa;
+  --color-on-light:       #1a1a1a;
+  --color-dark:           #1a1a1a;
+  --color-on-dark:        #f8f9fa;
+
+  /* Typography. The two knobs you'll typically adjust are
+     --font-body and --font-heading. --font-meta / --font-mono /
+     --font-sans default to sensible values and only need overriding
+     when the theme wants a specific face. */
+  --font-body:    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-body);
+  --font-meta:    var(--font-body);
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans:    var(--font-body);
+}
+
+/* Dark deltas — only redeclare values that differ from `:root`. Both
+   blocks must stay in sync — pure CSS can't share rule bodies across
+   selectors. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-text:    #ececec;
+    --color-bg:      #111;
+    --color-muted:   #9a9a9a;
+    --color-link:    #6cb;
+    --color-rule:    rgba(255, 255, 255, 0.15);
+    --color-card-bg: #1c1c1c;
+    --color-code-bg: rgba(255, 255, 255, 0.08);
+
+    --color-primary:        #6cb;
+    --color-on-primary:     #111;
+    --color-secondary:      #9a9a9a;
+    --color-on-secondary:   #111;
+    --color-success:        #4caf7a;
+    --color-on-success:     #111;
+    --color-danger:         #f06b75;
+    --color-on-danger:      #111;
+    --color-on-warning:     #111;
+    --color-info:           #6cb;
+    --color-on-info:        #111;
+    --color-light:          #1c1c1c;
+    --color-on-light:       #ececec;
+    --color-dark:           #ececec;
+    --color-on-dark:        #111;
+  }
+}
+
+[data-theme="dark"] {
+  --color-text:    #ececec;
+  --color-bg:      #111;
+  --color-muted:   #9a9a9a;
+  --color-link:    #6cb;
+  --color-rule:    rgba(255, 255, 255, 0.15);
+  --color-card-bg: #1c1c1c;
+  --color-code-bg: rgba(255, 255, 255, 0.08);
+
+  --color-primary:        #6cb;
+  --color-on-primary:     #111;
+  --color-secondary:      #9a9a9a;
+  --color-on-secondary:   #111;
+  --color-success:        #4caf7a;
+  --color-on-success:     #111;
+  --color-danger:         #f06b75;
+  --color-on-danger:      #111;
+  --color-on-warning:     #111;
+  --color-info:           #6cb;
+  --color-on-info:        #111;
+  --color-light:          #1c1c1c;
+  --color-on-light:       #ececec;
+  --color-dark:           #ececec;
+  --color-on-dark:        #111;
+}
+
+
+/* ============================================================
+ * Theme-specific aesthetic refinements
+ *
+ * The structural CSS in `_common.css` already handles 95% of styling
+ * via the variables you set above. Add small overrides here for the
+ * details that make your theme feel distinct: anchor decoration,
+ * heading sizes, button font, custom hover effects, etc.
+ *
+ * Examples below — uncomment / edit / delete as you go. Keep the
+ * file small; if you find yourself rewriting a whole component,
+ * that's a sign the structural rule itself should change in
+ * `_common.css`.
+ * ============================================================ */
+
+/* Hover state for the brand link — lower opacity gives a subtle press
+   feel without changing the colour. */
+/* .nav__brand:hover { opacity: 0.7; } */
+
+/* Tighter underline-offset for a more compact reading feel. */
+/* a { text-underline-offset: 2px; } */
+
+/* Article header — date directly under the h1, no extra spacing. */
+/* article header h1 { margin-bottom: 0.25rem; } */
+/* article header p  { margin-top: 0; font-size: 0.875rem; color: var(--color-muted); } */
+
+/* Pill-shaped tag chips on post-list cards (default is hash-prefix). */
+/* .post-list__tag {
+  padding: 0.125rem 0.5rem;
+  background: var(--color-code-bg);
+  border-radius: var(--radius-pill);
+}
+.post-list__tag::before { content: ""; } */

@@ -1,0 +1,88 @@
+<!--
+  Related books — sister-publications block on a single book detail
+  page. Same data shape and adaptive heading as the engine's version;
+  rendered with semantic class names so the visual treatment is
+  controlled by the theme CSS, not by inline framework classes.
+
+  Uses the canonical `publications` collection for overrides; URLs
+  follow the `publications.slug` aliasing (so /books/<slug>/ when
+  the slug is set to "books").
+
+  See themes/<name>/css/app.css for `.book-related*` rules.
+-->
+<%
+  all_books = Array(site.data['folio_publications']).map { |_, p| p }
+
+  book_position = lambda do |b|
+    override = site.featured('publications', b['slug'])
+    (override && override.frontmatter['series_position']) ||
+      b.dig('in_series', 'position') || 999
+  end
+
+  related = all_books.reject { |b| b['slug'] == page.slug }
+                     .sort_by { |b| book_position.call(b) }
+
+  this_override = site.featured('publications', page.slug)
+  this_position = (this_override && this_override.frontmatter['series_position']) ||
+                  (page.respond_to?(:data) ? page.data&.dig('in_series', 'position') : nil) ||
+                  0
+
+  heading = if related.size == 1
+              rel_pos = book_position.call(related.first)
+              if rel_pos == this_position + 1
+                'Ready for the sequel?'
+              elsif rel_pos > this_position
+                'Continue the series'
+              elsif rel_pos == 1
+                "Haven't read the first book?"
+              else
+                'Earlier in the series'
+              end
+            else
+              'Other books in the series'
+            end
+
+  # Resolve publications-collection URL prefix (honors slug aliasing).
+  pubs_cfg = site.collection_config('publications')
+  pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+    pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{pubs_cfg['slug']}/"
+  pubs_prefix = '/publications/' if pubs_prefix.empty?
+%>
+<% if related.any? %>
+<section class="book-related" aria-label="Related books">
+  <h2 class="book-related__heading"><%= heading %></h2>
+
+  <% related.each do |b| %>
+    <% override = site.featured('publications', b['slug']) %>
+    <% tagline  = override && override.frontmatter['tagline'] %>
+    <% has_buy  = b['buy_now_url'] || b['add_to_cart_url'] ||
+                  (override && override.frontmatter['amazon_url']) %>
+    <article class="book-related__item">
+      <a href="<%= pubs_prefix %><%= b['slug'] %>/" class="book-related__cover">
+        <% if b['cover_url'] %>
+          <div class="book-cover">
+            <img src="<%= sanitized_url(b['cover_url']) %>"
+                 alt="<%= b['title'] %> cover"
+                 loading="lazy">
+          </div>
+        <% end %>
+      </a>
+
+      <div class="book-related__body">
+        <h3 class="book-related__title">
+          <a href="<%= pubs_prefix %><%= b['slug'] %>/"><%= b['title'] %></a>
+        </h3>
+
+        <% if tagline %>
+          <p class="book-related__tagline"><%= tagline %></p>
+        <% end %>
+
+        <a href="<%= pubs_prefix %><%= b['slug'] %>/" class="book-related__cta">
+          <%= has_buy ? 'Read more' : 'Coming soon' %> &rarr;
+        </a>
+      </div>
+    </article>
+  <% end %>
+</section>
+<% end %>

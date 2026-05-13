@@ -1,0 +1,97 @@
+/*
+  Bootstrap theme — project-level overrides.
+
+  The Bootstrap 5.3.8 distribution itself lives under
+  themes/bootstrap/public/css/bootstrap.min.css and is copied to
+  /css/bootstrap.min.css at build time. The head partial loads it
+  before this file, so any rule you write here wins on cascade.
+
+  This file is YOURS to edit — bump custom variables, add brand
+  colours, tweak component tokens. The vendored Bootstrap dist is
+  not edited. To upgrade Bootstrap, replace the files under
+  themes/bootstrap/public/.
+
+  Examples:
+
+    :root {
+      --bs-primary: #1a73e8;
+      --bs-link-color: var(--bs-primary);
+    }
+
+    .navbar-brand { font-weight: 700; }
+*/
+
+/* Primary nav — three flex children: brand, links, theme toggle.
+   `.nav__links { margin-left: auto }` pushes links + toggle to the
+   right edge. (Bootstrap theme skips _common.css, so we redeclare
+   the nav layout rules here.) */
+nav[aria-label="Primary"] {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.nav__brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+.nav__brand:hover { opacity: 0.7; }
+.nav__links { margin-left: auto; }
+
+/* Active nav link — the one matching the current page (or section).
+   Bootstrap doesn't ship an active-link primitive for plain anchors;
+   we use the [aria-current="page"] selector emitted by the nav partial. */
+nav[aria-label="Primary"] [aria-current="page"] {
+  color: #111;
+  font-weight: 700;
+}
+@media (prefers-color-scheme: dark) {
+  nav[aria-label="Primary"] [aria-current="page"] { color: #f5f5f5; }
+}
+[data-theme="dark"]  nav[aria-label="Primary"] [aria-current="page"] { color: #f5f5f5; }
+[data-theme="light"] nav[aria-label="Primary"] [aria-current="page"] { color: #111; }
+
+/* Skip-link — visually hidden until focused. (Bootstrap doesn't ship
+   this primitive; the bootstrap theme also skips Abqari's _common.css
+   to avoid `.btn` / `.card` conflicts, so we redeclare it here.) */
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  z-index: 999;
+  padding: 0.5rem 1rem;
+  background: #222;
+  color: #fff;
+  text-decoration: none;
+  border-bottom-right-radius: 0.25rem;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 0;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Footer bar — meta on the left, social icons on the right, same line.
+   Wraps to two rows on narrow viewports. Standardised across every
+   theme via the partial at app/views/partials/_footer.html.erb. */
+.footer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.footer-bar > p { margin: 0; }
+.footer-bar .footer-social { display: flex; gap: 0.5rem; align-items: center; }
+.footer-bar .footer-social a { display: inline-flex; align-items: center; }
+
+/* Breathing room around the footer — separation from page content
+   above (margin-top) and from the browser chrome below
+   (padding-bottom). */
+footer {
+  margin-top: 3rem;
+  padding-bottom: 2rem;
+}

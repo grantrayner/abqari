@@ -1,0 +1,18 @@
+# Optional explicit nav override.
+#
+# Site#nav_links resolves a three-layer cascade:
+#   1. This file's `links:` array, if present (winner-take-all)
+#   2. Pages with `nav: { order: N, label: "…" }` in front matter
+#   3. Empty → the partial falls back to a single home link
+#
+# By default this file is comments only, so layer 2 (frontmatter) is active.
+# Uncomment `links:` below to take full manual control — useful when you want
+# external links, custom ordering, or pages outside content/ in the nav.
+#
+# links:
+#   - label: Home
+#     url: /
+#   - label: Stories
+#     url: /stories/
+#   - label: GitHub
+#     url: https://github.com/your-handle

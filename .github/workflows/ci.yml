@@ -1,0 +1,89 @@
+# PR / push CI checks. Runs on every push and pull request; gates merges
+# on a clean test suite, a strict site audit, and a clean bundle-audit.
+#
+# Separate from `deploy.yml` on purpose: deploys should be resilient (a
+# flaky external link shouldn't block a release), but PRs should fail
+# loudly so problems are caught at review time.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run test suite with coverage
+        env:
+          COVERAGE: '1'
+        run: bundle exec bin/test
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install Pagefind (optional — for static search)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run site audit (strict)
+        env:
+          ABQARI_ENV: production
+        # --strict exits non-zero when any error-severity finding is
+        # present. To also gate on warnings, change to `--strict=warn`.
+        run: bundle exec bin/audit --strict
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: audit/*.md
+          retention-days: 30
+
+  bundle-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install bundler-audit
+        run: gem install bundler-audit
+
+      - name: Run bundle-audit
+        # `check --update` refreshes the advisory database before scanning
+        # so the runner picks up CVEs published since the last cache build.
+        run: bundle-audit check --update

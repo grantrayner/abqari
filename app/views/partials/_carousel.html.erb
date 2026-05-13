@@ -1,0 +1,64 @@
+<!--
+  Photo carousel — slideshow view of an arbitrary collection (defaults
+  to `photos`). Render from any layout:
+
+      <%%= render 'partials/carousel' %>
+      <%%= render 'partials/carousel', collection: 'posts' %>
+
+  Or with an explicit list of photos:
+
+      <%%= render 'partials/carousel', items: site.collection('photos').first(20) %>
+
+  Each slide reads `image:`, `title`, `caption:`, `city`, `country`,
+  `date` from the source page — same shape the photo layout expects.
+  Vanilla-JS click handlers (no Bootstrap dependency); arrow keys + click
+  navigation; CSP-safe (external `carousel.js` only, no inline scripts).
+-->
+<%
+  items = if defined?(items) && items
+            items
+          else
+            requested = (defined?(collection) && collection) || 'photos'
+            site.collection(requested)
+          end
+%>
+<% if items.any? %>
+  <div class="carousel" data-carousel>
+    <div class="carousel__track">
+      <% items.each_with_index do |item, idx| %>
+        <figure class="carousel__slide<%= idx.zero? ? ' is-active' : '' %>" aria-hidden="<%= idx.zero? ? 'false' : 'true' %>">
+          <% if item.frontmatter['image'] %>
+            <img class="carousel__image"
+                 src="<%= item.frontmatter['image'] %>"
+                 alt="<%= item.frontmatter['caption'] || item.title %>"
+                 <%== idx.zero? ? 'fetchpriority="high"' : 'loading="lazy"' %>>
+          <% end %>
+          <figcaption class="carousel__caption">
+            <a href="<%= item.url %>" class="carousel__title"><%= item.title %></a>
+            <% if item.frontmatter['caption'] %>
+              <p class="carousel__quote"><%= item.frontmatter['caption'] %></p>
+            <% end %>
+            <p class="carousel__meta">
+              <% if item.frontmatter['city'] || item.frontmatter['country'] %>
+                <%= [item.frontmatter['city'], item.frontmatter['country']].compact.join(', ') %>
+              <% end %>
+              <% if item.respond_to?(:date) && item.date %>
+                · <time datetime="<%= item.date.iso8601 %>"><%= local_time(item.date) %></time>
+              <% end %>
+            </p>
+          </figcaption>
+        </figure>
+      <% end %>
+    </div>
+    <button type="button" class="carousel__prev" aria-label="Previous slide" data-carousel-prev>
+      <span aria-hidden="true">&larr;</span>
+    </button>
+    <button type="button" class="carousel__next" aria-label="Next slide" data-carousel-next>
+      <span aria-hidden="true">&rarr;</span>
+    </button>
+    <p class="carousel__counter">
+      <span data-carousel-current>1</span> / <%= items.size %>
+    </p>
+  </div>
+  <script src="<%= asset_path('js/carousel.js') %>" defer></script>
+<% end %>

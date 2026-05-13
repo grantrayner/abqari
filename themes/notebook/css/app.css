@@ -1,0 +1,179 @@
+/* Notebook — paper + ochre, mono-typeface character, dense typography.
+   Inherits all structural CSS from `_common.css`. This file is
+   intentionally near-empty: palette tokens express the visual
+   identity, density tokens express the typographic feel, and a tiny
+   set of refinements add docs-style decoration that can't be a token
+   (bracket banners, mono accents on specific UI elements, dashed
+   section dividers).
+
+   The signature trick: `--font-heading: var(--font-mono)` swaps
+   every h1–h6 to mono without any heading-specific rule.
+
+   To get the full visual experience, self-host JetBrains Mono and
+   Inter via the `fonts:` block in `config/site.yml` and run
+   `bin/fetch-fonts`. Without them, mono falls back to ui-monospace
+   and body falls back to system-ui — still distinct, just less
+   "design-aware".
+*/
+
+
+/* ==========================================================================
+   Theme tokens — palette + typography + density.
+   ========================================================================== */
+
+:root {
+  /* Base palette — paper background, ochre accent. The ochre family
+     (warm rust → goldenrod) is the colour signature; pairs with a
+     subtle paper-warm background and dark-graphite text. */
+  --color-text:    #2a2a2a;
+  --color-bg:      #f7f7f4;            /* warm paper */
+  --color-muted:   #767676;
+  --color-link:    #a06419;            /* deep ochre — links + primary */
+  --color-accent:  #c4811f;            /* lighter ochre — code-block left border, etc */
+  --color-rule:    rgba(0, 0, 0, 0.1);
+  --color-card-bg: #fff;
+  --color-code-bg: #ecebe6;
+
+  /* Component palette */
+  --color-primary:        #a06419;     /* deep ochre — buttons, links */
+  --color-on-primary:     #fff;
+  --color-secondary:      #767676;
+  --color-on-secondary:   #fff;
+  --color-success:        #3a8050;
+  --color-on-success:     #fff;
+  --color-danger:         #b03a3a;
+  --color-on-danger:      #fff;
+  --color-warning:        #c4811f;     /* lighter ochre */
+  --color-on-warning:     #2a2a2a;
+  --color-info:           #2a5d8f;     /* dusty navy — distinct from primary */
+  --color-on-info:        #fff;
+  --color-light:          #f7f7f4;
+  --color-on-light:       #2a2a2a;
+  --color-dark:           #2a2a2a;
+  --color-on-dark:        #f7f7f4;
+
+  /* Typography — Inter sans body, JetBrains Mono everywhere mono
+     appears. Both fall back to system fonts when not self-hosted.
+     `--font-heading: var(--font-mono)` is the move that makes every
+     h1–h6 read as docs/terminal — the always-visible theme signature. */
+  --font-body:    ui-sans-serif, "Inter", system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-mono);
+  --font-meta:    var(--font-mono);
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans:    var(--font-body);
+
+  /* Density — denser than the engine default (1.0625rem / 1.7).
+     Reinforces the "docs vibe" without overriding the `body` rule. */
+  --font-size-body:   1rem;
+  --line-height-body: 1.55;
+}
+
+/* Dark deltas — only values that differ from `:root`. The
+   `:not([data-theme="light"])` guard lets an explicit toggle to
+   light fall through to `:root`'s light defaults; no dedicated
+   `[data-theme="light"]` block needed. Both blocks must stay in
+   sync — pure CSS can't share rule bodies across selectors. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-text:    #e6e6e6;
+    --color-bg:      #1c1d1f;
+    --color-muted:   #888;
+    --color-link:    #e0a857;            /* lighter ochre for legibility on dark */
+    --color-accent:  #e0a857;
+    --color-rule:    rgba(255, 255, 255, 0.1);
+    --color-card-bg: #25262a;
+    --color-code-bg: #2a2b2e;
+
+    --color-primary:        #e0a857;
+    --color-on-primary:     #1c1d1f;
+    --color-secondary:      #888;
+    --color-on-secondary:   #1c1d1f;
+    --color-success:        #5ba679;
+    --color-on-success:     #1c1d1f;
+    --color-danger:         #d97070;
+    --color-on-danger:      #1c1d1f;
+    --color-warning:        #e0a857;
+    --color-on-warning:     #1c1d1f;
+    --color-info:           #7ab3e3;     /* lighter dusty blue */
+    --color-on-info:        #1c1d1f;
+    --color-light:          #25262a;
+    --color-on-light:       #e6e6e6;
+    --color-dark:           #e6e6e6;
+    --color-on-dark:        #1c1d1f;
+  }
+}
+
+[data-theme="dark"] {
+  --color-text:    #e6e6e6;
+  --color-bg:      #1c1d1f;
+  --color-muted:   #888;
+  --color-link:    #e0a857;
+  --color-accent:  #e0a857;
+  --color-rule:    rgba(255, 255, 255, 0.1);
+  --color-card-bg: #25262a;
+  --color-code-bg: #2a2b2e;
+
+  --color-primary:        #e0a857;
+  --color-on-primary:     #1c1d1f;
+  --color-secondary:      #888;
+  --color-on-secondary:   #1c1d1f;
+  --color-success:        #5ba679;
+  --color-on-success:     #1c1d1f;
+  --color-danger:         #d97070;
+  --color-on-danger:      #1c1d1f;
+  --color-warning:        #e0a857;
+  --color-on-warning:     #1c1d1f;
+  --color-info:           #7ab3e3;
+  --color-on-info:        #1c1d1f;
+  --color-light:          #25262a;
+  --color-on-light:       #e6e6e6;
+  --color-dark:           #e6e6e6;
+  --color-on-dark:        #1c1d1f;
+}
+
+
+/* ==========================================================================
+   Notebook-specific aesthetic refinements
+   --------------------------------------------------------------------------
+   Kept minimal — these are decorations that can't be expressed as token
+   values. Everything else (mono headings, dense body, code/pre mono, paper
+   background, ochre accents) is driven by the tokens above.
+   ========================================================================== */
+
+/* Section dividers — dashed, in the notebook docs idiom. */
+hr,
+.next-item,
+.related,
+.photo__related {
+  border-top-style: dashed;
+}
+
+/* Code blocks get a thin left border in the ochre accent. */
+pre {
+  border-left: 3px solid var(--color-accent);
+}
+
+/* Photo single-page — 1px outline on the image + colon-suffixed `key:`
+   labels in the metadata list (terminal-style key/value rendering). */
+.photo__image { border: 1px solid var(--color-rule); }
+.photo__meta dt::after { content: ":"; }
+
+/* Banners — `[draft]` / `[future]` brackets around the strong label,
+   reinforcing the docs/terminal feel. Base styling (colours, padding)
+   comes from `_common.css`; we just add the bracket decoration. */
+.draft-banner strong::before,
+.future-banner strong::before { content: "["; }
+.draft-banner strong::after,
+.future-banner strong::after  { content: "]"; }
+
+/* Tag chips — outlined rectangle (not the engine default underlined
+   anchor). Mono small-caps gives them the "label" feel. */
+.post-list__tag {
+  border: 1px solid var(--color-rule);
+  padding: 0.0625rem 0.4375rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-radius: 2px;
+  margin-right: 0.25rem;
+}
+.post-list__tag::before { content: ""; }    /* drop the engine's `#` prefix */

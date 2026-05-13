@@ -1,0 +1,19 @@
+<!--
+  Light/dark theme toggle (opt-in). Render anywhere you want the button:
+  <%%= render 'partials/theme_toggle' %>
+
+  How it works:
+    1. The inline bootstrap in _head.html.erb hydrates <html data-theme="..."> from
+       localStorage before render — no flash of the wrong theme.
+    2. Each theme's CSS responds to [data-theme="dark"] / [data-theme="light"]
+       overrides; without an attribute, prefers-color-scheme still wins.
+    3. Clicking flips data-theme and persists in localStorage via theme-toggle.js.
+-->
+<%# `aria-pressed` starts as "false" (light) — theme-toggle.js syncs it to
+    the resolved theme on load and flips it on click. Screen readers
+    announce the current state of the toggle to the user. %>
+<button type="button" class="theme-toggle" aria-label="Toggle light/dark theme" aria-pressed="false" data-theme-toggle>
+  <span class="theme-toggle__sun" aria-hidden="true"><%== icon 'sun', width: '18', height: '18' %></span>
+  <span class="theme-toggle__moon" aria-hidden="true"><%== icon 'moon', width: '18', height: '18' %></span>
+</button>
+<script src="<%= asset_path('js/theme-toggle.js') %>" defer></script>

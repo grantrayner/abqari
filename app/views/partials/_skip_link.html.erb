@@ -1,0 +1,12 @@
+<!--
+  Skip-to-content link. Renders as the very first focusable element on the
+  page so keyboard and screen-reader users can bypass the nav and jump
+  straight to the article. Visually hidden until focused (see .skip-link
+  CSS in each theme).
+
+  The target is `#main-content` — every layout sets that id and
+  `tabindex="-1"` on its <main> so the link can move focus there. Don't
+  remove the tabindex; without it, browsers won't focus a non-interactive
+  element after the anchor jump and screen readers lose context.
+-->
+<a class="skip-link" href="#main-content">Skip to content</a>

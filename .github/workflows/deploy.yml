@@ -1,0 +1,80 @@
+# Deploy an Abqari site to Cloudflare Pages on every push to main.
+#
+# Setup (one-time):
+#   1. Create a Cloudflare Pages project (Direct Upload, no Git integration).
+#   2. Generate an API token with the "Cloudflare Pages: Edit" scope:
+#      https://dash.cloudflare.com/profile/api-tokens
+#   3. In your GitHub repo: Settings → Secrets and variables → Actions → New
+#      repository secret. Add:
+#        CLOUDFLARE_API_TOKEN     — the token from step 2
+#        CLOUDFLARE_ACCOUNT_ID    — from any Cloudflare dashboard URL
+#   4. Edit `project-name` below to match your Pages project's name.
+#
+# What this does:
+#   - Installs Ruby and Pagefind (only used if `search: true` in site.yml)
+#   - Caches `bundle install` between runs
+#   - Builds the site in production mode
+#   - Runs the audit and uploads the report as an artifact (won't fail the deploy)
+#   - Deploys _site/ to Cloudflare Pages via Wrangler
+#
+# Other hosts:
+#   - Netlify:        replace the deploy step with `nwtgck/actions-netlify`
+#   - Render:         link the GitHub repo directly in the Render dashboard;
+#                     this workflow becomes optional
+#   - GitHub Pages:   replace deploy with `actions/deploy-pages`
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true   # caches Gemfile.lock-pinned gems between runs
+
+      - name: Install Pagefind (optional — for static search)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        # Skips silently if pagefind is unused; bin/build only runs it when
+        # `search: true` is set in config/site.yml.
+
+      - name: Build site
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/build
+
+      - name: Run audit
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/audit
+        continue-on-error: true
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: audit/*.md
+          retention-days: 30
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=your-project-name

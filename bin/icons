@@ -1,0 +1,81 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Generate the full favicon + PWA icon set from a single master PNG.
+#
+# Usage:
+#   bin/icons <path/to/master.png>
+#
+# The master should be square and at least 512×512. PNG is preferred (lossless);
+# JPG also works. The script writes these into public/, which is copied into
+# _site/ verbatim on the next `bin/build`:
+#
+#   /favicon-16x16.png
+#   /favicon-32x32.png
+#   /apple-touch-icon.png   180×180
+#   /icon-192.png           192×192
+#   /icon-512.png           512×512
+#
+# Requires `vips` or `magick` (ImageMagick) on PATH:
+#   macOS:   brew install vips      # or imagemagick
+#   Ubuntu:  apt install libvips-tools
+#
+# After running, the standard <link rel="icon"> + manifest references in
+# _head.html.erb pick them up automatically. No config changes required.
+
+require 'fileutils'
+require 'shellwords'
+
+ROOT = File.expand_path('..', __dir__)
+PUBLIC_DIR = File.join(ROOT, 'public')
+
+SIZES = {
+  'favicon-16x16.png'    => 16,
+  'favicon-32x32.png'    => 32,
+  'apple-touch-icon.png' => 180,
+  'icon-192.png'         => 192,
+  'icon-512.png'         => 512
+}.freeze
+
+def which(cmd)
+  ENV['PATH'].split(File::PATH_SEPARATOR).map { |dir| File.join(dir, cmd) }.find { |p| File.executable?(p) }
+end
+
+def detect_processor
+  return 'vips' if which('vips')
+  return 'magick' if which('magick')
+  abort "Neither `vips` nor `magick` (ImageMagick) found on PATH. Install one — see bin/icons header."
+end
+
+def resize(processor, master, size, dest)
+  if processor == 'vips'
+    # vips thumbnail handles aspect-ratio padding via "force" if needed; we
+    # require square inputs so the simple form is fine.
+    cmd = "vips thumbnail #{Shellwords.escape(master)} #{Shellwords.escape(dest)} #{size}"
+  else
+    cmd = "magick #{Shellwords.escape(master)} -resize #{size}x#{size}^ -gravity center -extent #{size}x#{size} #{Shellwords.escape(dest)}"
+  end
+  ok = system(cmd, out: File::NULL, err: File::NULL)
+  abort "Failed to generate #{File.basename(dest)} (command: #{cmd})" unless ok
+end
+
+# --- Main ---
+
+master = ARGV.first
+abort "Usage: bin/icons <path/to/master.png>" unless master
+abort "Master file not found: #{master}" unless File.exist?(master)
+
+processor = detect_processor
+puts "Using #{processor}"
+
+FileUtils.mkdir_p(PUBLIC_DIR)
+
+SIZES.each do |filename, size|
+  dest = File.join(PUBLIC_DIR, filename)
+  resize(processor, master, size, dest)
+  puts "  ✓ #{filename} (#{size}×#{size})"
+end
+
+puts ''
+puts 'Done. Run `bin/build` to copy the icons into _site/.'
+puts 'They are referenced from <head> via standard rel="icon" / rel="apple-touch-icon" links.'

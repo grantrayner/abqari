@@ -1,0 +1,32 @@
+---
+layout: application
+---
+<%
+  description = page.frontmatter['description']
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Bundles' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+
+  <%== page.content %>
+
+  <ul class="bundles-index">
+    <% Array(site.data['folio_bundles']).each do |slug, bundle| %>
+      <li>
+        <a href="/bundles/<%= slug %>/">
+          <span class="bundles-index__name"><%= bundle['name'] %></span>
+          <% if (price = bundle.dig('price', 'formatted')) %>
+            <span class="bundles-index__price"><%= price %></span>
+          <% end %>
+          <% if (count = Array(bundle['publications']).size) > 0 %>
+            <span class="bundles-index__count"><%= pluralize(count, 'book') %></span>
+          <% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</article>

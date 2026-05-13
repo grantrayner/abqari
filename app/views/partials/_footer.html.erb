@@ -1,0 +1,88 @@
+<%#
+  Site footer. Site#footer_links resolves the same three-layer cascade as nav:
+
+    1. data/footer.yml `links:` array — explicit, used as-is.
+    2. Pages with `footer: { order: N, label: "…" }` in front matter, sorted.
+    3. Empty → no footer-link row.
+
+  Site#social_links emits one icon per `social:` entry in config/site.yml,
+  resolved against app/icons/<key>.svg.
+
+  Signature line ("Built with Abqari · 2026" by default):
+    footer:
+      signature: false                   # hide entirely
+      signature: "© 2026 Acme"           # custom text
+      signature: "© {year} Acme"         # `{year}` substitutes the
+                                         #   current year at build time
+      # (unset)                          # default "Built with Abqari · <year>"
+
+  Copyright — off by default. When enabled, REPLACES the year portion
+  of the default signature, so "Built with Abqari · <year>" becomes
+  "Built with Abqari · © <year> <author>". Has no effect when the
+  signature is set to a custom string (you're being explicit) or to
+  false (no signature line to extend):
+    footer:
+      copyright: false                   # default — signature stays "· <year>"
+      copyright: true                    # signature becomes
+                                         #   "Built with Abqari · © <year> <site.author>"
+      copyright: "© {year} Acme Ltd."    # custom text in the same slot
+
+  Layout:
+    [footer-links row, when present]
+    [signature on the left] -------- [social icons on the right]
+%>
+<%
+  # Resolve the copyright slot first — it feeds into the default
+  # signature below. Three states:
+  #   false / nil → nil (signature uses bare year)
+  #   true        → "© <year> <site.author>"
+  #   string      → custom text with `{year}` substitution
+  current_year  = local_time(Time.now, format: '%Y')
+  copyright_cfg = site.config.dig('footer', 'copyright')
+  copyright = case copyright_cfg
+              when true       then "© #{current_year} #{site.config['author']}".strip
+              when false, nil then nil
+              else                 copyright_cfg.to_s.gsub('{year}', current_year)
+              end
+
+  # Resolve the signature line. Three states match `nav.brand`:
+  #   false  → omit the line
+  #   string → use as-is (with `{year}` substitution)
+  #   nil    → default "Built with Abqari · <year-or-copyright>"
+  signature_cfg = site.config.dig('footer', 'signature')
+  default_tail  = copyright || current_year
+  signature = case signature_cfg
+              when false then nil
+              when nil   then "Built with Abqari · #{default_tail}"
+              else            signature_cfg.to_s.gsub('{year}', current_year)
+              end
+%>
+<footer>
+  <%# `<footer>` stays full-width so a top border / background extends
+      edge-to-edge; the inner `.container` is what gets centred at the
+      responsive content width (matching the header and main). %>
+  <div class="container">
+    <% footer_links = site.footer_links %>
+    <% if footer_links.any? %>
+    <p class="footer-links">
+      <% footer_links.each_with_index do |link, i| %>
+        <%= ' · ' if i.positive? %><%== link_to link['label'], link['url'] %>
+      <% end %>
+    </p>
+    <% end %>
+
+    <div class="footer-bar">
+      <% if signature %>
+      <p class="footer-meta"><%= signature %></p>
+      <% end %>
+      <% socials = site.social_links %>
+      <% if socials.any? %>
+      <p class="footer-social">
+        <% socials.each do |entry| %>
+          <a href="<%= entry['url'] %>" aria-label="<%= entry['label'] %>" rel="me"><%== icon entry['icon'], width: '20', height: '20' %></a>
+        <% end %>
+      </p>
+      <% end %>
+    </div>
+  </div>
+</footer>

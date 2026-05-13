@@ -1,0 +1,95 @@
+<!--
+  Schema.org Course + CourseInstance JSON-LD for the workshops
+  collection. Workshops are simultaneously Events AND Courses —
+  emitting both lets the same page win rich results in either
+  surface (event carousel OR course directory). Google rolled out
+  the Course rich result in 2023; it's now well-supported.
+
+  Reads the same workshop frontmatter as `_event_jsonld`:
+    title, description, date_from, date_to, duration, location,
+    format, instructors, price, registration_url, image.
+
+  Renders nothing when frontmatter has no `date_from` AND no
+  `duration` — without either, the page isn't a real course offering.
+
+  Wire from `workshop.html.erb`:
+      <%%= render 'partials/course_jsonld' %>
+-->
+<%
+  fm = page.frontmatter
+%>
+<% if fm['date_from'] || fm['duration'] %>
+<%
+  site_url   = site.config['url'].to_s.sub(%r{/\z}, '')
+  page_url   = site_url.empty? ? page.url : "#{site_url}#{page.url}"
+
+  course = {
+    "@context"  => "https://schema.org",
+    "@type"     => "Course",
+    "name"      => page.title,
+    "provider"  => { "@type" => "Organization", "name" => site.config['title'], "sameAs" => "#{site_url}/" }.compact
+  }
+  course["description"] = fm['description'] if fm['description']
+  course["url"]         = page_url
+
+  if (img = fm['image'])
+    resolved = if img.to_s.start_with?('http://', 'https://')
+                 img
+               elsif img.to_s.start_with?('/')
+                 "#{site_url}#{img}"
+               else
+                 "#{site_url}#{bundle_asset_url_for(page, img)}"
+               end
+    course["image"] = resolved
+  end
+
+  fmt = fm['format'].to_s.downcase
+  course_mode = case
+                when fmt.include?('hybrid')                                then 'Blended'
+                when %w[remote online virtual].any? { |k| fmt.include?(k) } then 'Online'
+                else                                                            'Onsite'
+                end
+
+  instance = { "@type" => "CourseInstance", "courseMode" => course_mode }
+  if fm['date_from']
+    start_iso = to_time(fm['date_from']).iso8601
+    instance["startDate"] = start_iso
+    instance["endDate"]   = to_time(fm['date_to']).iso8601 if fm['date_to']
+  elsif fm['duration']
+    instance["courseWorkload"] = fm['duration'].to_s
+  end
+  instance["location"] = { "@type" => "Place", "name" => fm['location'].to_s } if fm['location']
+  instructors = Array(fm['instructors']).reject { |i| i.to_s.strip.empty? }
+  if instructors.any?
+    instance["instructor"] = instructors.map { |n| { "@type" => "Person", "name" => n.to_s } }
+  end
+
+  # Google's Course rich-result requirement: at least one
+  # `hasCourseInstance`. The instance carries dates / mode / location;
+  # the parent Course carries the title / description / provider.
+  course["hasCourseInstance"] = instance
+
+  # Offers — same parsing path as the Event partial.
+  if (price_str = fm['price']) && fm['registration_url']
+    digits = price_str.to_s.gsub(/[^\d.]/, '')
+    if !digits.empty?
+      currency = case price_str.to_s
+                 when /\A\$/                 then 'USD'
+                 when /\A£/                  then 'GBP'
+                 when /\A€/                  then 'EUR'
+                 when /\A¥/                  then 'JPY'
+                 when /\AS\$/, /SGD/         then 'SGD'
+                 else                             'USD'
+                 end
+      course["offers"] = {
+        "@type"         => "Offer",
+        "category"      => "Paid",
+        "price"         => digits,
+        "priceCurrency" => currency,
+        "url"           => fm['registration_url']
+      }
+    end
+  end
+%>
+<script type="application/ld+json"><%== JSON.generate(course.compact) %></script>
+<% end %>

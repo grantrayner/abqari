@@ -1,0 +1,100 @@
+---
+layout: application
+---
+<!--
+  Layout for a single image-centric post — a photograph with caption,
+  location, and equipment metadata. Use it by setting `layout: photo` in
+  the post's front matter:
+
+      ---
+      layout: photo
+      title: Pistachio Man
+      caption: A man at a small shop selling pistachios.
+      date: 2025-07-21
+      city: Fayzabad
+      country: Afghanistan
+      camera: Leica Q2
+      series: Afghanistan 2025
+      image: /assets/photos/20250721-af-L1020343.webp
+      ---
+
+  Plays well with two Abqari taxonomies most photo blogs want:
+
+    taxonomies:
+      countries: { field: country, permalink: /country/:slug/, layout: country_index }
+      series:    { field: series,  permalink: /series/:slug/,  layout: series_index }
+
+  The `country` and `series` links below resolve to those auto-generated
+  taxonomy pages.
+-->
+<article class="photo">
+  <%== render 'partials/draft_banner' %>
+  <%== render 'partials/future_banner' %>
+  <%== render 'partials/back_to_index' %>
+
+  <% if page.frontmatter['image'] %>
+    <img class="photo__image"
+         src="<%= sanitized_url(page.frontmatter['image']) %>"
+         alt="<%= page.frontmatter['caption'] || page.title %>"
+         fetchpriority="high">
+  <% end %>
+
+  <header>
+    <h1 class="photo__title"><%= page.title %></h1>
+    <% if page.frontmatter['caption'] %>
+      <p class="photo__caption"><%= page.frontmatter['caption'] %></p>
+    <% end %>
+  </header>
+
+  <%# <dl> with each term/definition pair wrapped in a <div> — modern
+      pattern that lets CSS lay each row out as a flex/grid pair without
+      JS or :has() gymnastics. Both forms are valid HTML; this one is
+      easier to style row-by-row. %>
+  <dl class="photo__meta">
+    <% if page.date %>
+      <div>
+        <dt>Date</dt>
+        <dd><time datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time></dd>
+      </div>
+    <% end %>
+
+    <% if page.frontmatter['city'] || page.frontmatter['country'] %>
+      <div>
+        <dt>Location</dt>
+        <dd>
+          <%= page.frontmatter['city'] %><%= ', ' if page.frontmatter['city'] && page.frontmatter['country'] %>
+          <% if page.frontmatter['country'] %>
+            <a href="<%= taxonomy_url('countries', page.frontmatter['country']) %>"><%= page.frontmatter['country'] %></a>
+          <% end %>
+        </dd>
+      </div>
+    <% end %>
+
+    <% if page.frontmatter['camera'] %>
+      <div>
+        <dt>Camera</dt>
+        <dd><%= page.frontmatter['camera'] %><% if page.frontmatter['type'] %> (<%= page.frontmatter['type'] %>)<% end %></dd>
+      </div>
+    <% end %>
+
+    <% if page.frontmatter['series'] %>
+      <div>
+        <dt>Series</dt>
+        <dd><a href="<%= taxonomy_url('photos_series', page.frontmatter['series']) %>"><%= page.frontmatter['series'] %></a></dd>
+      </div>
+    <% end %>
+  </dl>
+
+  <%== page.content %>
+</article>
+
+<%# Related photos — driven by `collections.photos.related.match_by`
+    (defaults to series + country + tags, in priority order). The
+    partial renders nothing when there are no matches, so the photo
+    page just ends after the article. %>
+<%== render 'partials/related_items' %>
+
+<%# Schema.org ImageObject — surfaces the photo to Google Images
+    with caption, location, date, and credit metadata. Renders nothing
+    when the page has no `image:` frontmatter. %>
+<%== render 'partials/image_object_jsonld' %>

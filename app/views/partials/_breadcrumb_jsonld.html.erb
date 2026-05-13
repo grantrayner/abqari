@@ -1,0 +1,60 @@
+<!--
+  Schema.org BreadcrumbList JSON-LD. Builds a 2-3 item trail
+  automatically from the page's collection (or its index ancestry):
+
+    Home → Posts → Building with Abqari       (post show)
+    Home → Photos → Old city walls            (photo show)
+    Home → Publications → An Atlas of …       (publication show)
+    Home → Workshops → Crisis Response …      (workshop show)
+    Home → Posts                              (posts index)
+
+  Slug-aware: if `posts.slug: stories`, the middle crumb reads
+  "Stories" and links to `/stories/`. The label is title-cased from
+  the effective collection name; override with a per-page
+  `breadcrumb_parent_label:` if needed.
+
+  Renders nothing when:
+    - the site has no `url:` configured (need absolute IDs)
+    - the page has no collection AND no detectable collection-index
+      ancestry (home, About, top-level pages)
+
+  Use it from any show or index layout:
+      <%%= render 'partials/breadcrumb_jsonld' %>
+-->
+<%
+  site_url = site.config['url'].to_s.sub(%r{/\z}, '')
+  coll_for_show  = page.respond_to?(:collection) ? page.collection : nil
+  coll_for_index = site.collection_index_name(page) if page.respond_to?(:source_path)
+  coll_name      = coll_for_show || coll_for_index
+%>
+<% if !site_url.empty? && coll_name %>
+<%
+  cfg          = site.collection_config(coll_name) || {}
+  effective    = cfg['slug'].to_s.empty? ? coll_name : cfg['slug'].to_s
+  parent_url   = "#{site_url}/#{effective}/"
+  parent_label = page.frontmatter['breadcrumb_parent_label'] ||
+                 effective.capitalize
+
+  crumbs = [
+    { "@type" => "ListItem", "position" => 1, "name" => 'Home', "item" => "#{site_url}/" },
+    { "@type" => "ListItem", "position" => 2, "name" => parent_label, "item" => parent_url }
+  ]
+
+  # When this page IS the collection index, the trail stops at "Home →
+  # Posts". When it's a show page (page.collection set), append a third
+  # crumb pointing at the current page.
+  if coll_for_show
+    crumbs << { "@type" => "ListItem",
+                "position" => 3,
+                "name"     => page.title.to_s,
+                "item"     => "#{site_url}#{page.url}" }
+  end
+
+  jsonld = {
+    "@context"        => "https://schema.org",
+    "@type"           => "BreadcrumbList",
+    "itemListElement" => crumbs
+  }
+%>
+<script type="application/ld+json"><%== JSON.generate(jsonld) %></script>
+<% end %>

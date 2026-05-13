@@ -1,0 +1,19 @@
+<!--
+  Home module — contact. Wraps the spam-resistant contact button in a
+  home-module section so it sits alongside the other home modules
+  visually. Renders nothing when `contact:` isn't configured in
+  config/site.yml (the inner partial guards on that).
+
+  Toggled by `home.contact: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  contact_cfg = site.config['contact'] || {}
+  has_email = contact_cfg['email'].to_s.include?('@')
+%>
+<% if has_email %>
+<section class="home-module home-module--contact" aria-label="Get in touch">
+  <h2 class="home-module__heading">Get in touch</h2>
+  <%== render 'partials/contact_button' %>
+</section>
+<% end %>

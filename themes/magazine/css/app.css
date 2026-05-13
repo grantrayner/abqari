@@ -1,0 +1,201 @@
+/* Magazine — serif headings with drop caps, warm cream palette,
+   editorial vibe. Inherits structural CSS from `_common.css`. This
+   file just sets:
+
+     1. Theme tokens (palette + serif fonts) for both light and dark
+     2. Light/dark mode overrides
+     3. Magazine-specific aesthetic refinements (drop cap, uppercase
+        nav, italic metadata, drop-shadow-free covers)
+*/
+
+
+/* ==========================================================================
+   Theme tokens
+   ========================================================================== */
+
+:root {
+  /* Base palette — warm cream */
+  --color-text:    #1a1410;
+  --color-bg:      #fbf8f3;
+  --color-muted:   #6e655c;
+  --color-link:    #a8431a;
+  --color-rule:    rgba(120, 90, 60, 0.18);
+  --color-card-bg: #fff;
+  --color-code-bg: rgba(120, 90, 60, 0.08);
+
+  /* Component palette */
+  --color-primary:        #a8431a;     /* warm rust */
+  --color-on-primary:     #fff;
+  --color-secondary:      #6e655c;
+  --color-on-secondary:   #fff;
+  --color-success:        #4a7c4f;
+  --color-on-success:     #fff;
+  --color-danger:         #b04030;
+  --color-on-danger:      #fff;
+  --color-warning:        #b8860b;
+  --color-on-warning:     #1a1410;
+  --color-info:           #6789a8;
+  --color-on-info:        #fff;
+  --color-light:          #fbf8f3;
+  --color-on-light:       #1a1410;
+  --color-dark:           #1a1410;
+  --color-on-dark:        #fbf8f3;
+
+  /* Typography — serif body, display-serif headings. Magazine's
+     body/heading are both serif, so `--font-sans` (used by buttons +
+     nav + footer in `_common.css`) explicitly declares the standard
+     system sans stack — buttons stay crisp against the serif body. */
+  --font-body:    "Charter", "Iowan Old Style", "Palatino", Georgia, serif;
+  --font-heading: "Playfair Display", "Charter", Georgia, serif;
+  --font-meta:    var(--font-body);
+  --font-mono:    ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark deltas — only redeclare values that differ from `:root`. The
+   `:not([data-theme="light"])` guard lets an explicit toggle to
+   light fall through to `:root`'s light defaults; no dedicated
+   `[data-theme="light"]` block needed. Both blocks must stay in
+   sync — pure CSS can't share rule bodies across selectors. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-text:    #ece4d6;
+    --color-bg:      #1a1612;
+    --color-muted:   #9d9080;
+    --color-link:    #e09060;
+    --color-rule:    rgba(220, 200, 170, 0.15);
+    --color-card-bg: #221d18;
+    --color-code-bg: rgba(220, 200, 170, 0.08);
+
+    --color-primary:        #e09060;          /* brighter rust for dark contrast */
+    --color-on-primary:     #1a1612;
+    --color-secondary:      #9d9080;
+    --color-on-secondary:   #1a1612;
+    --color-success:        #6ba872;
+    --color-on-success:     #1a1612;
+    --color-danger:         #d97070;
+    --color-on-danger:      #1a1612;
+    --color-warning:        #d4a040;
+    --color-on-warning:     #1a1612;
+    --color-info:           #8aa6c2;
+    --color-on-info:        #1a1612;
+    --color-light:          #221d18;
+    --color-on-light:       #ece4d6;
+    --color-dark:           #ece4d6;
+    --color-on-dark:        #1a1612;
+  }
+}
+
+[data-theme="dark"] {
+  --color-text:    #ece4d6;
+  --color-bg:      #1a1612;
+  --color-muted:   #9d9080;
+  --color-link:    #e09060;
+  --color-rule:    rgba(220, 200, 170, 0.15);
+  --color-card-bg: #221d18;
+  --color-code-bg: rgba(220, 200, 170, 0.08);
+
+  --color-primary:        #e09060;
+  --color-on-primary:     #1a1612;
+  --color-secondary:      #9d9080;
+  --color-on-secondary:   #1a1612;
+  --color-success:        #6ba872;
+  --color-on-success:     #1a1612;
+  --color-danger:         #d97070;
+  --color-on-danger:      #1a1612;
+  --color-warning:        #d4a040;
+  --color-on-warning:     #1a1612;
+  --color-info:           #8aa6c2;
+  --color-on-info:        #1a1612;
+  --color-light:          #221d18;
+  --color-on-light:       #ece4d6;
+  --color-dark:           #ece4d6;
+  --color-on-dark:        #1a1612;
+}
+
+
+/* ==========================================================================
+   Magazine-specific aesthetic refinements
+   ========================================================================== */
+
+/* Heading weights + tracking — display-serif character. */
+h1, h2, h3, h4 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Drop cap on the first paragraph of an article — the magazine signature. */
+article > p:first-of-type::first-letter {
+  font-family: var(--font-heading);
+  font-size: 4rem;
+  float: left;
+  line-height: 0.85;
+  margin: 0.25rem 0.5rem 0 0;
+  font-weight: 700;
+  color: var(--color-link);
+}
+
+/* Uppercase nav with display-serif tracking. */
+nav[aria-label="Primary"] {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.site-header { border-bottom: 2px solid var(--color-text); }
+body > footer { border-top: 2px solid var(--color-text); }
+
+/* Active nav link uses the same warm-rust `--color-primary` as the
+   hover state. Overrides the engine default (which sets active to
+   body text colour) with matching specificity — the theme stylesheet
+   loads after `_common.css`, so source-order resolves the tie. The
+   engine's `font-weight: 600` on active links stays. */
+nav[aria-label="Primary"] [aria-current="page"] {
+  color: var(--color-primary);
+}
+
+/* Italic metadata (date + reading time below post title). */
+article header p,
+.post-list__meta {
+  font-style: italic;
+}
+
+/* Pill-shaped tag chips. */
+.post-list__tag {
+  padding: 0.125rem 0.625rem;
+  background: var(--color-code-bg);
+  border-radius: var(--radius-pill);
+}
+.post-list__tag::before { content: ""; }
+
+/* Pagination — display-serif uppercase. */
+.pagination {
+  font-family: var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Code block — branded left border. */
+pre { border-left: 3px solid var(--color-link); }
+
+/* Italic quote with branded border. */
+blockquote {
+  border-left: 3px solid var(--color-link);
+  padding-left: 1.25rem;
+}
+
+/* Photo single-page — italic caption + uppercase metadata labels. */
+.photo__caption { font-style: italic; }
+.photo__meta dt {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* Italic descriptions in publications index. */
+.publications-index__description { font-style: italic; }
+.publications-index__title { font-family: var(--font-heading); }
+.gallery-index__title { font-family: var(--font-heading); }
+.gallery-index__location {
+  font-style: italic;
+}

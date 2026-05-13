@@ -1,0 +1,42 @@
+<!--
+  Spam-resistant contact button. Reads `contact:` from config/site.yml.
+
+  Anti-harvest technique:
+    - The email is split at the `@` into `data-user` and `data-domain`
+      attributes; the rendered HTML never contains a single string with `@`
+      in it, so naive scrapers can't reconstruct the address.
+    - There's no `mailto:` prefix in the HTML and no JS-readable string
+      that combines both halves until the user clicks.
+    - On click, contact-button.js joins the halves and opens mailto:.
+    - Without JS, the button does nothing — graceful degradation; the
+      partial intentionally does NOT fall back to a plain mailto:.
+
+  Renders nothing when the config block is missing or `enabled: false`.
+  Place anywhere by calling `<%%= render 'partials/contact_button' %%>`
+  from any layout. Already wired into the default about layout.
+
+  Default styling: `.btn .btn-outline-secondary` from _common.css.
+  Override with `css_class:` to swap the variant — e.g.
+      <%%= render 'partials/contact_button', css_class: 'btn btn-success' %%>
+      <%%= render 'partials/contact_button', css_class: 'btn btn-primary rounded-pill' %%>
+-->
+<%
+  cfg = site.config['contact'] || {}
+  email = cfg['email'].to_s
+  enabled = cfg.fetch('enabled', !email.empty?)
+%>
+<% if enabled && email.include?('@') %>
+  <% user, domain = email.split('@', 2) %>
+  <% label = cfg['label'] || 'Contact' %>
+  <% subject = cfg['subject'] %>
+  <% button_class = defined?(css_class) ? css_class.to_s : 'btn btn-outline-secondary' %>
+  <p class="contact-button-wrapper">
+    <button type="button" class="<%= button_class %>"
+            data-user="<%= user %>"
+            data-domain="<%= domain %>"
+            <%= subject ? %(data-subject="#{h(subject)}") : '' %>>
+      <%= label %>
+    </button>
+  </p>
+  <script src="<%= asset_path('js/contact-button.js') %>" defer></script>
+<% end %>

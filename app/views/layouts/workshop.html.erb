@@ -1,0 +1,155 @@
+---
+layout: application
+---
+<!--
+  Workshop detail page — a single training offering / workshop.
+  Reads structured metadata from frontmatter; the body markdown
+  describes the workshop in detail (curriculum, outcomes, format
+  specifics, who it's for, etc.).
+
+  Frontmatter:
+
+      ---
+      layout: workshop
+      title: Crisis Response Foundations
+      description: A two-day workshop on building crisis-response capability.
+      date_from: 2026-06-15            # optional — start date
+      date_to:   2026-06-16            # optional — paired with date_from
+      duration:  2 days                # optional — fallback when dates
+                                       #   aren't fixed (evergreen workshops)
+      location:  Singapore             # optional — city / country / "Remote"
+      format:    In-person             # optional — In-person / Remote / Hybrid
+      instructors:                     # optional — one or many
+        - Grant Rayner
+        - Jane Doe
+      price:     $1,495                # optional — string or number
+      registration_url: https://...    # optional — CTA button target
+      image:     hero.jpg              # optional — wide hero image,
+                                       #   relative within the bundle
+                                       #   (renders between header and meta)
+      tags: [crisis-management]
+      ---
+
+  All metadata fields are optional. Each `<dl>` row only renders
+  when its frontmatter is set, and the `<dl>` itself is omitted
+  if no metadata fields are present.
+
+  When `date_from` is set, the dates row renders with `<time>`
+  elements (machine-readable + display-formatted). Otherwise
+  `duration` is used as the fallback (useful for evergreen
+  workshop templates offered on request).
+
+  Renders nothing about the workshop when the page lacks all
+  metadata — body markdown still renders, so a workshop page
+  with only title + body works fine.
+
+  Hero rendering is gated by `collections.workshops.show.show_image`
+  in config/site.yml — set it to `false` to suppress the hero across
+  the whole collection without editing each workshop's frontmatter.
+  The matching toggle on the index card is
+  `collections.workshops.index.show_image`; the two are intentionally
+  independent so you can show a cover in the listing but not on the
+  detail page (or vice versa).
+-->
+<%
+  fm = page.frontmatter
+  date_from        = fm['date_from']
+  date_to          = fm['date_to']
+  duration         = fm['duration']
+  location         = fm['location']
+  format           = fm['format']
+  instructors      = Array(fm['instructors']).reject { |i| i.to_s.strip.empty? }
+  price            = fm['price']
+  registration_url = fm['registration_url']
+
+  has_meta   = date_from || duration || location || format || instructors.any? || price
+
+  show_cfg   = (site.collection_config('workshops')['show'] || {})
+  show_image = show_cfg.fetch('show_image', true)
+%>
+<article class="workshop">
+  <%== render 'partials/draft_banner' %>
+  <%== render 'partials/future_banner' %>
+  <%== render 'partials/back_to_index' %>
+
+  <header>
+    <h1><%= page.title %></h1>
+    <% if (description = fm['description']) && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+    <% if show_image && (hero = fm['image']) %>
+      <img class="workshop__hero"
+           src="<%= sanitized_url(bundle_asset_url(hero)) %>"
+           alt="<%= page.title %>"
+           loading="eager">
+    <% end %>
+  </header>
+
+  <%# Workshop metadata. `<dl>` with each row wrapped in a `<div>` —
+      lets CSS lay each pair out as a flex/grid row without `:has()`
+      gymnastics, same pattern as `.photo__meta`. %>
+  <% if has_meta %>
+    <dl class="workshop__meta">
+      <% if date_from %>
+        <div>
+          <dt>When</dt>
+          <dd>
+            <time datetime="<%= to_time(date_from).iso8601 %>"><%= local_time(date_from) %></time>
+            <% if date_to %>
+              &ndash;
+              <time datetime="<%= to_time(date_to).iso8601 %>"><%= local_time(date_to) %></time>
+            <% end %>
+          </dd>
+        </div>
+      <% elsif duration %>
+        <div><dt>Duration</dt><dd><%= duration %></dd></div>
+      <% end %>
+
+      <% if location %>
+        <div><dt>Location</dt><dd><%= location %></dd></div>
+      <% end %>
+
+      <% if format %>
+        <div><dt>Format</dt><dd><%= format %></dd></div>
+      <% end %>
+
+      <% if instructors.any? %>
+        <div>
+          <dt><%= instructors.size > 1 ? 'Instructors' : 'Instructor' %></dt>
+          <dd><%= instructors.map { |i| h(i) }.join(', ') %></dd>
+        </div>
+      <% end %>
+
+      <% if price %>
+        <div><dt>Price</dt><dd><%= price %></dd></div>
+      <% end %>
+    </dl>
+  <% end %>
+
+  <% if registration_url && (safe_registration_url = sanitized_url(registration_url)) %>
+    <p class="workshop__cta">
+      <a href="<%= safe_registration_url %>" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Register</a>
+    </p>
+  <% end %>
+
+  <%== page.content %>
+</article>
+
+<%# Testimonials about this workshop — pulls from data/testimonials.yml
+    entries where `collection: workshops` matches this page's slug. The
+    partial renders nothing when there are no matches. %>
+<%== render 'partials/testimonials', subject: page, heading: 'What attendees say' %>
+
+<%== render 'partials/related_items' %>
+
+<%# Schema.org Event JSON-LD — renders nothing when `date_from` is
+    absent (evergreen workshops aren't real Events). Otherwise carries
+    startDate/endDate, location (or VirtualLocation for remote), offers,
+    performers (instructors), and organizer for rich-snippet eligibility. %>
+<%== render 'partials/event_jsonld' %>
+
+<%# Schema.org Course + CourseInstance — workshops are both events
+    AND courses semantically, and Google has separate rich-result
+    surfaces for each. Emitting both lets the page win in either
+    carousel. Renders when frontmatter has `date_from:` or `duration:`. %>
+<%== render 'partials/course_jsonld' %>

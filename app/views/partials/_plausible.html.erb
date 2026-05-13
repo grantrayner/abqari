@@ -1,0 +1,24 @@
+<!--
+  Plausible analytics. Renders only when `plausible.enabled: true` AND
+  `plausible.key` are both set in config/site.yml:
+
+      plausible:
+        enabled: true
+        key: pa-abc123        # the slug in https://plausible.io/js/<key>.js
+
+  The CSP is auto-extended in lib/abqari/headers_file.rb when this
+  block is enabled, so the strict 'self'-only policy stays intact
+  otherwise.
+
+  The inline boot script lives at lib/abqari/plausible_script.rb so
+  its SHA256 hash is computed at the same place CSP picks it up.
+-->
+<%
+  cfg = site.config['plausible'] || {}
+  show = cfg['enabled'] == true && !cfg['key'].to_s.empty?
+%>
+<% if show %>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/<%= cfg['key'] %>.js"></script>
+<script><%== Abqari::PlausibleScript::SCRIPT %></script>
+<% end %>

@@ -1,0 +1,71 @@
+<!--
+  Post list — the cards on /<posts-slug>/ and tag-index pages. Each
+  card is title, optional hero image, date, truncated description,
+  reading time, and tags, all toggled via `collections.posts.index.*`
+  in config/site.yml:
+
+    collections:
+      posts:
+        index:
+          show_image: true               # render hero image when post
+                                         # has `image:` in frontmatter
+          show_date: true
+          show_description: true
+          description_truncate: 160      # characters
+          show_reading_time: true
+          show_tags: false
+
+  The semantic class names (`.post-list__cover`, `.post-list__title`,
+  `.post-list__body`, etc.) are theme-neutral hooks. Themes style them
+  to match their visual language — the `bootstrap` theme renders cards
+  with a cover-on-left layout, `minimal` renders a flat list. Edit
+  themes/<name>/css/app.css to change appearance; edit this partial
+  to change structure or add fields.
+-->
+<%
+  cfg = (site.collection_config('posts')['index'] || {})
+  show_image        = cfg.fetch('show_image',        true)
+  show_date         = cfg.fetch('show_date',         true)
+  show_description  = cfg.fetch('show_description',  true)
+  show_reading_time = cfg.fetch('show_reading_time', true)
+  show_tags         = cfg.fetch('show_tags',         false)
+  truncate_at       = cfg.fetch('description_truncate', 160)
+%>
+<ul class="post-list">
+  <% posts.each do |post| %>
+    <li class="post-list__item">
+      <% if show_image && (img = post.frontmatter['image']) %>
+        <a class="post-list__cover" href="<%= post.url %>">
+          <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+        </a>
+      <% end %>
+
+      <div class="post-list__body">
+        <h2 class="post-list__title">
+          <% if (pos = post.frontmatter['series_position']) %><span class="series-position">#<%= pos %></span> <% end %><a href="<%= post.url %>"><%= post.title %></a>
+        </h2>
+
+        <% if show_date && post.date %>
+          <p class="post-list__meta">
+            <time datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
+            <% if show_reading_time && post.respond_to?(:content) && post.content.to_s.length.positive? %>
+              · <%= reading_time(post.content) %>
+            <% end %>
+          </p>
+        <% end %>
+
+        <% if show_description && (desc = post.frontmatter['description'].to_s) && !desc.empty? %>
+          <p class="post-list__description"><%= truncate(desc, length: truncate_at) %></p>
+        <% end %>
+
+        <% if show_tags && post.tags.any? %>
+          <p class="post-list__tags">
+            <% post.tags.each do |tag| %>
+              <a class="post-list__tag" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
+            <% end %>
+          </p>
+        <% end %>
+      </div>
+    </li>
+  <% end %>
+</ul>

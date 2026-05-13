@@ -1,0 +1,376 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <%# `color-scheme` tells the browser the page works in both modes,
+      so it can prepare the right initial render (form controls, scroll
+      bars, native UI) without a flash. `format-detection` blocks iOS
+      from auto-linking phone-number-shaped strings in body text
+      (e.g. ISBNs, dates), which look like phone numbers to its
+      heuristics. %>
+  <meta name="color-scheme" content="light dark">
+  <meta name="format-detection" content="telephone=no">
+  <%# Hydrates the user's saved theme preference (light/dark) onto <html>
+      before render to avoid a flash of the wrong theme. The strict CSP
+      pins this script by SHA256 hash — no 'unsafe-inline' needed. %>
+  <script><%== Abqari::ThemeBootstrap::SCRIPT %></script>
+  <title><%= page.title %> · <%= site.config['title'] %></title>
+  <% if page.description %>
+  <meta name="description" content="<%= page.description %>">
+  <% end %>
+
+  <%
+    # Site base URL (no trailing slash). Falls back to empty string so
+    # everything downstream still concatenates safely when the site
+    # owner hasn't configured `url:` yet.
+    site_url    = site.config['url'].to_s.sub(%r{/\z}, '')
+    abs_url     = site_url + page.url
+
+    # Per-page robots meta — `robots: noindex` (or any directive list)
+    # in frontmatter wins over the global robots.txt for fine-grained
+    # control. Useful for archive shards, search-results pages, etc.
+    robots_meta = page.frontmatter['robots']
+
+    # Author resolution — per-post `author:` frontmatter overrides the
+    # site-wide author. Used in JSON-LD and (optionally) bylines.
+    page_author = page.frontmatter['author'] || site.config['author'] || site.config['title']
+
+    # Twitter identity — site-level handles plus a per-post creator
+    # override. All optional; meta tags only emit when set.
+    twitter_cfg   = site.config['twitter'] || {}
+    twitter_site  = twitter_cfg['site']
+    twitter_creator = page.frontmatter['twitter_creator'] || twitter_cfg['creator']
+
+    # Share image — resolution chain:
+    #   1. Page frontmatter `share_image:` (explicit social override)
+    #   2. Page frontmatter `image:` / `cover:` (the hero — most common)
+    #   3. Auto-generated OG card at `<page-url>og.svg` when
+    #      `og_images.auto: true` is enabled in config — the build
+    #      step (OgImageGenerator) writes a styled SVG per page that
+    #      uses the site's theme colours + page title + author + date.
+    #   4. Site-wide `share_image:` config (final fallback)
+    # Returns absolute URL for OG/Twitter or nil to skip.
+    auto_og_path = if site.config.dig('og_images', 'auto') &&
+                      page.frontmatter['share_image'].to_s.empty? &&
+                      page.frontmatter['image'].to_s.empty? &&
+                      page.frontmatter['cover'].to_s.empty?
+                     "#{page.url}og.svg"
+                   end
+    raw_share = page.frontmatter['share_image'] ||
+                page.frontmatter['image'] ||
+                page.frontmatter['cover'] ||
+                auto_og_path ||
+                site.config['share_image']
+    share_image = if raw_share.nil? || raw_share.to_s.empty?
+                    nil
+                  elsif raw_share.start_with?('http://', 'https://')
+                    raw_share
+                  elsif raw_share.start_with?('/')
+                    "#{site_url}#{raw_share}"
+                  else
+                    "#{site_url}#{bundle_asset_url_for(page, raw_share)}"
+                  end
+    share_image_alt = page.frontmatter['share_image_alt'] || page.title
+    # Image dimensions for `og:image:width` / `og:image:height`. Some
+    # social validators (notably LinkedIn) fail silently when missing.
+    # Defaults depend on the source: auto-OG cards are 1200×630
+    # (OG-spec dimensions), engine hero SVGs are 1600×900. Users
+    # uploading their own assets can override either via frontmatter:
+    #   share_image_width:  1200
+    #   share_image_height:  630
+    is_auto_og        = share_image && auto_og_path && raw_share == auto_og_path
+    default_share_w   = is_auto_og ? 1200 : 1600
+    default_share_h   = is_auto_og ?  630 :  900
+    share_image_width  = page.frontmatter['share_image_width']  || (share_image ? default_share_w : nil)
+    share_image_height = page.frontmatter['share_image_height'] || (share_image ? default_share_h : nil)
+    twitter_card    = share_image ? 'summary_large_image' : 'summary'
+
+    # LCP preload — when the page renders a hero on its show view, the
+    # hero is usually the Largest Contentful Paint candidate. Preloading
+    # cuts 200-400ms off LCP on cold loads because the fetch starts
+    # before body parsing. We only preload the page's own `image:` —
+    # site-wide `share_image` fallbacks aren't visible on the page, so
+    # preloading them wastes bandwidth. External URLs aren't worth
+    # preloading either (the connection setup eats most of the gain).
+    lcp_raw = page.frontmatter['image']
+    lcp_preload = if lcp_raw.nil? || lcp_raw.to_s.empty?
+                    nil
+                  elsif lcp_raw.to_s.start_with?('http://', 'https://')
+                    nil
+                  elsif lcp_raw.to_s.start_with?('/')
+                    lcp_raw.to_s
+                  else
+                    bundle_asset_url_for(page, lcp_raw)
+                  end
+  %>
+
+  <%# Self-canonical on every page, including paginated shards. Matches
+      Google's current guidance (since 2019): /posts/archive/page/2/
+      canonicalises to itself, not /posts/archive/. Rolling up paginated
+      pages can split ranking signal in unintended ways; self-canonical
+      lets each shard accumulate its own. rel="prev"/"next" emitted
+      below — Google doesn't use them for SEO anymore but feed readers
+      and assistive tech still do. %>
+  <%# LCP image preload — fetches the hero image in parallel with the
+      HTML parse, so the LCP candidate is on its way before body
+      rendering even starts. Set `fetchpriority="high"` for explicit
+      priority hint; modern browsers honour it. %>
+  <% if lcp_preload %>
+  <link rel="preload" as="image" href="<%= sanitized_url(lcp_preload) %>" fetchpriority="high">
+  <% end %>
+
+  <% if site.config['url'] %>
+  <link rel="canonical" href="<%= abs_url %>">
+  <% end %>
+  <% if robots_meta && !robots_meta.to_s.empty? %>
+  <meta name="robots" content="<%= robots_meta %>">
+  <% end %>
+  <% paginator = page.respond_to?(:paginator) ? page.paginator : nil %>
+  <% if paginator && paginator.prev_url %>
+  <link rel="prev" href="<%= sanitized_url(paginator.prev_url) %>">
+  <% end %>
+  <% if paginator && paginator.next_url %>
+  <link rel="next" href="<%= sanitized_url(paginator.next_url) %>">
+  <% end %>
+
+  <%# Per-page `robots:` frontmatter still wins above; this is the
+      always-on baseline. `max-image-preview: large` tells Google that
+      large image previews are welcome in SERPs (the default these days,
+      but explicit doesn't hurt). When a per-page `robots:` value is set,
+      we don't emit this — caller is being deliberate. %>
+  <% if robots_meta.to_s.empty? %>
+  <meta name="robots" content="max-image-preview:large">
+  <% end %>
+
+  <meta property="og:title" content="<%= page.title %>">
+  <% if page.description %>
+  <meta property="og:description" content="<%= page.description %>">
+  <% end %>
+  <meta property="og:type" content="<%= page.respond_to?(:post?) && page.post? ? 'article' : 'website' %>">
+  <meta property="og:site_name" content="<%= site.config['title'] %>">
+  <meta property="og:locale" content="<%= site.config['og_locale'] || site.config['locale'] || 'en' %>">
+  <% if site.config['url'] %>
+  <meta property="og:url" content="<%= abs_url %>">
+  <% end %>
+  <% if share_image %>
+  <meta property="og:image" content="<%= share_image %>">
+  <meta property="og:image:alt" content="<%= share_image_alt %>">
+  <% if share_image_width  %><meta property="og:image:width"  content="<%= share_image_width  %>"><% end %>
+  <% if share_image_height %><meta property="og:image:height" content="<%= share_image_height %>"><% end %>
+  <% end %>
+
+  <meta name="twitter:card" content="<%= twitter_card %>">
+  <meta name="twitter:title" content="<%= page.title %>">
+  <% if page.description %>
+  <meta name="twitter:description" content="<%= page.description %>">
+  <% end %>
+  <% if share_image %>
+  <meta name="twitter:image" content="<%= share_image %>">
+  <meta name="twitter:image:alt" content="<%= share_image_alt %>">
+  <% end %>
+  <% if twitter_site %>
+  <meta name="twitter:site" content="<%= twitter_site %>">
+  <% end %>
+  <% if twitter_creator %>
+  <meta name="twitter:creator" content="<%= twitter_creator %>">
+  <% end %>
+
+  <% if page.respond_to?(:post?) && page.post? && page.date %>
+  <%
+    body_text  = page.respond_to?(:content) ? page.content.to_s : ''
+    word_total = word_count(body_text)
+    # `dateModified` — falls back to the file's most-recent mtime
+    # (via Page#lastmod, which also accounts for bundle-asset edits).
+    # Lets Google show "updated" timestamps and rewards freshness.
+    last_mod   = page.respond_to?(:lastmod) ? page.lastmod : nil
+    date_mod   = last_mod && last_mod.respond_to?(:iso8601) ? last_mod.iso8601 : nil
+  %>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": <%== page.title.to_json %>,
+    "datePublished": "<%= page.date.iso8601 %>",
+    <% if date_mod %>"dateModified": <%== date_mod.to_json %>,<% end %>
+    <% if page.description %>"description": <%== page.description.to_json %>,<% end %>
+    <% if site.config['url'] %>"url": <%== abs_url.to_json %>,<% end %>
+    <% if site.config['url'] %>"mainEntityOfPage": { "@type": "WebPage", "@id": <%== abs_url.to_json %> },<% end %>
+    <% if share_image %>"image": <%== share_image.to_json %>,<% end %>
+    <% if word_total.positive? %>"wordCount": <%= word_total %>,<% end %>
+    "author": { "@type": "Person", "name": <%== page_author.to_json %> }
+  }
+  </script>
+  <% end %>
+
+  <%# Auto-discovery for every collection that has feeds enabled. Posts
+      keep the root /feed.xml + /feed.json paths; other collections
+      live under /<name>/feed.xml + /<name>/feed.json. When a collection
+      uses `slug:` to rename itself, the feed paths follow the slug.
+
+      Ordering: the current page's collection (when it's a collection
+      show or index page) is emitted FIRST so feed-reader autodiscovery
+      picks the most contextually-relevant feed. Other feeds follow. %>
+  <%
+    current_coll = (page.respond_to?(:collection) && page.collection) ||
+                   site.collection_index_name(page)
+    matching, others = site.collections.partition { |name, _| name == current_coll }
+    ordered_collections = matching + others
+  %>
+  <% ordered_collections.each do |coll_name, coll_cfg| %>
+    <% next unless coll_cfg.fetch('enabled', true) %>
+    <% feeds_enabled = coll_cfg.dig('feeds', 'enabled') %>
+    <% feeds_enabled = (coll_name == 'posts') if feeds_enabled.nil? %>
+    <% next unless feeds_enabled %>
+    <% effective_name = coll_cfg['slug'].to_s.empty? ? coll_name : coll_cfg['slug'].to_s %>
+    <% prefix = effective_name == 'posts' ? '' : "/#{effective_name}" %>
+    <% title = effective_name == 'posts' ? site.config['title'] : "#{site.config['title']} — #{effective_name.capitalize}" %>
+  <link rel="alternate" type="application/rss+xml"  href="<%= prefix %>/feed.xml"  title="<%= title %>">
+  <link rel="alternate" type="application/feed+json" href="<%= prefix %>/feed.json" title="<%= title %>">
+  <% end %>
+
+  <%# Favicons + PWA manifest. Run `bin/icons path/to/master.png` to generate
+      the full set into public/. Each <link> below is conditionally emitted —
+      only present in the rendered HTML when the file actually exists, so the
+      audit stays green for users who haven't generated icons yet. %>
+  <%
+    public_dir = File.join(Abqari::ROOT, 'public')
+    icon_links = {
+      'favicon-32x32.png'    => '<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">',
+      'favicon-16x16.png'    => '<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">',
+      'apple-touch-icon.png' => '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
+    }
+  %>
+  <% icon_links.each do |file, tag| %><% if File.exist?(File.join(public_dir, file)) %>
+  <%= tag %>
+  <% end %><% end %>
+  <link rel="manifest" href="/manifest.json">
+  <%
+    theme_color_light = site.config.dig('manifest', 'theme_color')
+    theme_color_dark  = site.config.dig('manifest', 'theme_color_dark')
+  %>
+  <% if theme_color_light && theme_color_dark %>
+  <%# Distinct light + dark `theme-color`s — browsers swap the active
+      value based on `prefers-color-scheme`, so the address-bar tint
+      matches the page in both modes. %>
+  <meta name="theme-color" content="<%= theme_color_light %>" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="<%= theme_color_dark %>"  media="(prefers-color-scheme: dark)">
+  <% else %>
+  <meta name="theme-color" content="<%= theme_color_light || '#ffffff' %>">
+  <% end %>
+
+  <%# IndieWeb / Mastodon-style identity verification — every social
+      profile the site claims also points back here via `rel="me"`,
+      which forms a verified bidirectional link. The footer already
+      emits these on the rendered anchors; mirroring them as `<link>`
+      elements in the head makes the relationship discoverable by
+      crawlers that don't follow render layout. %>
+  <% site.social_links.each do |entry| %>
+  <link rel="me" href="<%= sanitized_url(entry['url']) %>">
+  <% end %>
+
+  <%# Cross-origin preconnect for Folio's storefront — when the site
+      is wired to a Folio account, the head emits Folio markup that
+      would otherwise wait until the browser parses the URLs to open
+      a connection. Preconnect shaves 50–200ms on connection setup. %>
+  <%
+    folio_cfg = site.config['folio'] || {}
+    folio_base = folio_cfg['base_url'].to_s
+    folio_author = folio_cfg['author_slug'].to_s
+  %>
+  <% if !folio_base.empty? && !folio_author.empty? %>
+  <link rel="preconnect" href="<%= sanitized_url(folio_base) %>" crossorigin>
+  <% end %>
+
+  <%# Speculation Rules — prerender posts the user is likely to click
+      (any `/posts/<slug>/` link in the current document). Modern
+      browsers (Chrome, Edge) act on this for measurably-faster
+      navigations; other browsers safely ignore it. Strict-CSP friendly:
+      no inline JS, just a typed JSON block. Toggle off with
+      `speculation_rules.enabled: false` in config.
+
+      The CSP-pinned inline guard JS below honours `prefers-reduced-data`
+      / `Save-Data` / `connection.saveData` — when the user has opted
+      into data-saving, the prerender block is removed before browsers
+      can act on it. This avoids burning bandwidth on metered users.
+      The script gets its own SHA256 entry in HeadersFile so strict CSP
+      stays clean. %>
+  <% spec_cfg = site.config['speculation_rules'] || {} %>
+  <% if spec_cfg.fetch('enabled', true) %>
+  <%
+    eagerness  = %w[conservative moderate eager].include?(spec_cfg['eagerness'].to_s) ? spec_cfg['eagerness'].to_s : 'moderate'
+    posts_slug = site.collection_config('posts')['slug'].to_s
+    posts_path = posts_slug.empty? ? 'posts' : posts_slug
+  %>
+  <script type="speculationrules" id="abqari-spec-rules">
+  { "prerender": [{ "source": "document",
+    "where": { "href_matches": "/<%= posts_path %>/*" },
+    "eagerness": "<%= eagerness %>" }] }
+  </script>
+  <script><%== Abqari::SpeculationRulesGuard::SCRIPT %></script>
+  <% end %>
+
+  <%# Font preload — explicit list of woff2 paths to fetch ASAP so
+      they're ready when the stylesheet wires up `@font-face`. Cuts
+      100–300ms of LCP delay on cold loads when set correctly. Find
+      the right paths by inspecting `vendor/fonts/fonts.css` for the
+      `latin` subset of the regular-weight body font. Optional; sites
+      that don't set it use the standard stylesheet path (slower
+      first-paint, no functional difference).
+        fonts_preload:
+          - /assets/fonts/abc123-latin-400.woff2
+          - /assets/fonts/def456-latin-600.woff2 %>
+  <% Array(site.config['fonts_preload']).each do |path| %>
+  <link rel="preload" href="<%= sanitized_url(path) %>" as="font" type="font/woff2" crossorigin>
+  <% end %>
+  <% if Array(site.config['fonts']).any? %>
+  <link rel="stylesheet" href="/assets/fonts/fonts.css">
+  <% end %>
+  <% if site.config.fetch('syntax_highlighting', true) %>
+  <link rel="stylesheet" href="/assets/css/syntax.css">
+  <% end %>
+  <%# Icon libraries.
+      - `fontawesome: true` loads the vendored Free dist from
+        public/fontawesome/. Strict-CSP-friendly, self-hosted.
+      - `fontawesome_kit: <kit-id>` loads the FA Pro kit from
+        kit.fontawesome.com (replaces the vendored link).
+        CSP is auto-extended for the kit's hosts in headers_file.rb.
+      - `bootstrap_icons: true` loads the vendored BI dist from
+        public/bootstrap-icons/.
+      Heroicons is a server-side helper (`heroicon(name)`) — no link
+      tag, so no head wiring. %>
+  <% icons_cfg = site.config['icons'] || {} %>
+  <% if (kit_id = icons_cfg['fontawesome_kit']) && !kit_id.to_s.empty? %>
+  <script src="https://kit.fontawesome.com/<%= kit_id %>.js" crossorigin="anonymous"></script>
+  <% elsif icons_cfg['fontawesome'] %>
+  <link rel="stylesheet" href="/fontawesome/css/all.min.css">
+  <% end %>
+  <% if icons_cfg['bootstrap_icons'] %>
+  <link rel="stylesheet" href="/bootstrap-icons/font/bootstrap-icons.min.css">
+  <% end %>
+  <%# Shared structural CSS (a11y primitives, layout standardisation, soft-tint
+      placeholders) loads first so theme app.css can override on cascade-equal
+      specificity. Bootstrap theme bundles its own version — skip _common
+      there to avoid duplicate rules. %>
+  <% unless %w[bootstrap none].include?(site.config['theme'].to_s) %>
+  <link rel="stylesheet" href="<%= asset_path('css/_common.css') %>">
+  <% end %>
+  <%# Bootstrap theme: load the vendored dist (copied from
+      themes/bootstrap/public/ at build time) before the theme's app.css so
+      project-level overrides win on cascade. The JS bundle covers
+      dropdowns / modals / collapses; static-only sites can ignore it. %>
+  <% if site.config['theme'].to_s == 'bootstrap' %>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <% end %>
+  <link rel="stylesheet" href="<%= asset_path('css/app.css') %>">
+  <%# Site-local override slot. Loaded AFTER the theme's app.css so a
+      site's CSS wins on cascade-equal specificity. Opt-in: create
+      `app/assets/css/site.css` in the consuming site to use it. When
+      the file doesn't exist `optional_asset_path` returns nil and
+      the link silently disappears. %>
+  <% if (site_css = optional_asset_path('css/site.css')) %>
+  <link rel="stylesheet" href="<%= site_css %>">
+  <% end %>
+  <% if site.config['theme'].to_s == 'bootstrap' %>
+  <script src="/js/bootstrap.bundle.min.js" defer></script>
+  <% end %>
+  <%== render 'partials/plausible' %>
+</head>

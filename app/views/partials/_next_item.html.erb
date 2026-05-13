@@ -1,0 +1,43 @@
+<!--
+  Renders a single "Up next" card below a show view, linking to the
+  chronologically-newer post in the same collection. "Next" means
+  strictly newer — at the newest post the section is suppressed
+  rather than falling back to an older neighbour (which would
+  contradict the label).
+
+  Reuses the `_post_list` partial's card markup, so cover and
+  per-card toggles inherit from `collections.posts.index` (`show_image`,
+  `show_date`, `show_description`, etc.). One card per render.
+
+  Hero behavior:
+    - Next post has `image:` → hero renders on the left of the card
+      at desktop (≥ 480px), pinned to 240px wide so it matches the
+      `.related__cover` thumbnails directly below it. Mobile stacks
+      cover-on-top, body-below — same reflow the related grid does
+      when there's not enough width for two columns.
+    - Next post has no `image:` → no cover renders, card falls back
+      to a text-only single-column layout. No placeholder tile —
+      it's a single emphasized card, so the visual-consistency
+      problem the related grid has (mix of cards) doesn't apply.
+
+  Usage:
+      <%%= render 'partials/next_item' %>
+
+  Config (per collection in config/site.yml):
+
+      collections:
+        posts:
+          next:
+            enabled: true       # set false to suppress the section
+
+  Renders nothing when the source is the newest in its collection,
+  there's no next page (e.g. the only post in a collection), or
+  `next.enabled` is false.
+-->
+<% next_post = site.next_in_collection(page) %>
+<% if next_post %>
+<section class="next-item" aria-labelledby="next-item-heading">
+  <h2 id="next-item-heading" class="next-item__heading">Up next</h2>
+  <%== render 'partials/post_list', posts: [next_post] %>
+</section>
+<% end %>

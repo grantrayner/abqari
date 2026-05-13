@@ -1,0 +1,49 @@
+<!--
+  Home module — random photo. Same pool-of-candidates + pick-on-page-
+  load pattern as `_random_post.html.erb`. See that file's head
+  comment for the rationale (static sites can't roll randomness at
+  request time; `random-pool.js` handles it client-side).
+
+  Toggled by `home.random_photo: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  pool_cap = 12
+  candidates = site.collection('photos').first(pool_cap)
+%>
+<% if candidates.any? %>
+<section class="home-module home-module--random-photo" aria-label="From the gallery">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">From the gallery</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('photos')) %>">All <%= collection_index_label('photos') %> &rarr;</a>
+  </header>
+  <div class="home-module__pool" data-random-pool>
+    <% candidates.each_with_index do |photo, i| %>
+      <article class="home-module__item"<%= ' hidden' if i.positive? %>>
+        <% if (img = photo.frontmatter['image']) %>
+          <a class="home-module__cover" href="<%= sanitized_url(photo.url) %>">
+            <img src="<%= sanitized_url(img) %>" alt="<%= photo.frontmatter['caption'] || photo.title %>" loading="lazy">
+          </a>
+        <% end %>
+        <div class="home-module__body">
+          <h3 class="home-module__title">
+            <a href="<%= sanitized_url(photo.url) %>"><%= photo.title %></a>
+          </h3>
+          <% if photo.date %>
+            <p class="home-module__meta">
+              <time datetime="<%= photo.date.iso8601 %>"><%= local_time(photo.date) %></time>
+              <% if photo.frontmatter['country'] %>
+                · <%= photo.frontmatter['country'] %>
+              <% end %>
+            </p>
+          <% end %>
+          <% if (caption = photo.frontmatter['caption']) %>
+            <p class="home-module__description"><%= truncate(caption.to_s, length: 200) %></p>
+          <% end %>
+        </div>
+      </article>
+    <% end %>
+  </div>
+  <script src="<%= asset_path('js/random-pool.js') %>" defer></script>
+</section>
+<% end %>

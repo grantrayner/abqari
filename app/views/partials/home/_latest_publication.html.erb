@@ -1,0 +1,39 @@
+<!--
+  Home module — latest publication. Pulls the most recent entry from
+  the publications collection (manual entries; Folio publications
+  appear here only when they have a corresponding override page in
+  content/publications/<slug>/index.md). Renders cover thumbnail when
+  one is set in frontmatter (`cover:` or `cover_image:`).
+
+  Toggled by `home.latest_publication: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  pub = site.collection('publications').first
+%>
+<% if pub %>
+<section class="home-module home-module--latest-publication" aria-label="Latest publication">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">Latest publication</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('publications')) %>">All <%= collection_index_label('publications') %> &rarr;</a>
+  </header>
+  <article class="home-module__item">
+    <% if (cover = pub.frontmatter['cover'] || pub.frontmatter['cover_image']) %>
+      <a class="home-module__cover" href="<%= sanitized_url(pub.url) %>">
+        <img src="<%= sanitized_url(cover) %>" alt="<%= pub.title %> cover" loading="lazy">
+      </a>
+    <% end %>
+    <div class="home-module__body">
+      <h3 class="home-module__title">
+        <a href="<%= sanitized_url(pub.url) %>"><%= pub.title %></a>
+      </h3>
+      <% if (tagline = pub.frontmatter['tagline']) %>
+        <p class="home-module__tagline"><%= tagline %></p>
+      <% end %>
+      <% if (desc = pub.frontmatter['description'].to_s) && !desc.empty? %>
+        <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+    </div>
+  </article>
+</section>
+<% end %>

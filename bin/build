@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Build the site. Flags:
+#   --verbose / -v   — set ABQARI_LOG=debug for extra build-time output
+#                      (incremental decisions, parallel slice info,
+#                      cache hits, etc.).
+#   --quiet   / -q   — set ABQARI_LOG=warn to suppress info-level lines.
+
+require 'optparse'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/build [--verbose|--quiet]'
+  opts.on('-v', '--verbose', 'Verbose build output (ABQARI_LOG=debug)') { options[:log] = 'debug' }
+  opts.on('-q', '--quiet',   'Suppress info-level output (ABQARI_LOG=warn)') { options[:log] = 'warn' }
+end.parse!(ARGV)
+
+# CLI flag wins over env so an explicit `--verbose` on the command line
+# beats a stale ABQARI_LOG=warn in the shell.
+ENV['ABQARI_LOG']         = options[:log] if options[:log]
+ENV['ABQARI_ENV']       ||= 'production'
+# Pin the site root to the script's parent so `bin/build` works
+# regardless of the cwd.
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+
+Abqari::Site.new.build

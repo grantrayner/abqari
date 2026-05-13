@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Audit the site for common issues. Rebuilds first, then walks _site/ for:
+#   - Broken internal links
+#   - SEO problems (titles, descriptions, duplicates)
+#   - Accessibility (missing alt text, multiple h1s)
+#   - Privacy (external resources)
+#   - Dependency CVEs (if bundle-audit is installed) + outdated gems
+#   - Content issues (missing descriptions, single-use tags)
+#
+# Output: audit/<YYYY-MM-DD-HHMM>.md
+#
+# Flags:
+#   --strict           — exit non-zero when any error-severity finding is
+#                        present. Wire this into CI to gate merges on a
+#                        clean audit.
+#   --strict=warn      — exit non-zero on errors AND warnings.
+#   --verbose / -v     — set ABQARI_LOG=debug for extra build output.
+
+require 'optparse'
+
+options = { strict: nil, log: nil }
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/audit [--strict[=warn]] [--verbose]'
+  opts.on('--strict[=LEVEL]', %w[error warn],
+          'Exit non-zero when findings exist at LEVEL or above (default: error)') do |level|
+    options[:strict] = level || 'error'
+  end
+  opts.on('-v', '--verbose', 'Verbose output (ABQARI_LOG=debug)') { options[:log] = 'debug' }
+end.parse!(ARGV)
+
+ENV['ABQARI_LOG']         = options[:log] if options[:log]
+ENV['ABQARI_ENV']       ||= 'production'
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+
+audit = Abqari::Audit.new(Abqari::Site.new).run
+
+if options[:strict]
+  count = audit.count(at_least: options[:strict])
+  if count.positive?
+    Abqari::Log.error "Audit failed: #{count} finding(s) at severity >= #{options[:strict]}"
+    exit 1
+  end
+end

@@ -1,0 +1,46 @@
+<!--
+  Home module — featured publication. Surfaces the same publication
+  flagged with `showcase: true` in frontmatter — the one shown as the
+  showcase block at the top of /publications/ — but in the smaller
+  home-module card shape (same design as the latest-publication
+  module). Renders nothing when no publication is flagged.
+
+  Note: this module respects the `showcase: true` flag regardless of
+  `collections.publications.index.display_showcase`. The two settings
+  are independent — `display_showcase` controls the showcase block on
+  the publications index; `home.featured_publication` controls whether
+  the same flagged book appears here on the home page. A site can run
+  one without the other.
+
+  Toggled by `home.featured_publication: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  pub = site.collection('publications').find { |p| p.frontmatter['showcase'] == true }
+%>
+<% if pub %>
+<section class="home-module home-module--featured-publication" aria-label="Featured publication">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">Featured publication</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('publications')) %>">All <%= collection_index_label('publications') %> &rarr;</a>
+  </header>
+  <article class="home-module__item">
+    <% if (cover = pub.frontmatter['cover'] || pub.frontmatter['cover_image']) %>
+      <a class="home-module__cover" href="<%= sanitized_url(pub.url) %>">
+        <img src="<%= sanitized_url(cover) %>" alt="<%= pub.title %> cover" loading="lazy">
+      </a>
+    <% end %>
+    <div class="home-module__body">
+      <h3 class="home-module__title">
+        <a href="<%= sanitized_url(pub.url) %>"><%= pub.title %></a>
+      </h3>
+      <% if (tagline = pub.frontmatter['tagline']) %>
+        <p class="home-module__tagline"><%= tagline %></p>
+      <% end %>
+      <% if (desc = pub.frontmatter['description'].to_s) && !desc.empty? %>
+        <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+    </div>
+  </article>
+</section>
+<% end %>

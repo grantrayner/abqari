@@ -1,0 +1,69 @@
+---
+layout: application
+---
+<!--
+  Home page. Same shape as the other top-level layouts (about,
+  posts_index, publications_index): the h1 and visible lede come
+  from the frontmatter of `content/index.md`, and the markdown body
+  renders below.
+
+      ---
+      title: Hello from Abqari
+      description: A short lede shown under the title…
+      ---
+
+  Below the markdown body, the layout dispatches a set of optional
+  "home modules" — small content cards driven by config:
+
+      home:
+        latest_post: true
+        random_post: false
+        featured_publication: false # showcase-flagged publication, latest_publication design
+        latest_publication: true
+        next_workshop: false        # soonest upcoming workshop card
+        latest_photo: false
+        random_photo: false
+        photo_gallery: latest       # 'latest' / 'random' / false — single-
+                                    #   row gallery of four photos
+        contact: false
+
+  Each module renders nothing when the underlying collection is empty
+  or its config flag is off. Add featured-content sections (book
+  grids, hero treatments, etc.) to `content/index.md` and they'll
+  render in the markdown body above the modules.
+
+  The `home__lede` and `home-module*` classes are CSS hooks — see
+  `themes/<name>/css/app.css` to style them.
+-->
+<%
+  description = page.frontmatter['description']
+  home_cfg    = site.config['home'] || {}
+%>
+<article>
+  <header>
+    <h1><%= page.title %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <%== page.content %>
+</article>
+
+<%# Home modules — each is a self-contained section that renders nothing
+    when its config flag is false. Order is fixed in the layout; toggle
+    individual modules in config/site.yml under the `home:` block. %>
+<% if home_cfg['latest_post']        %><%== render 'partials/home/latest_post'        %><% end %>
+<% if home_cfg['random_post']        %><%== render 'partials/home/random_post'        %><% end %>
+<% if home_cfg['featured_publication'] %><%== render 'partials/home/featured_publication' %><% end %>
+<% if home_cfg['latest_publication']   %><%== render 'partials/home/latest_publication'   %><% end %>
+<% if home_cfg['next_workshop']        %><%== render 'partials/home/next_workshop'        %><% end %>
+<% if home_cfg['latest_photo']       %><%== render 'partials/home/latest_photo'       %><% end %>
+<% if home_cfg['random_photo']       %><%== render 'partials/home/random_photo'       %><% end %>
+<% if home_cfg['photo_gallery']      %><%== render 'partials/home/photo_gallery'      %><% end %>
+<% if home_cfg['contact']            %><%== render 'partials/home/contact'            %><% end %>
+
+<%# Schema.org WebSite — the site-wide entity declaration. Identifies
+    the publisher (Person or Organization) and links out to all social
+    profiles for entity-graph discovery. Rendered on the home page
+    only because the entity it describes is the site, not the page. %>
+<%== render 'partials/website_jsonld' %>

@@ -1,0 +1,41 @@
+<!--
+  Auto-generated table of contents. Parses h2/h3 headings from the
+  page's rendered body and emits a flat `<nav>` of anchor links.
+  Commonmarker emits markdown headings as:
+
+      <h2><a href="#slug" id="slug" class="anchor"></a>Heading text</h2>
+
+  We pluck level + id + text from that, skipping the auxiliary
+  headings the layouts add (their h2s have direct `id` attributes
+  rather than the anchor-with-id pattern — easy to filter out).
+
+  Wire from any show layout (post, publication, photo, workshop):
+      <%%= render 'partials/toc' %>
+
+  Optional locals:
+      min_headings: 3      # don't render unless there are at least N
+                           # headings (default 3 — short posts don't
+                           # need a TOC).
+
+  Renders nothing when the body has fewer than `min_headings` matching
+  headings. h4+ are skipped to keep the list scannable.
+-->
+<%
+  min_count = defined?(min_headings) ? min_headings.to_i : 3
+  body      = page.respond_to?(:content) ? page.content.to_s : ''
+  # Match `<h[23]><a ... id="..." ...></a>Text</h>`. The id-on-anchor
+  # pattern is commonmarker's anchor convention; layout-added h2s
+  # (next-item, related, …) have the id on the heading tag itself and
+  # won't match this regex, so they're naturally excluded.
+  matches = body.scan(%r{<(h[23])><a[^>]*\sid="([^"]+)"[^>]*></a>([^<]+)</\1>}m)
+%>
+<% if matches.size >= min_count %>
+<nav class="toc" aria-labelledby="toc-heading">
+  <h2 id="toc-heading" class="toc__heading">Contents</h2>
+  <ol class="toc__list">
+    <% matches.each do |tag, id, text| %>
+      <li class="toc__item toc__item--<%= tag %>"><a href="#<%= id %>"><%= text %></a></li>
+    <% end %>
+  </ol>
+</nav>
+<% end %>

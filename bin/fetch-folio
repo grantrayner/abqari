@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Force-refresh the Folio cache. Build does this automatically — this script
+# exists for cases where you want to refresh without a full rebuild (e.g. you
+# just published a new book and want to verify the cache picks it up).
+#
+# Usage: bin/fetch-folio
+
+ENV['ABQARI_SITE_ROOT']  ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+require 'fileutils'
+
+site = Abqari::Site.new
+folio = Abqari::Folio.new(site)
+
+unless folio.enabled?
+  warn "Folio: not configured. Set folio.base_url and folio.author_slug in config/site.yml."
+  exit 1
+end
+
+# Drop ETags so we get a fresh 200 even if Folio thinks nothing changed.
+Dir.glob(File.join(folio.cache_dir, 'etag-*')).each { |f| File.delete(f) }
+
+folio.fetch

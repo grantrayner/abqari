@@ -1,0 +1,20 @@
+<!--
+  Draft notice. Renders only on pages where `page.draft?` is true (i.e.
+  front matter has `published: false`). The banner is for the author's
+  benefit during preview — production builds exclude drafts entirely
+  (unless `ABQARI_INCLUDE_DRAFTS=true` is set), so this only ever appears
+  in development.
+
+  The visual styling lives in each theme's `css/app.css` under `.draft-banner`.
+  `role="note"` + `aria-label` give screen-reader users the same context
+  sighted users get from the colour.
+-->
+<% if page.respond_to?(:draft?) && page.draft? %>
+<aside class="draft-banner" role="note" aria-label="Draft notice">
+  <p>
+    <strong>Draft</strong> — this post is hidden from production builds.
+    To publish it, change <code>published: false</code> to <code>published: true</code>
+    in the front matter at the top of this file.
+  </p>
+</aside>
+<% end %>

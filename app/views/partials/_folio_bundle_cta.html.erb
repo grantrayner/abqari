@@ -1,0 +1,22 @@
+<!--
+  CTA box on a book page nudging the reader toward a bundle that contains
+  this book. Required local: bundle_slug. Pulls the bundle payload from
+  site.data and emits nothing if the bundle isn't loaded (e.g. fetch failed
+  or bundle was unpublished).
+-->
+<% bundle = site.data.dig('folio_bundles', bundle_slug) %>
+<% if bundle %>
+  <aside class="folio-bundle-cta">
+    <h3>Save with the bundle</h3>
+    <p>
+      <a href="/bundles/<%= bundle['slug'] %>/"><%= bundle['name'] %></a>
+      <% if (price = bundle.dig('price', 'formatted')) %>
+        — <%= price %>
+      <% end %>
+    </p>
+    <p class="folio-bundle-cta__buttons">
+      <%== folio_buy_button(bundle['slug'], kind: :bundle) %>
+      <%== folio_cart_button(bundle['slug'], kind: :bundle) %>
+    </p>
+  </aside>
+<% end %>

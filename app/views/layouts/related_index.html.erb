@@ -1,0 +1,48 @@
+---
+layout: application
+---
+<!--
+  Auto-generated index of all related items for a source page. Lives at
+  /<source url>related/ — e.g. /posts/writing-in-markdown/related/. Only
+  generated when the show-view's related block has overflow (more matches
+  than the visible `limit`). Driven by Site#generate_related_pages and
+  the RelatedIndexPage class.
+
+  Uses the same .related__* CSS as the show-view block, plus a
+  --full modifier for the wider grid that suits a dedicated page.
+-->
+<article>
+  <header>
+    <h1>Related to
+      <a href="<%= sanitized_url(page.source_page.url) %>"><%= page.source_page.title %></a>
+    </h1>
+    <p class="lede"><%= pluralize(page.related_items.size, 'related item') %>, ranked by overlap.</p>
+  </header>
+
+  <ul class="related__list related__list--full">
+    <% page.related_items.each do |item| %>
+      <li class="related__item">
+        <a href="<%= sanitized_url(item.url) %>">
+          <% if (cover = item.frontmatter['image'] || item.frontmatter['cover']) %>
+            <div class="related__cover">
+              <img src="<%= sanitized_url(cover) %>"
+                   alt="<%= item.frontmatter['caption'] || item.title %>"
+                   loading="lazy"
+                   decoding="async">
+            </div>
+          <% end %>
+          <span class="related__title"><%= item.title %></span>
+          <% if item.respond_to?(:date) && item.date %>
+            <span class="related__date">
+              <time datetime="<%= item.date.iso8601 %>"><%= local_time(item.date) %></time>
+            </span>
+          <% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+
+  <p class="related__back">
+    <a href="<%= sanitized_url(page.source_page.url) %>">&larr; Back to <%= page.source_page.title %></a>
+  </p>
+</article>

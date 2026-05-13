@@ -1,0 +1,310 @@
+---
+layout: application
+---
+<!--
+  Publications index — lists every publication in the `publications`
+  collection. Single index for both data sources:
+
+  1. **Manually-maintained publications** (content/publications/<slug>/
+     index.md): rendered from each Page's frontmatter.
+
+  2. **Folio publications** (auto-generated when Folio is configured):
+     rendered from site.data['folio_publications']. A manual override
+     for a Folio slug suppresses the auto-generated entry.
+
+  Sites that want /books/ URLs set `publications.slug: books` in
+  config — the URL prefix below follows the slug.
+-->
+<%
+  cfg = (site.collection_config('publications') || {})
+  index_cfg   = cfg['index']   || {}
+  archive_cfg = cfg['archive'] || {}
+  description      = page.frontmatter['description']
+  show_description = index_cfg.fetch('show_description', true)
+  show_price       = index_cfg.fetch('show_price',       true)
+  show_isbn        = index_cfg.fetch('show_isbn',        false)
+  show_pages       = index_cfg.fetch('show_pages',       false)
+  show_published   = index_cfg.fetch('show_published',   false)
+  truncate_at      = index_cfg.fetch('description_truncate', 200)
+  display_showcase = index_cfg.fetch('display_showcase',  false)
+  archive_on       = archive_cfg.fetch('enabled', true)
+  latest_count     = index_cfg.fetch('latest_count', 8).to_i
+
+  # URL prefix for individual publication pages — honors `slug:` aliasing.
+  pubs_prefix = cfg['slug'].to_s.empty? ?
+    cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{cfg['slug']}/"
+  pubs_prefix = '/publications/' if pubs_prefix.empty?
+  archive_url = "#{pubs_prefix}archive/"
+
+  # Build the list of items to show, merging Folio data with manual
+  # overrides. Each entry is normalised to a hash with: slug, title,
+  # cover, description, price, isbn, pages, published.
+  manual = site.collection('publications').reject { |p| p.url == page.url }
+  manual_slugs = manual.map(&:slug).to_set
+
+  folio_data = (site.data['folio_publications'] || {})
+
+  items = []
+  # Folio publications (skip those with manual overrides)
+  folio_data.each do |slug, pub|
+    next if manual_slugs.include?(slug)
+    items << {
+      slug:        slug,
+      title:       pub['title'],
+      cover:       pub['cover_url'],
+      description: pub['excerpt'],
+      price:       pub.dig('price', 'formatted'),
+      isbn:        pub['isbn'],
+      pages:       pub['pages'],
+      published:   pub['published_at'],
+      sort_pos:    pub.dig('in_series', 'position') || 999
+    }
+  end
+  # Manual publications (frontmatter-driven; folio_publications is a
+  # fallback when a manual page references the same slug).
+  manual.each do |pub|
+    folio = folio_data[pub.slug] || {}
+    fm = pub.frontmatter
+    items << {
+      slug:        pub.slug,
+      title:       folio['title'] || pub.title,
+      cover:       folio['cover_url'] || fm['cover'] || fm['cover_image'],
+      description: folio['excerpt'] || fm['description'],
+      price:       folio.dig('price', 'formatted') || fm['price'],
+      isbn:        folio['isbn'] || fm['isbn'],
+      pages:       folio['pages'] || fm['pages'],
+      published:   folio['published_at'] || fm['published_at'] || fm['publish_date'],
+      sort_pos:    fm['series_position'] || folio.dig('in_series', 'position') || 999
+    }
+  end
+
+  items.sort_by! { |item| [item[:sort_pos], item[:title].to_s] }
+
+  # Showcase book — surfaced at the top of the page when
+  # `collections.publications.index.display_showcase` is true AND a manual
+  # publication frontmatter declares `showcase: true`. The showcased book
+  # is removed from `items` below so it doesn't appear twice. When more
+  # than one publication is flagged, the first match (by sort order)
+  # wins; the showcase is a single-slot feature, not a carousel.
+  showcase = nil
+  if display_showcase
+    showcase_page = manual.find { |p| p.frontmatter['showcase'] == true }
+    if showcase_page
+      showcase = items.find { |it| it[:slug] == showcase_page.slug }
+      if showcase
+        # Surface the tagline (not part of the standard items hash) for
+        # the showcase view, which gives it more room than the index card.
+        showcase = showcase.merge(tagline: showcase_page.frontmatter['tagline'])
+        items.reject! { |it| it[:slug] == showcase_page.slug }
+      end
+    end
+  end
+
+  # Companion groupings: bundles + series. Two sources, treated uniformly:
+  #   1. Manual content collections — `content/bundles/<slug>/index.md`
+  #      and `content/series/<slug>/index.md`. First-class built-in
+  #      collections, available on every site.
+  #   2. Folio data — `site.data['folio_bundles']` / `folio_series`,
+  #      populated automatically when Folio is configured.
+  # A slug appearing in both sources prefers the manual entry (so an
+  # override page wins over auto-generated Folio content). Each preview
+  # links through to its detail page. Cap the preview cover count so
+  # large groupings don't dominate the row.
+  preview_cover_cap = 3
+
+  # Normalize a single bundle/series entry — either a manual Page or a
+  # Folio data hash — into the shape the preview markup expects.
+  build_preview_from_page = lambda do |item|
+    fm   = item.frontmatter
+    pubs = Array(fm['publications']).map { |e| e.is_a?(String) ? e : e['slug'] }.compact
+    {
+      slug:   item.slug,
+      url:    item.url,
+      title:  fm['name'] || fm['title'] || item.title,
+      price:  fm['price'],
+      sort:   fm['order'] || Float::INFINITY,
+      count:  pubs.size,
+      covers: pubs.first(preview_cover_cap).map { |s| publication_card_data(s) }
+    }
+  end
+
+  build_preview_from_folio = lambda do |slug, data, collection_name|
+    pubs = Array(data['publications']).map { |e| e.is_a?(String) ? e : e['slug'] }.compact
+    {
+      slug:   slug,
+      url:    "#{collection_index_url(collection_name)}#{slug}/",
+      title:  data['name'] || data['title'] || slug,
+      price:  data.dig('price', 'formatted'),
+      sort:   Float::INFINITY,                 # Folio sources don't carry an `order`
+      count:  pubs.size,
+      covers: pubs.first(preview_cover_cap).map { |s| publication_card_data(s) }
+    }
+  end
+
+  # Merge manual + Folio sources for a single collection. Manual wins
+  # on slug collision (override pages suppress auto-generated entries).
+  collect_previews = lambda do |collection_name, folio_key|
+    manual       = (site.collection(collection_name) rescue []) || []
+    manual       = manual.reject { |p| p.url == page.url }
+    manual_slugs = manual.map(&:slug).to_set
+    folio_hash   = site.data[folio_key] || {}
+
+    folio_items  = folio_hash.reject  { |slug, _| manual_slugs.include?(slug) }
+                             .map     { |slug, data| build_preview_from_folio.call(slug, data, collection_name) }
+    manual_items = manual.map         { |item| build_preview_from_page.call(item) }
+
+    (folio_items + manual_items).select { |p| p[:covers].any? }
+                                .sort_by { |p| [p[:sort], p[:title].to_s] }
+  end
+
+  bundle_previews = collect_previews.call('bundles', 'folio_bundles')
+  series_previews = collect_previews.call('series',  'folio_series')
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Publications' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <%== page.content %>
+
+  <%# Showcase block — opt-in via `collections.publications.index.display_showcase`
+      + a single publication's `showcase: true` frontmatter. Renders nothing
+      when either is missing. Cover-left / body-right on wider screens. %>
+  <% if showcase %>
+    <section class="publication-showcase" aria-label="Featured publication">
+      <a class="publication-showcase__link" href="<%= pubs_prefix %><%= showcase[:slug] %>/">
+        <% if showcase[:cover] %>
+          <div class="publication-showcase__cover">
+            <img src="<%= sanitized_url(showcase[:cover]) %>" alt="<%= showcase[:title] %> cover" loading="eager">
+          </div>
+        <% end %>
+        <div class="publication-showcase__body">
+          <p class="publication-showcase__eyebrow">Featured</p>
+          <h2 class="publication-showcase__title"><%= showcase[:title] %></h2>
+          <% if (tagline = showcase[:tagline]) && !tagline.to_s.empty? %>
+            <p class="publication-showcase__tagline"><%= tagline %></p>
+          <% end %>
+          <% if show_description && (desc = showcase[:description].to_s) && !desc.empty? %>
+            <p class="publication-showcase__description"><%= truncate(desc, length: truncate_at) %></p>
+          <% end %>
+          <% if show_price && showcase[:price] %>
+            <p class="publication-showcase__price"><%= showcase[:price] %></p>
+          <% end %>
+        </div>
+      </a>
+    </section>
+  <% end %>
+
+  <%# Publications catalogue — primary list, sits directly under the page
+      header. Each book rendered by the shared `_publication_card` partial;
+      same markup is reused on bundle pages' "What's included" section.
+      Bundles + series sit below as supplementary groupings.
+
+      When `archive.enabled: true` (the default), the landing is finite:
+      it shows only `index.latest_count` items as full cards, then links
+      out to /publications/archive/ for the canonical full list. With
+      `archive.enabled: false` the catalogue holds every item, with no
+      "view all" footer. %>
+  <%
+    # `visible_items` slices the MERGED list (Folio + manual) so the
+    # landing shows the freshest cards. `archive_total` counts what
+    # the archive page actually paginates — `site.collection`
+    # (manual publications only) — so the "View all N publications"
+    # link is honest about what the user will see when they click.
+    # See the publications_archive layout doc-comment for the Folio
+    # caveat that explains the gap.
+    archive_total = site.collection('publications').reject { |p| p.url == page.url }.size
+    visible_items = archive_on ? items.first(latest_count) : items
+    show_more     = archive_on && archive_total > visible_items.size
+  %>
+  <ul class="publications-index">
+    <% visible_items.each_with_index do |pub, idx| %>
+      <%== render 'partials/publication_card',
+                 pub: pub,
+                 idx: idx,
+                 pubs_prefix: pubs_prefix,
+                 heading_level: 2,
+                 show_description: show_description,
+                 show_price: show_price,
+                 show_isbn: show_isbn,
+                 show_pages: show_pages,
+                 show_published: show_published,
+                 truncate_at: truncate_at %>
+    <% end %>
+  </ul>
+
+  <% if show_more %>
+    <p class="publications-index__more">
+      <a href="<%= sanitized_url(archive_url) %>">View all <%= archive_total %> publications &rarr;</a>
+    </p>
+  <% end %>
+
+  <%# Bundles — each rendered as a stack of covers at slight angles,
+      linking through to the bundle detail page. Renders nothing when
+      no bundles exist. %>
+  <% if bundle_previews.any? %>
+    <section class="pubs-grouping pubs-grouping--bundles" aria-labelledby="bundles-heading">
+      <h2 id="bundles-heading" class="pubs-grouping__heading">Bundles</h2>
+      <ul class="bundle-previews">
+        <% bundle_previews.each do |b| %>
+          <li class="bundle-preview">
+            <a class="bundle-preview__link" href="<%= sanitized_url(b[:url]) %>">
+              <span class="bundle-preview__stack" aria-hidden="true">
+                <% b[:covers].reverse.each_with_index do |c, i| %>
+                  <% layer = ['back', 'mid', 'front'][b[:covers].size - 1 - i] || 'back' %>
+                  <% if c[:cover] %>
+                    <img class="bundle-preview__cover bundle-preview__cover--<%= layer %>"
+                         src="<%= sanitized_url(c[:cover]) %>" alt="" loading="lazy">
+                  <% end %>
+                <% end %>
+              </span>
+              <span class="bundle-preview__body">
+                <span class="bundle-preview__title"><%= b[:title] %></span>
+                <span class="bundle-preview__meta">
+                  <%= b[:count] %> <%= b[:count] == 1 ? 'book' : 'books' %>
+                  <% if b[:price] %> &middot; <%= b[:price] %><% end %>
+                </span>
+              </span>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
+  <%# Series — each rendered as a row of overlapping covers at slight
+      alternating angles, linking through to the series detail page.
+      Renders nothing when no series exist. %>
+  <% if series_previews.any? %>
+    <section class="pubs-grouping pubs-grouping--series" aria-labelledby="series-heading">
+      <h2 id="series-heading" class="pubs-grouping__heading">Series</h2>
+      <ul class="series-previews">
+        <% series_previews.each do |s| %>
+          <li class="series-preview">
+            <a class="series-preview__link" href="<%= sanitized_url(s[:url]) %>">
+              <span class="series-preview__row" aria-hidden="true">
+                <% s[:covers].each_with_index do |c, i| %>
+                  <% if c[:cover] %>
+                    <img class="series-preview__cover"
+                         style="--i:<%= i %>;--n:<%= s[:covers].size %>"
+                         src="<%= sanitized_url(c[:cover]) %>" alt="" loading="lazy">
+                  <% end %>
+                <% end %>
+              </span>
+              <span class="series-preview__body">
+                <span class="series-preview__title"><%= s[:title] %></span>
+                <span class="series-preview__meta">
+                  <%= s[:count] %> <%= s[:count] == 1 ? 'book' : 'books' %>
+                  <% if s[:price] %> &middot; <%= s[:price] %><% end %>
+                </span>
+              </span>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</article>

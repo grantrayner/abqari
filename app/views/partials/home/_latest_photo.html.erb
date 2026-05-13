@@ -1,0 +1,42 @@
+<!--
+  Home module — latest photo. Pulls the newest photo from the photos
+  collection. Renders nothing when the collection is empty or
+  disabled.
+
+  Toggled by `home.latest_photo: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  photo = site.collection('photos').first
+%>
+<% if photo %>
+<section class="home-module home-module--latest-photo" aria-label="Latest photo">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">Latest photo</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('photos')) %>">All <%= collection_index_label('photos') %> &rarr;</a>
+  </header>
+  <article class="home-module__item">
+    <% if (img = photo.frontmatter['image']) %>
+      <a class="home-module__cover" href="<%= sanitized_url(photo.url) %>">
+        <img src="<%= sanitized_url(img) %>" alt="<%= photo.frontmatter['caption'] || photo.title %>" loading="lazy">
+      </a>
+    <% end %>
+    <div class="home-module__body">
+      <h3 class="home-module__title">
+        <a href="<%= sanitized_url(photo.url) %>"><%= photo.title %></a>
+      </h3>
+      <% if photo.date %>
+        <p class="home-module__meta">
+          <time datetime="<%= photo.date.iso8601 %>"><%= local_time(photo.date) %></time>
+          <% if photo.frontmatter['country'] %>
+            · <%= photo.frontmatter['country'] %>
+          <% end %>
+        </p>
+      <% end %>
+      <% if (caption = photo.frontmatter['caption']) %>
+        <p class="home-module__description"><%= truncate(caption.to_s, length: 200) %></p>
+      <% end %>
+    </div>
+  </article>
+</section>
+<% end %>

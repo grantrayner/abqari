@@ -1,0 +1,64 @@
+<!--
+  Home module — photo gallery. Renders a single row of four photos
+  using the same `.gallery-index` markup the /photos/ index page uses
+  — same thumbnail style, same tinted placeholder fallbacks, same
+  hover behavior. On wider screens (≥ 768px) the row is exactly 4
+  wide; below that it reflows via the base `.gallery-index` auto-fill
+  rule (2 cols on tablets, 1 col on phones).
+
+  Config (`home.photo_gallery` in config/site.yml):
+      latest   — four most-recent photos (the default)
+      random   — four random photos, fresh per build
+      false    — module is disabled
+  Boolean `true` is treated as `latest` for backwards compatibility.
+
+  Renders nothing when the photos collection is empty or disabled.
+
+  Title and location come from each photo's frontmatter; camera and
+  caption are intentionally omitted to keep the home module visually
+  light — the photos index page is the full-detail view.
+
+  Style via `.home-module*` and `.gallery-index*` class hooks in
+  `themes/<name>/css/app.css`.
+-->
+<%
+  mode    = site.config.dig('home', 'photo_gallery').to_s
+  mode    = 'latest' if mode == 'true' || mode.empty?
+  photos  = if mode == 'random'
+              site.collection('photos').sample(4)
+            else
+              site.collection('photos').first(4)
+            end
+  heading = mode == 'random' ? 'From the gallery' : 'Latest photos'
+%>
+<% if photos.any? %>
+<section class="home-module home-module--photo-gallery" aria-label="Photo gallery">
+  <header class="home-module__header">
+    <h2 class="home-module__heading"><%= heading %></h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('photos')) %>">All <%= collection_index_label('photos') %> &rarr;</a>
+  </header>
+  <ul class="gallery-index gallery-index--cols-4">
+    <% photos.each_with_index do |photo, idx| %>
+      <% tint = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+      <li>
+        <a href="<%= sanitized_url(photo.url) %>">
+          <div class="gallery-index__cover <%= tint %>">
+            <% if (img = photo.frontmatter['image']) %>
+              <img src="<%= sanitized_url(img) %>"
+                   alt="<%= photo.frontmatter['caption'] || photo.title %>"
+                   loading="lazy"
+                   decoding="async">
+            <% end %>
+          </div>
+          <span class="gallery-index__title"><%= photo.title %></span>
+          <% if photo.frontmatter['city'] || photo.frontmatter['country'] %>
+            <span class="gallery-index__location">
+              <%= [photo.frontmatter['city'], photo.frontmatter['country']].compact.join(', ') %>
+            </span>
+          <% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</section>
+<% end %>

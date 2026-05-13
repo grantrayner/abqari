@@ -1,0 +1,83 @@
+---
+layout: application
+---
+<!--
+  Posts archive — compact list of every post in the collection,
+  newest first. Pairs with `posts_index.html.erb`: when
+  `collections.posts.archive.enabled` is on, the front index shows
+  the latest N posts as full cards, and this page is the canonical
+  full list (title + date, no heroes, no descriptions).
+
+  Wire it up by creating `content/posts-archive.md` (NOT inside
+  `content/posts/` — that would make the page a post itself) with
+  this layout + an explicit permalink so the page lives at the
+  expected URL:
+
+      ---
+      title: Archive
+      description: Every post on the site, newest first.
+      layout: posts_archive
+      permalink: /posts/archive/
+      paginate: true
+      ---
+
+  Title and lede come from that file's frontmatter. The post body
+  (any markdown below the frontmatter) renders above the list.
+
+  Each entry uses the same vertical card structure as the home page's
+  "From the archive" module: title (h3) → meta line (date · reading
+  time) → short description. No hero images. Same visual rhythm as
+  the home modules — readers familiar with the home page recognise
+  the shape immediately.
+
+  Pagination: `paginate: true` reads the page count from
+  `collections.posts.pagination.per_page` in config/site.yml. Set an
+  explicit integer (`paginate: 25`) here only when this specific
+  archive needs to deviate per-page from the site-wide setting. The
+  engine generates `/posts/archive/page/2/` etc. automatically.
+-->
+<%
+  description = page.frontmatter['description']
+  posts       = page.paginator&.posts || site.collection('posts')
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Archive' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <%== page.content %>
+
+  <% if posts.any? %>
+    <ul class="posts-archive">
+      <% posts.each do |post| %>
+        <li class="posts-archive__item">
+          <% if (img = post.frontmatter['image']) %>
+            <a class="posts-archive__cover" href="<%= sanitized_url(post.url) %>">
+              <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>"
+                   alt="<%= post.title %>" loading="lazy">
+            </a>
+          <% end %>
+          <div class="posts-archive__body">
+            <h3 class="posts-archive__title">
+              <a href="<%= sanitized_url(post.url) %>"><%= post.title %></a>
+            </h3>
+            <% if post.date %>
+              <p class="posts-archive__meta">
+                <time datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
+                <% if post.respond_to?(:content) && post.content.to_s.length.positive? %>
+                  · <%= reading_time(post.content) %>
+                <% end %>
+              </p>
+            <% end %>
+            <% if (desc = post.frontmatter['description'].to_s) && !desc.empty? %>
+              <p class="posts-archive__description"><%= truncate(desc, length: 160) %></p>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+    <%== render 'partials/pagination', paginator: page.paginator %>
+  <% end %>
+</article>

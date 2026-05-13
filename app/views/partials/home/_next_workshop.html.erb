@@ -1,0 +1,72 @@
+<!--
+  Home module — next workshop. Pulls the soonest upcoming entry from
+  the workshops collection. A workshop is "upcoming" when its end-date
+  (`date_to` ‖ `date_from`) is today or later, OR when it has no dates
+  at all (evergreen offerings). Renders nothing when no workshop fits
+  or the collection is empty/disabled.
+
+  Card shape mirrors the other home modules: optional hero on the left
+  (when the workshop has `image:` frontmatter), title + meta + short
+  description on the right. The meta line condenses the dl block used
+  on the workshops index into a one-row summary.
+
+  Toggled by `home.next_workshop: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  today = Date.today
+  upcoming = site.collection('workshops').select do |w|
+    end_date = w.frontmatter['date_to'] || w.frontmatter['date_from']
+    end_date.nil? || to_time(end_date).to_date >= today
+  end
+  upcoming.sort_by! do |w|
+    fm = w.frontmatter
+    start_key = fm['date_from'] ? to_time(fm['date_from']).to_i : Float::INFINITY
+    [fm['order'] || Float::INFINITY, start_key, w.title.to_s]
+  end
+  workshop = upcoming.first
+%>
+<% if workshop %>
+<%
+  fm     = workshop.frontmatter
+  df     = fm['date_from']
+  dt     = fm['date_to']
+  parts  = []
+  if df
+    date_html = %(<time datetime="#{to_time(df).iso8601}">#{local_time(df)}</time>)
+    if dt && dt != df
+      date_html += %( &ndash; <time datetime="#{to_time(dt).iso8601}">#{local_time(dt)}</time>)
+    end
+    parts << date_html
+  elsif fm['duration']
+    parts << h(fm['duration'])
+  end
+  parts << h(fm['location']) if fm['location']
+  parts << h(fm['format'])   if fm['format']
+%>
+<section class="home-module home-module--next-workshop" aria-label="Next workshop">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">Next workshop</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('workshops')) %>">All <%= collection_index_label('workshops') %> &rarr;</a>
+  </header>
+  <article class="home-module__item">
+    <% if (img = fm['image']) %>
+      <a class="home-module__cover" href="<%= sanitized_url(workshop.url) %>">
+        <img src="<%= sanitized_url(bundle_asset_url_for(workshop, img)) %>"
+             alt="<%= workshop.title %>" loading="lazy">
+      </a>
+    <% end %>
+    <div class="home-module__body">
+      <h3 class="home-module__title">
+        <a href="<%= sanitized_url(workshop.url) %>"><%= workshop.title %></a>
+      </h3>
+      <% if parts.any? %>
+        <p class="home-module__meta"><%== parts.join(' &middot; ') %></p>
+      <% end %>
+      <% if (desc = fm['description'].to_s) && !desc.empty? %>
+        <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+    </div>
+  </article>
+</section>
+<% end %>

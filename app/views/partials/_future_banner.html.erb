@@ -1,0 +1,25 @@
+<!--
+  Scheduled-post notice. Renders only on posts where `page.future?` is
+  true (the post's date is later than `Time.now`). Like the draft banner,
+  this only appears in development — production builds exclude future
+  posts entirely unless ABQARI_INCLUDE_FUTURE=true is set.
+
+  Why a banner: future-dated posts can sit in your repo for weeks. A
+  visible reminder ("scheduled for…") prevents the surprise of "why is
+  this post not appearing on prod yet?" — the answer is on the page.
+
+  The displayed time always includes the timezone (`Z`/abbreviation)
+  so the author sees Abqari's interpretation of their date string and
+  can tell whether they wrote it in UTC, local, or with an explicit
+  offset.
+-->
+<% if page.respond_to?(:future?) && page.future? && page.respond_to?(:date) && page.date %>
+<aside class="future-banner" role="note" aria-label="Scheduled post notice">
+  <p>
+    <strong>Scheduled</strong> — this post will publish at
+    <time datetime="<%= page.date.iso8601 %>"><%= page.date.strftime('%B %-d, %Y at %H:%M %Z') %></time>
+    (<%= time_until(page.date) %>).
+    Production builds skip future-dated posts; this preview only shows in development.
+  </p>
+</aside>
+<% end %>

@@ -1,0 +1,43 @@
+<!--
+  Home module — latest post. Pulls the newest published post from the
+  posts collection and renders a one-card preview (title, date,
+  reading time, truncated description). Renders nothing when the
+  collection is empty or all posts are drafts/future-dated.
+
+  Toggled by `home.latest_post: true` in config/site.yml.
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  post = site.collection('posts').first
+%>
+<% if post %>
+<section class="home-module home-module--latest-post" aria-label="Latest post">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">Latest post</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('posts')) %>">All <%= collection_index_label('posts') %> &rarr;</a>
+  </header>
+  <article class="home-module__item">
+    <% if (img = post.frontmatter['image']) %>
+      <a class="home-module__cover" href="<%= sanitized_url(post.url) %>">
+        <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+      </a>
+    <% end %>
+    <div class="home-module__body">
+      <h3 class="home-module__title">
+        <a href="<%= sanitized_url(post.url) %>"><%= post.title %></a>
+      </h3>
+      <% if post.date %>
+        <p class="home-module__meta">
+          <time datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
+          <% if post.respond_to?(:content) && post.content.to_s.length.positive? %>
+            · <%= reading_time(post.content) %>
+          <% end %>
+        </p>
+      <% end %>
+      <% if (desc = post.frontmatter['description'].to_s) && !desc.empty? %>
+        <p class="home-module__description"><%= truncate(desc, length: 160) %></p>
+      <% end %>
+    </div>
+  </article>
+</section>
+<% end %>

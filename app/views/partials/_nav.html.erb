@@ -1,0 +1,63 @@
+<!--
+  Site navigation. Site#nav_links resolves a three-layer cascade:
+
+    1. data/nav.yml `links:` array — explicit, used as-is.
+    2. Pages with `nav: { order: N, label: "…" }` in front matter, sorted.
+    3. Empty → fall back to a single home link with the site title.
+
+  Layout (3 flex children):
+
+    [brand]          [links · links · links]    [theme toggle]
+
+  The brand is a home link with the site title (or `nav.brand` config
+  if set). Set `nav.brand: false` in config/site.yml to omit it.
+
+  Edit this file to change the layout (logo image, multi-section,
+  drop-downs); edit data/nav.yml or page front matter to change *what*
+  appears in the links list.
+-->
+<%
+  brand_cfg = site.config.dig('nav', 'brand')
+  brand_text = case brand_cfg
+               when false then nil
+               when nil   then site.config['title']         # default: site title
+               else            brand_cfg.to_s
+               end
+
+  # Active-link detection. Mark the link whose URL matches the current
+  # page (or whose section the page is inside) with aria-current="page"
+  # so the active item can be styled differently. Two cases:
+  #   1. Exact match — used for "/" (home), "/about/", and any page
+  #      whose URL is identical to a nav link.
+  #   2. Section prefix match — `/books/` is active on `/books/<slug>/`
+  #      so users in a sub-page still see their section highlighted.
+  #      Excludes "/" since otherwise every page would match.
+  current_url = page.url
+  active_link = lambda do |link_url|
+    return current_url == '/' if link_url == '/'
+
+    current_url == link_url || current_url.start_with?(link_url)
+  end
+%>
+<nav aria-label="Primary">
+  <% if brand_text %>
+    <a class="nav__brand" href="/"<% if current_url == '/' %> aria-current="page"<% end %>><%= brand_text %></a>
+  <% end %>
+  <span class="nav__links">
+    <% links = site.nav_links %>
+    <% if links.any? %>
+      <% links.each_with_index do |link, i| %>
+        <%= ' · ' if i.positive? %><a href="<%= sanitized_url(link['url']) %>"<%== ' aria-current="page"' if active_link.call(link['url']) %>><%= link['label'] %></a>
+      <% end %>
+    <% elsif !brand_text %>
+      <%# No brand AND no links → fall back to a single home link so the
+          nav isn't empty. %>
+      <%== link_to site.config['title'], '/' %>
+    <% end %>
+  </span>
+  <%# Light/dark toggle — opt out by setting `theme_toggle: false` in
+      config/site.yml. Default is enabled. %>
+  <% if site.config['theme_toggle'] %>
+    <%== render 'partials/theme_toggle' %>
+  <% end %>
+</nav>

@@ -1,0 +1,62 @@
+<!--
+  Row of taxonomy tiles — one per term, used by the photos landing
+  to render the "Series" and "Countries" sections. Reusable for any
+  taxonomy that maps to photos (or any dated collection).
+
+  Required locals:
+    heading       — section heading text (e.g. "Series")
+    taxonomy      — taxonomy name as configured in site.yml (e.g. 'series')
+    collection    — collection name to filter terms by (e.g. 'photos')
+    limit         — max tiles to show; nil = show all
+    all_url       — destination for the "View all" link; nil = no link
+    cols_class    — gallery-index column-modifier class (optional)
+
+  Each tile carries:
+    - Term name (e.g. "Maaloula 2026")
+    - Photo count
+    - Cover image: first photo's `image:` frontmatter, when present
+    - Link to the term's taxonomy index page
+
+  Terms are sorted by photo count desc (most-photographed series first),
+  then by name. Drop the section entirely when there are no terms.
+-->
+<%
+  terms_for_collection = site.posts_by_term(taxonomy)
+                             .transform_values { |pages| pages.select { |p| p.collection == collection } }
+                             .reject { |_term, pages| pages.empty? }
+                             .sort_by { |term, pages| [-pages.size, term.to_s] }
+  terms_for_collection = terms_for_collection.first(limit) if limit
+%>
+<% if terms_for_collection.any? %>
+<section class="taxonomy-row" aria-label="<%= h(heading) %>">
+  <%# Reuses `home-module__*` header classes for the heading + see-all
+      row — same shared pattern the photos landing's "Latest photos"
+      section uses. See _common.css note on home-module__header. %>
+  <header class="home-module__header">
+    <h2 class="home-module__heading"><%= heading %></h2>
+    <% if all_url && !all_url.to_s.empty? %>
+      <a class="home-module__see-all" href="<%= sanitized_url(all_url) %>">View all &rarr;</a>
+    <% end %>
+  </header>
+  <ul class="gallery-index<%= " gallery-index--cols-#{cols_class}" if cols_class %>">
+    <% terms_for_collection.each_with_index do |(term, pages), idx| %>
+      <% tint = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+      <% cover = pages.first&.frontmatter&.dig('image') %>
+      <li>
+        <a href="<%= sanitized_url(taxonomy_url(taxonomy, term)) %>">
+          <div class="gallery-index__cover <%= tint %>">
+            <% if cover %>
+              <img src="<%= sanitized_url(bundle_asset_url_for(pages.first, cover)) %>"
+                   alt="<%= term %>"
+                   loading="lazy"
+                   decoding="async">
+            <% end %>
+          </div>
+          <span class="gallery-index__title"><%= term %></span>
+          <span class="gallery-index__location"><%= pluralize(pages.size, 'photo') %></span>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</section>
+<% end %>

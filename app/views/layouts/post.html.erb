@@ -1,0 +1,78 @@
+---
+layout: application
+---
+<!--
+  Single post detail. Theme-neutral structure with semantic class
+  hooks (`.post__meta`, `.post__hero`, `.post__tags-footer`); themes
+  style via `themes/<name>/css/app.css`.
+
+  Hero image — set `image:` in the post's frontmatter and it renders
+  between the meta line and the body. Path is sanitized; alt text
+  defaults to the post title.
+
+      ---
+      title: My Post
+      date: 2026-04-15
+      image: hero.jpg            # relative within a bundled post
+      tags: [foo, bar]
+      ---
+
+  Hero rendering is also gated by `collections.posts.show.show_image`
+  in config/site.yml — set it to `false` to suppress the hero across
+  the whole collection without editing each post's frontmatter. The
+  matching toggle on the index card is `collections.posts.index.show_image`;
+  the two are intentionally independent so you can show a hero in the
+  listing but not on the detail page (or vice versa).
+
+  Tags footer renders only when the post has tags. The "Up next" and
+  "Related" partials below the article are also conditional on the
+  collection's `next:` and `related:` config; both render nothing
+  when not applicable so they degrade silently.
+-->
+<%
+  show_cfg   = (site.collection_config('posts')['show'] || {})
+  show_image = show_cfg.fetch('show_image', true)
+%>
+<article>
+
+  <%== render 'partials/draft_banner' %>
+  <%== render 'partials/future_banner' %>
+  <%== render 'partials/back_to_index' %>
+
+  <header>
+    <h1><%= page.title %></h1>
+    <p class="post__meta">
+      <time datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
+      · <%= reading_time(page.content) %>
+    </p>
+    <%# Hero — emits a <picture> with AVIF/WebP sources when sibling
+        files exist alongside the bundle image (convention: generate
+        `hero.avif` + `hero.webp` next to `hero.jpg`), else a plain
+        <img>. SVG sources skip picture entirely (no format negotiation
+        benefit). See `bundle_picture_tag` in render_context.rb. %>
+    <% if show_image && (hero = page.frontmatter['image']) %>
+      <%== bundle_picture_tag(page, hero, alt: page.title, class_: 'post__hero') %>
+    <% end %>
+  </header>
+
+  <%# Auto-generated TOC — renders nothing for posts with fewer than 3
+      h2/h3 headings, so short pieces stay clean. Override threshold
+      with `min_headings: N`. %>
+  <%== render 'partials/toc' %>
+
+  <%== page.content %>
+
+  <% if page.tags.any? %>
+  <footer class="post__tags-footer">
+    <p>Tagged: <%== page.tags.map { |t| link_to(t, taxonomy_url('tags', t)) }.join(', ') %></p>
+  </footer>
+  <% end %>
+</article>
+
+<%# Testimonials about this post — pulls from data/testimonials.yml
+    entries where `collection: posts` matches this page's slug. Same
+    polymorphic mechanism the workshop and publication views use. %>
+<%== render 'partials/testimonials', subject: page, heading: 'What readers say' %>
+
+<%== render 'partials/next_item' %>
+<%== render 'partials/related_items' %>
