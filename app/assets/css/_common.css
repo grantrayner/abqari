@@ -1094,6 +1094,11 @@ article > header > .lede {
   display: block;
   overflow: hidden;
   aspect-ratio: 4 / 3;                 /* default index aspect (vs. 16:9 on show views) */
+  /* Same colour the placeholder SVG uses — so a real `<img>` that's
+     still loading paints the same surface as a heroless card. Once
+     the image arrives `object-fit: cover` paints over this entirely,
+     so loaded cards are unchanged. */
+  background-color: var(--color-code-bg);
 }
 .post-list__cover img {
   width: 100%;
