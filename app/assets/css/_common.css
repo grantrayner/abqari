@@ -1553,10 +1553,10 @@ article > header > .lede {
   width: 58%;
   /* Overlap only on the right edge so the first cover sits flush with
      the row's left edge. Each subsequent cover slides under the next
-     by 36% of the row width — tighter than a casual fan, so the
-     three heroes read as a single grouped stack rather than three
-     near-distinct cards. */
-  margin: 0 -36% 0 0;
+     by 44% of the row width — heavy overlap so only ~14% of each
+     back cover peeks out from behind the front, reading as one
+     tightly-grouped stack. */
+  margin: 0 -44% 0 0;
   top: auto;
   left: auto;
   --max-rot: 6deg;
