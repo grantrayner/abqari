@@ -2075,6 +2075,13 @@ article > header > .lede {
   font-size: 0.9375rem;
   color: var(--color-muted);
 }
+/* Each `<dt>/<dd>` pair is wrapped in a `<div>` in the markup so the
+   row reads as a single semantic unit. `display: contents` removes
+   the div from the layout tree so the inner `<dt>` and `<dd>`
+   participate directly in the parent grid — one pair per row with
+   labels aligned in the first column. Without this, each `<div>` is
+   a single grid item and two pairs land side-by-side per row. */
+.photo__meta > div { display: contents; }
 .photo__meta dt { font-weight: 600; }
 .photo__meta dd { margin: 0; }
 .photo__related {
