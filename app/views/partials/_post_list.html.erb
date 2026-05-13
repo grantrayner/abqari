@@ -34,9 +34,25 @@
 <ul class="post-list">
   <% posts.each do |post| %>
     <li class="post-list__item">
-      <% if show_image && (img = post.frontmatter['image']) %>
-        <a class="post-list__cover" href="<%= post.url %>">
-          <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+      <%# Cover slot. When the post has a hero, render it; otherwise
+          render an inline SVG placeholder (a single `<rect>` filling
+          the cover box, painted in `var(--color-code-bg)` via
+          `currentColor`) so the cover slot keeps the card's grid
+          alignment intact across mixed has-hero / no-hero rows.
+          The placeholder is purely decorative — `aria-hidden`. When
+          `show_image` is false at the config level the whole slot
+          disappears and the body fills the card (handled by the
+          `:not(:has(.post-list__cover))` CSS rule). %>
+      <% if show_image %>
+        <a class="post-list__cover" href="<%= post.url %>" aria-label="<%= post.title %>">
+          <% if (img = post.frontmatter['image']) %>
+            <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+          <% else %>
+            <svg class="post-list__cover-placeholder" viewBox="0 0 4 3"
+                 preserveAspectRatio="none" aria-hidden="true">
+              <rect width="4" height="3" fill="currentColor"/>
+            </svg>
+          <% end %>
         </a>
       <% end %>
 
