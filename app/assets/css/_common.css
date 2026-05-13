@@ -1376,7 +1376,10 @@ article > header > .lede {
   display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
-  margin-bottom: var(--space-md);
+  /* Tighter-than-space-md gap to the title — the stacked covers
+     create enough visual breathing room on their own that the full
+     1rem space-md feels overgenerous. */
+  margin-bottom: 0.75rem;
   /* Inset so rotated covers don't get clipped by the column edge. */
   padding: 6% 12%;
 }
@@ -1453,7 +1456,8 @@ article > header > .lede {
   display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
-  margin-bottom: var(--space-md);
+  /* Match `.bundle-preview__stack`'s tighter title gap. */
+  margin-bottom: 0.75rem;
   /* Same inset as `.bundle-preview__stack` so the cover edges sit at
      the same tile coordinates as the bundle covers. */
   padding: 6% 12%;
