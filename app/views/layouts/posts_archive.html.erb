@@ -53,12 +53,25 @@ layout: application
     <ul class="posts-archive">
       <% posts.each do |post| %>
         <li class="posts-archive__item">
-          <% if (img = post.frontmatter['image']) %>
-            <a class="posts-archive__cover" href="<%= sanitized_url(post.url) %>">
+          <%# Cover slot. Always present so the 2-column grid (cover
+              left / body right) applies uniformly across rows with
+              and without a real hero. When the post has no image,
+              emit an inline `<svg><rect/></svg>` filled with
+              `var(--color-code-bg)` so the slot keeps the 4:3 shape;
+              when the post does have an image, the same colour also
+              backs the `<img>` so the slot is filled while the
+              hero is loading. Same pattern as `_post_list`. %>
+          <a class="posts-archive__cover" href="<%= sanitized_url(post.url) %>" aria-label="<%= post.title %>">
+            <% if (img = post.frontmatter['image']) %>
               <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>"
                    alt="<%= post.title %>" loading="lazy">
-            </a>
-          <% end %>
+            <% else %>
+              <svg class="posts-archive__cover-placeholder" viewBox="0 0 4 3"
+                   preserveAspectRatio="none" aria-hidden="true">
+                <rect width="4" height="3" fill="currentColor"/>
+              </svg>
+            <% end %>
+          </a>
           <div class="posts-archive__body">
             <h3 class="posts-archive__title">
               <a href="<%= sanitized_url(post.url) %>"><%= post.title %></a>
