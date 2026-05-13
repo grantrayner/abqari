@@ -1473,6 +1473,31 @@ article > header > .lede {
   }
 }
 
+/* Publications series tile — match the bundles tile width and inset
+   so the two stacks sit in the same-shaped envelope within their
+   tiles. Without this scope, the series grid uses the wider 260px
+   column (set above as the cross-collection default for posts), and
+   the smaller covers leave noticeable empty space inside each tile
+   compared to the snugly-filled bundle stack on the same landing. */
+.pubs-grouping--series .series-previews {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.pubs-grouping--series .series-preview__row {
+  /* Match `.bundle-preview__stack` horizontal padding (12%) so the
+     visible cover stack starts and ends at the same tile inset as
+     the bundle covers. Vertical padding can stay smaller because
+     the shallow ±3° rotation needs less clearance. */
+  padding: 4% 12% 6%;
+}
+.pubs-grouping--series .series-preview__cover {
+  /* Wider covers + heavier overlap so the stack visually fills the
+     180px tile in proportion to the bundle stack (which uses 76%
+     wide covers). 60% × 3 covers minus 30% combined overlap = 90%
+     layout fill of the inner area. */
+  width: 60%;
+  margin: 0 -15%;
+}
+
 /* Posts series preview — same stacked-fan visual as publications but
    sized for post hero images. Landscape aspect ratio with tight
    horizontal overlap so the heroes read as a single grouped stack,
