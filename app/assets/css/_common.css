@@ -1393,26 +1393,24 @@ article > header > .lede {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 2 / 3;
-  /* No outer margin below the stack — the visual gap between the
-     cover stack and the title comes entirely from the row's
-     `padding-bottom: 6%` (with the cover bottom-anchored). Same
-     approach as the posts-series preview, so the gap-below-cover
-     reads the same across all three partials on landing pages. */
+  /* Row sized to hug the cover stack with a deliberate gap below
+     before the per-tile title. Cover height (76% × 1.5 = 1.14W) plus
+     padding-top (6% W) plus ~8% W gap below the cover = 1.3W → row
+     aspect-ratio 10/13. Using a tighter ratio than 2/3 keeps the
+     section heading flush above the covers rather than leaving
+     ~30% of row-width as empty space at the top. */
+  aspect-ratio: 10 / 13;
   margin-bottom: 0;
   /* Inset so rotated covers don't get clipped by the column edge. */
   padding: 6% 12%;
 }
 .bundle-preview__cover {
   position: absolute;
-  /* Anchor at the bottom of the stack rather than the top. With the
-     row's 2/3 aspect ratio, `bottom: 4%` of row height equals 6% of
-     row width — same proportional space below the cover as the row's
-     `padding-bottom: 6%`, mirroring how `align-items: flex-end` works
-     in the flex-based posts series row. Any vertical headroom that
-     used to sit *below* the stack now sits *above* it. */
-  top: auto;
-  bottom: 4%;
+  /* Top-anchored — keeps the section heading sitting just above the
+     stack. The deliberate ~8% W gap *below* the stack (before the
+     per-tile title) comes from the row's tighter aspect-ratio above,
+     not from a bottom offset on the cover. */
+  top: 6%;
   left: 50%;
   width: 76%;
   height: auto;
@@ -1482,11 +1480,12 @@ article > header > .lede {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 2 / 3;
-  /* Match `.bundle-preview__stack` — no outer margin; gap to title
-     comes from the row's `padding-bottom: 6%` (cover bottom-anchored
-     below) so the visual cover-to-title gap matches the posts series
-     partial on the posts landing. */
+  /* Match `.bundle-preview__stack`: tighter than 2/3 so the section
+     heading sits just above the cover stack and a deliberate ~8% W
+     gap is left below the stack before the per-tile title. See the
+     bundle stack rule above for the breakdown of how 10/13 is
+     derived from cover height + top padding + gap-below. */
+  aspect-ratio: 10 / 13;
   margin-bottom: 0;
   /* Same inset as `.bundle-preview__stack` so the cover edges sit at
      the same tile coordinates as the bundle covers. */
@@ -1494,11 +1493,9 @@ article > header > .lede {
 }
 .series-preview__cover {
   position: absolute;
-  /* Bottom-anchor — see `.bundle-preview__cover` for why `bottom: 4%`
-     of the row height equals `padding-bottom: 6%` of the row width
-     here (row aspect 2/3). */
-  top: auto;
-  bottom: 4%;
+  /* Top-anchored, matching `.bundle-preview__cover`. The gap below
+     the stack comes from the row's tighter aspect-ratio (10/13). */
+  top: 6%;
   left: 50%;
   width: 76%;
   height: auto;
