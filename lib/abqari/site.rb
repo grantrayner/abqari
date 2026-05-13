@@ -337,6 +337,41 @@ module Abqari
       idx.positive? ? pages[idx - 1] : nil
     end
 
+    # The "next" page within the same series — the page with the
+    # smallest `series_position` strictly greater than this page's.
+    # Requires the page to have BOTH `series:` and `series_position:`
+    # in frontmatter, and to belong to a collection (so the series is
+    # scoped consistently with the per-collection series taxonomies).
+    #
+    # Returns nil when:
+    #   - The page isn't in a series (no `series:` frontmatter).
+    #   - The page has no `series_position:` (can't order it).
+    #   - The page is the last position in the series.
+    #   - The page is outside a collection.
+    #
+    # Used by the post show view to render a "Next in the series" card
+    # in place of the chronological "Up next" card when a series
+    # relationship exists. Generic across collections — works for
+    # posts, photos, publications, workshops alike.
+    def next_in_series(page)
+      return nil unless page.respond_to?(:frontmatter)
+      return nil unless page.respond_to?(:collection) && page.collection
+
+      series_name = page.frontmatter['series'].to_s
+      return nil if series_name.empty?
+
+      current_pos = page.frontmatter['series_position']
+      return nil if current_pos.nil?
+
+      candidates = collection(page.collection).select do |p|
+        p.frontmatter['series'].to_s == series_name &&
+          p.frontmatter['series_position'].is_a?(Integer) &&
+          p.frontmatter['series_position'] > current_pos.to_i
+      end
+
+      candidates.min_by { |p| p.frontmatter['series_position'].to_i }
+    end
+
     # Shared-term count between two frontmatter values. Both can be
     # scalars (`country: Syria`) or arrays (`tags: [a, b]`); we use
     # `Array()` to normalise. Returns 0 when either side is missing.

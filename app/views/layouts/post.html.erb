@@ -44,6 +44,13 @@ layout: application
     <p class="post__meta">
       <time datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
       · <%= reading_time(page.content) %>
+      <%# Series breadcrumb — only when the post carries both `series:`
+          and `series_position:` in frontmatter. Position renders as a
+          plain "#N" prefix; the series name links back to the per-
+          collection series taxonomy page. %>
+      <% if (sn = page.frontmatter['series']) && (sp = page.frontmatter['series_position']) %>
+        · #<%= sp %> in the <a href="<%= sanitized_url(taxonomy_url('posts_series', sn)) %>"><%= sn %></a> series
+      <% end %>
     </p>
     <%# Hero — emits a <picture> with AVIF/WebP sources when sibling
         files exist alongside the bundle image (convention: generate
@@ -74,5 +81,30 @@ layout: application
     polymorphic mechanism the workshop and publication views use. %>
 <%== render 'partials/testimonials', subject: page, heading: 'What readers say' %>
 
-<%== render 'partials/next_item' %>
+<%# "Next" section — three-way dispatch:
+    1. Post is in a series AND a next-by-position exists  →  show
+       "Next in the series" with that post.
+    2. Post is in a series AND is the last position       →  show a
+       "this is the last post in <series> series" note, then still
+       offer chronological "Up next" so the reader has somewhere to go.
+    3. Post is not in a series                             →  the
+       historical default — chronological "Up next" only.
+    All three branches degrade silently when there's nothing to link to. %>
+<%
+  in_series = page.frontmatter['series'] && page.frontmatter['series_position']
+  next_in_series_post = in_series ? site.next_in_series(page) : nil
+%>
+<% if next_in_series_post %>
+  <%== render 'partials/next_in_series' %>
+<% elsif in_series %>
+  <aside class="series-end" aria-label="End of series">
+    <p>This is the last post in the
+      <a href="<%= sanitized_url(taxonomy_url('posts_series', page.frontmatter['series'])) %>"><%= page.frontmatter['series'] %></a>
+      series.</p>
+  </aside>
+  <%== render 'partials/next_item' %>
+<% else %>
+  <%== render 'partials/next_item' %>
+<% end %>
+
 <%== render 'partials/related_items' %>
