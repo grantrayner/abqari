@@ -1463,6 +1463,16 @@ article > header > .lede {
   margin: 0 -22%;
 }
 
+/* `.post-series-previews` section sits beneath the post list on the
+   posts landing. Borrows the home-module divider rule (1px line on
+   top + breathing room) so the visual rhythm between the post list
+   and this row matches the rhythm between home modules. */
+.post-series-previews {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-rule);
+}
+
 .series-preview__body {
   display: block;
   text-align: center;
