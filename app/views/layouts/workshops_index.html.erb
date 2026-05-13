@@ -74,23 +74,30 @@ layout: application
     -(end_date ? to_time(end_date).to_i : 0)
   end
 
-  # Helper: compact meta line for a workshop card.
-  build_meta = lambda do |fm, compact:|
-    parts = []
+  # Date-range fragment for a card — `<time>` element(s) for the start
+  # date, plus an en-dash and a second `<time>` when there's a distinct
+  # end date. Returns nil if there are no dates and no duration to fall
+  # back on.
+  build_date_html = lambda do |fm|
     if show_dates && (df = fm['date_from'])
-      date_html = %(<time datetime="#{to_time(df).iso8601}">#{local_time(df)}</time>)
+      html = %(<time datetime="#{to_time(df).iso8601}">#{local_time(df)}</time>)
       if (dt = fm['date_to']) && dt != df
-        date_html += %( &ndash; <time datetime="#{to_time(dt).iso8601}">#{local_time(dt)}</time>)
+        html += %( &ndash; <time datetime="#{to_time(dt).iso8601}">#{local_time(dt)}</time>)
       end
-      parts << date_html
+      html
     elsif (duration = fm['duration'])
-      parts << h(duration)
+      h(duration)
+    end
+  end
+
+  # Compact meta line for the past-workshops section — collapses
+  # date + location into a single bullet-separated row.
+  build_compact_meta = lambda do |fm|
+    parts = []
+    if (d = build_date_html.call(fm))
+      parts << d
     end
     parts << h(fm['location']) if show_location && fm['location']
-    unless compact
-      parts << h(fm['format']) if show_format && fm['format']
-      parts << h(fm['price'])  if show_price  && fm['price']
-    end
     parts
   end
 %>
@@ -128,9 +135,26 @@ layout: application
                   <p class="workshops-index__description"><%= truncate(desc.to_s, length: truncate_at) %></p>
                 <% end %>
 
-                <% parts = build_meta.call(fm, compact: false) %>
-                <% if parts.any? %>
-                  <p class="workshops-index__meta"><%== parts.join(' &middot; ') %></p>
+                <%# Meta block — three stacked lines on upcoming cards
+                    so each fact reads cleanly:
+                      1. Date range (or duration when no dates)
+                      2. Location · Format (joined by ·, both optional)
+                      3. Price
+                    Any line whose source data is absent or whose toggle
+                    is off renders nothing — the remaining lines close up. %>
+                <% if (date_html = build_date_html.call(fm)) %>
+                  <p class="workshops-index__meta workshops-index__meta--dates"><%== date_html %></p>
+                <% end %>
+                <%
+                  loc_parts = []
+                  loc_parts << h(fm['location']) if show_location && fm['location']
+                  loc_parts << h(fm['format'])   if show_format   && fm['format']
+                %>
+                <% if loc_parts.any? %>
+                  <p class="workshops-index__meta workshops-index__meta--location"><%== loc_parts.join(' &middot; ') %></p>
+                <% end %>
+                <% if show_price && (price = fm['price']) %>
+                  <p class="workshops-index__meta workshops-index__meta--price"><%= price %></p>
                 <% end %>
               </span>
             </a>
@@ -154,7 +178,7 @@ layout: application
             <a href="<%= w.url %>" class="workshops-index__link">
               <span class="workshops-index__body">
                 <h3 class="workshops-index__title"><%= w.title %></h3>
-                <% parts = build_meta.call(fm, compact: true) %>
+                <% parts = build_compact_meta.call(fm) %>
                 <% if parts.any? %>
                   <p class="workshops-index__meta"><%== parts.join(' &middot; ') %></p>
                 <% end %>

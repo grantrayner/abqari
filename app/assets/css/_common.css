@@ -2435,6 +2435,13 @@ article > header > .lede {
   font-size: 0.9375rem;
   color: var(--color-muted);
 }
+/* Upcoming cards emit one meta line per fact (date / location+format
+   / price) so each reads cleanly. This rule gives adjacent lines a
+   small gap. Past-card meta is always a single line so this is a
+   no-op there. */
+.workshops-index__meta + .workshops-index__meta {
+  margin-top: 0.125rem;
+}
 
 /* Future + past sections share the same `.workshops-index__group`
    wrapper so they can stack with consistent vertical rhythm. The

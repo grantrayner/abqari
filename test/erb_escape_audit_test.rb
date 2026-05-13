@@ -69,7 +69,14 @@ class ErbEscapeAuditTest < Minitest::Test
     # workshops_index + _next_workshop: `parts.join(' &middot; ')` where
     # `parts` is a mix of pre-escaped helper output and literal
     # `<time>...</time>` HTML produced via `%(...)`.
-    "parts.join("
+    "parts.join(",
+
+    # workshops_index: `date_html` is the return value of the
+    # `build_date_html` lambda — either nil/skipped or a `%(...)` string
+    # composed of `<time datetime="...">local_time(...)</time>` fragments
+    # (`local_time` returns a pre-formatted display string, no user
+    # markup). Same safety pattern as the `parts.join` entry above.
+    "date_html"
   ].freeze
 
   def test_no_unaudited_raw_interpolations
