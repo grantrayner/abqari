@@ -1454,13 +1454,13 @@ article > header > .lede {
 /* Posts series preview — same stacked-fan visual as publications but
    sized for post hero images. Landscape aspect ratio with tight
    horizontal overlap so the heroes read as a single grouped stack,
-   not three independent cards in a row. Tightened from the initial
-   -10% margin to -22%: at 58% cover width that means each cover
-   sits ~38% of its own width over its neighbour. */
+   not three independent cards in a row. At 58% cover width, the
+   -26% margin means each cover sits ~45% of its own width over its
+   neighbour — the heroes overlap roughly by half. */
 .series-preview--posts .series-preview__cover {
   aspect-ratio: 16 / 9;
   width: 58%;
-  margin: 0 -22%;
+  margin: 0 -26%;
 }
 
 /* `.post-series-previews` section sits beneath the post list on the
