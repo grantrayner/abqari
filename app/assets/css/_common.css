@@ -1454,16 +1454,22 @@ article > header > .lede {
   box-shadow: var(--shadow-cover);
   background: var(--color-card-bg);
   transition: transform 0.35s ease;
-  /* Negative margin so covers overlap. */
-  margin: 0 -6%;
-  /* Rotation grows linearly across the row: leftmost ≈ -6deg,
-     rightmost ≈ +6deg. --i is the 0-based index, --n is the count. */
-  --max-rot: 6deg;
+  /* Negative margin so covers overlap. Tighter than the original -6%
+     so the stack reads as one grouped object rather than a row of
+     near-touching books. */
+  margin: 0 -10%;
+  /* Rotation grows linearly across the row: leftmost ≈ -3deg,
+     rightmost ≈ +3deg. --i is the 0-based index, --n is the count.
+     The shallow tilt is deliberate — it differentiates the series
+     stack from the bundle stack (which uses larger ±9° rotations
+     in `.bundle-preview__cover--*`). */
+  --max-rot: 3deg;
   transform: rotate(calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-rot)));
 }
 @media (hover: hover) {
   .series-preview__link:hover .series-preview__cover {
-    --max-rot: 9deg;
+    /* Hover boost stays gentle — proportional to the resting angle. */
+    --max-rot: 5deg;
   }
 }
 
@@ -1472,11 +1478,19 @@ article > header > .lede {
    horizontal overlap so the heroes read as a single grouped stack,
    not three independent cards in a row. At 58% cover width, the
    -26% margin means each cover sits ~45% of its own width over its
-   neighbour — the heroes overlap roughly by half. */
+   neighbour — the heroes overlap roughly by half. Restores the
+   pre-tightening fan angle because the wider landscape covers need
+   the extra rotation to read as fanned rather than parallel. */
 .series-preview--posts .series-preview__cover {
   aspect-ratio: 16 / 9;
   width: 58%;
   margin: 0 -26%;
+  --max-rot: 6deg;
+}
+@media (hover: hover) {
+  .series-preview--posts .series-preview__link:hover .series-preview__cover {
+    --max-rot: 9deg;
+  }
 }
 
 /* `.post-series-previews` section sits beneath the post list on the
