@@ -75,7 +75,10 @@
   total   = all_related.size
 %>
 <% if visible.any? %>
-<section class="related" aria-labelledby="related-heading">
+<%# `related--book` modifier when the source collection is publications,
+    so the thumbnail uses a 2:3 book-cover aspect (instead of the
+    landscape 4:3 default that crops book covers top/bottom). %>
+<section class="related<%= ' related--book' if source_collection == 'publications' %>" aria-labelledby="related-heading">
   <h2 id="related-heading" class="related__heading">Related</h2>
   <ul class="related__list">
     <% visible.each do |item| %>

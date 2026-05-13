@@ -2269,6 +2269,20 @@ article > header > .lede {
   margin-bottom: var(--space-sm);
 }
 .related__cover img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Publications-context override — book covers are 2:3, not the 4:3
+   landscape default. Without this, `object-fit: cover` crops the
+   top + bottom of a book thumbnail. Also narrow the grid column so
+   a 2:3 cover doesn't dominate the listing row (240px wide × 360px
+   tall is too tall; 150 × 225 reads as a book thumbnail). The
+   modifier is set on the `<section>` by `_related_items.html.erb`
+   when `source_collection == 'publications'`. */
+.related--book .related__list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.related--book .related__cover {
+  aspect-ratio: 2 / 3;
+}
 /* Title is a `<span>` (not an `<h*>`), so it doesn't pick up the
    browser's heading font-weight. Bump to 700 and pin to `--color-text`
    so it reads as substantial as the post-list/h2 titles elsewhere. */
