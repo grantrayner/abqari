@@ -2464,7 +2464,7 @@ article > header > .lede {
 }
 .workshops-index__cover {
   display: block;
-  aspect-ratio: 4 / 3;                 /* index default */
+  aspect-ratio: 4 / 3;                 /* mobile + no-body fallback */
   overflow: hidden;
   background-color: var(--color-code-bg);
 }
@@ -2473,6 +2473,17 @@ article > header > .lede {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+@media (min-width: 768px) {
+  /* In the side-by-side layout the cover lives in a `1fr 2fr` grid
+     cell that stretches to match the body's height (title +
+     description + three meta lines). Without overriding aspect-ratio
+     here, the cover stays pinned to 4:3 of its column width and a
+     gap appears below it when the body is taller. */
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover {
+    aspect-ratio: auto;
+    height: 100%;
+  }
 }
 .workshops-index__body {
   display: block;
