@@ -1530,16 +1530,31 @@ article > header > .lede {
 .series-preview--posts .series-preview__row {
   position: static;
   display: flex;
-  justify-content: center;
+  /* Anchor the stack to the left edge of the partial so the leftmost
+     cover lines up with the post-list cards above (which also sit
+     against the partial's left edge). The overlap cascade runs to
+     the right from there. */
+  justify-content: flex-start;
   align-items: flex-end;
   aspect-ratio: auto;
-  padding: 4% 6% 6%;
+  /* Drop the row's left padding to 0 so the first cover starts at
+     the section edge; keep top/right/bottom so rotated covers don't
+     get clipped and the row stays vertically inset. */
+  padding: 4% 6% 6% 0;
 }
 .series-preview--posts .series-preview__cover {
   position: static;
-  aspect-ratio: 16 / 9;
+  /* Match the 4:3 aspect of `.post-list__cover` so the stacked heroes
+     read as the same shape as the cards above. Post hero images are
+     stored at 16:9; `object-fit: cover` crops top/bottom into the
+     4:3 box without distorting. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   width: 58%;
-  margin: 0 -26%;
+  /* Overlap only on the right edge so the first cover sits flush with
+     the row's left edge. Each subsequent cover slides under the next
+     by 26% of the row width. */
+  margin: 0 -26% 0 0;
   top: auto;
   left: auto;
   --max-rot: 6deg;
