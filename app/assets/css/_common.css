@@ -2243,7 +2243,21 @@ article > header > .lede {
   padding-top: var(--space-lg);
   border-top: 1px solid var(--color-rule);
 }
-.related__heading { margin: 0 0 var(--space-md); font-size: 1.125rem; }
+/* Same typographic treatment as `.home-module__heading` and
+   `.pubs-grouping__heading` — small uppercase muted — so the
+   "Related" section reads consistently with the home modules,
+   the posts-landing Series row, and the publications-landing
+   Bundles / Series headings. Applied across all related sections
+   (posts, photos, publications, workshops). */
+.related__heading {
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
 /* Grid track minimum drives the desktop card count. At 240px, the
    typical content max-width (~768px inner) fits 3 cards per row;
    smaller screens reflow to 2 or 1 automatically via auto-fill. */
