@@ -1040,9 +1040,9 @@ article > header > .lede {
 }
 /* 4:3 in the archive (an index view) — post heroes are authored at
    16:9 to suit the show view; `object-fit: cover` on the img crops
-   to the archive's 4:3 thumbnail. Visual treatment (border-radius
-   + shadow) on the img itself, matching `.home-module__cover img`
-   so home modules and archive look identical. */
+   to the archive's 4:3 thumbnail. Flat (no rounded corners, no
+   shadow) to match `.post-list__cover` on the front posts index —
+   the archive and the front index share visual treatment. */
 .posts-archive__cover {
   display: block;
   max-width: 200px;
@@ -1053,27 +1053,21 @@ article > header > .lede {
   height: auto;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: var(--radius-1);
-  box-shadow: var(--shadow-soft);
   /* Same neutral surface the placeholder SVG paints, so a real `<img>`
      that's still on the wire fills its 4:3 box rather than flashing
      transparent — `object-fit: cover` paints over this entirely once
      the image arrives, so loaded thumbnails are unchanged. */
   background-color: var(--color-code-bg);
 }
-/* Placeholder rendered when a post has no hero. Mirrors the `<img>`
-   shape/chrome so heroless rows keep the same grid alignment as
-   their hero-bearing siblings. `<rect>` paints in `currentColor`; the
-   theme token sets the surface to the same `--color-code-bg` used
-   for the loading-state background above. Same pattern as
-   `.post-list__cover-placeholder` on the front index. */
+/* Placeholder rendered when a post has no hero. Matches the `<img>`
+   shape so heroless rows keep the same grid alignment as their
+   hero-bearing siblings. Flat (no shadow / no radius) so it reads
+   the same as the front-index post-list placeholder. */
 .posts-archive__cover-placeholder {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   color: var(--color-code-bg);
-  border-radius: var(--radius-1);
-  box-shadow: var(--shadow-soft);
 }
 .posts-archive__body { min-width: 0; }
 .posts-archive__title {
