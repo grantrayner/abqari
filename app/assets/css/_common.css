@@ -1418,17 +1418,24 @@ article > header > .lede {
   font-size: 0.875rem;
 }
 
-/* Series previews — a row of covers with slight alternating tilts.
-   Two-cover series lean toward each other (left tilts right edge up,
-   right tilts left edge up) like a pair of bookends; for more covers
-   the rotation interpolates evenly via the `--i` / `--n` custom
-   properties set per cover in markup. */
+/* Series previews — structurally identical to `.bundle-preview__stack`
+   / `.bundle-preview__cover`. Same tile, same cover size, same anchor
+   point within the tile. The *only* difference is how the N covers
+   stack: bundles fan out with hardcoded back/mid/front rotations and
+   translates (-9°/-2°/+5°, ±12% translate); series uses a gentle
+   continuous --i/--n rotation (±3°) with NO translate, so the covers
+   sit in a near-flat pile rather than a splayed fan. This is the
+   intended visual contrast on the publications landing — same shape
+   of "tile", different shape of "stack".
+
+   Posts series previews override below to keep their flex-row layout
+   for landscape hero images. */
 .series-previews {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--space-2xl);
 }
 .series-preview__link {
@@ -1437,79 +1444,66 @@ article > header > .lede {
   text-decoration: none;
 }
 .series-preview__row {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
+  position: relative;
+  display: block;
   width: 100%;
+  aspect-ratio: 2 / 3;
   margin-bottom: var(--space-md);
-  /* Avoid the row's height collapsing on tall rotations. */
-  padding: 4% 6% 6%;
+  /* Same inset as `.bundle-preview__stack` so the cover edges sit at
+     the same tile coordinates as the bundle covers. */
+  padding: 6% 12%;
 }
 .series-preview__cover {
-  display: block;
-  width: 46%;
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  width: 76%;
   height: auto;
   aspect-ratio: 2 / 3;
+  margin-left: -38%;
+  display: block;
   border-radius: 2px;
   box-shadow: var(--shadow-cover);
   background: var(--color-card-bg);
-  transition: transform 0.35s ease;
-  /* Negative margin so covers overlap. Tighter than the original -6%
-     so the stack reads as one grouped object rather than a row of
-     near-touching books. */
-  margin: 0 -10%;
-  /* Rotation grows linearly across the row: leftmost ≈ -3deg,
-     rightmost ≈ +3deg. --i is the 0-based index, --n is the count.
-     The shallow tilt is deliberate — it differentiates the series
-     stack from the bundle stack (which uses larger ±9° rotations
-     in `.bundle-preview__cover--*`). */
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  /* Later-positioned covers (higher --i) stack on top. */
+  z-index: calc(var(--i, 0) + 1);
+  /* Rotation interpolates linearly: leftmost ≈ -3°, rightmost ≈ +3°.
+     Deliberately small angle and zero translate — the contrast with
+     the bundle stack's ±9° rotations + ±12% translates is the whole
+     point of this partial. */
   --max-rot: 3deg;
   transform: rotate(calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-rot)));
 }
 @media (hover: hover) {
   .series-preview__link:hover .series-preview__cover {
-    /* Hover boost stays gentle — proportional to the resting angle. */
     --max-rot: 5deg;
   }
 }
 
-/* Publications series tile — match the bundles tile width and inset
-   so the two stacks sit in the same-shaped envelope within their
-   tiles. Without this scope, the series grid uses the wider 260px
-   column (set above as the cross-collection default for posts), and
-   the smaller covers leave noticeable empty space inside each tile
-   compared to the snugly-filled bundle stack on the same landing. */
-.pubs-grouping--series .series-previews {
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+/* Posts series preview — flex row of landscape hero images, with
+   tight horizontal overlap. Different visual metaphor from the book
+   stack above: heroes lined up side-by-side with overlap, not a
+   pile of book covers. Override the absolute-positioned book stack
+   structure inherited from the base rule. */
+.post-series-previews .series-previews {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
-.pubs-grouping--series .series-preview__row {
-  /* Match `.bundle-preview__stack` horizontal padding (12%) so the
-     visible cover stack starts and ends at the same tile inset as
-     the bundle covers. Vertical padding can stay smaller because
-     the shallow ±3° rotation needs less clearance. */
-  padding: 4% 12% 6%;
+.series-preview--posts .series-preview__row {
+  position: static;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  aspect-ratio: auto;
+  padding: 4% 6% 6%;
 }
-.pubs-grouping--series .series-preview__cover {
-  /* Wider covers + heavier overlap so the stack visually fills the
-     180px tile in proportion to the bundle stack (which uses 76%
-     wide covers). 60% × 3 covers minus 30% combined overlap = 90%
-     layout fill of the inner area. */
-  width: 60%;
-  margin: 0 -15%;
-}
-
-/* Posts series preview — same stacked-fan visual as publications but
-   sized for post hero images. Landscape aspect ratio with tight
-   horizontal overlap so the heroes read as a single grouped stack,
-   not three independent cards in a row. At 58% cover width, the
-   -26% margin means each cover sits ~45% of its own width over its
-   neighbour — the heroes overlap roughly by half. Restores the
-   pre-tightening fan angle because the wider landscape covers need
-   the extra rotation to read as fanned rather than parallel. */
 .series-preview--posts .series-preview__cover {
+  position: static;
   aspect-ratio: 16 / 9;
   width: 58%;
   margin: 0 -26%;
+  top: auto;
+  left: auto;
   --max-rot: 6deg;
 }
 @media (hover: hover) {
