@@ -1399,12 +1399,12 @@ article > header > .lede {
    cover dominates; back + mid peek out as small wedges at the edges
    from beneath. The contrast with the series stack on the same
    landing is the splayed fan vs flat pile — see `.series-preview__cover`. */
-.bundle-preview__cover--back  { transform: rotate(-3deg); z-index: 1; }
+.bundle-preview__cover--back  { transform: rotate(-5deg); z-index: 1; }
 .bundle-preview__cover--mid   { transform: rotate(0deg);  z-index: 2; }
-.bundle-preview__cover--front { transform: rotate(3deg);  z-index: 3; }
+.bundle-preview__cover--front { transform: rotate(5deg);  z-index: 3; }
 @media (hover: hover) {
-  .bundle-preview__link:hover .bundle-preview__cover--back  { transform: rotate(-5deg); }
-  .bundle-preview__link:hover .bundle-preview__cover--front { transform: rotate(5deg);  }
+  .bundle-preview__link:hover .bundle-preview__cover--back  { transform: rotate(-8deg); }
+  .bundle-preview__link:hover .bundle-preview__cover--front { transform: rotate(8deg);  }
 }
 .bundle-preview__body {
   display: block;
@@ -1479,9 +1479,9 @@ article > header > .lede {
      rotate(+9°) translate(+12%, +2%) — the same fanned silhouette
      the bundles partial used to carry, now reassigned to series to
      contrast with bundles' new flat pile. */
-  --max-rot: 9deg;
-  --max-tx:  12%;
-  --max-ty:  2%;
+  --max-rot: 6deg;
+  --max-tx:  8%;
+  --max-ty:  1.5%;
   transform:
     translate(
       calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-tx)),
@@ -1491,9 +1491,9 @@ article > header > .lede {
 }
 @media (hover: hover) {
   .series-preview__link:hover .series-preview__cover {
-    --max-rot: 13deg;
-    --max-tx:  17%;
-    --max-ty:  3%;
+    --max-rot: 9deg;
+    --max-tx:  11%;
+    --max-ty:  2%;
   }
 }
 
