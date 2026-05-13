@@ -1394,12 +1394,17 @@ article > header > .lede {
   transition: transform 0.35s ease, box-shadow 0.35s ease;
   background: var(--color-card-bg);
 }
-.bundle-preview__cover--back  { transform: rotate(-9deg) translate(-12%, -2%); z-index: 1; }
-.bundle-preview__cover--mid   { transform: rotate(-2deg) translate(-3%, -1%);  z-index: 2; }
-.bundle-preview__cover--front { transform: rotate(5deg)  translate(8%, 1%);    z-index: 3; }
+/* Near-flat pile: all three covers sit at the same centered position
+   (no translate), differentiated only by a shallow rotation. Front
+   cover dominates; back + mid peek out as small wedges at the edges
+   from beneath. The contrast with the series stack on the same
+   landing is the splayed fan vs flat pile — see `.series-preview__cover`. */
+.bundle-preview__cover--back  { transform: rotate(-3deg); z-index: 1; }
+.bundle-preview__cover--mid   { transform: rotate(0deg);  z-index: 2; }
+.bundle-preview__cover--front { transform: rotate(3deg);  z-index: 3; }
 @media (hover: hover) {
-  .bundle-preview__link:hover .bundle-preview__cover--back  { transform: rotate(-13deg) translate(-17%, -3%); }
-  .bundle-preview__link:hover .bundle-preview__cover--front { transform: rotate(9deg)   translate(13%, 2%);   }
+  .bundle-preview__link:hover .bundle-preview__cover--back  { transform: rotate(-5deg); }
+  .bundle-preview__link:hover .bundle-preview__cover--front { transform: rotate(5deg);  }
 }
 .bundle-preview__body {
   display: block;
@@ -1421,12 +1426,12 @@ article > header > .lede {
 /* Series previews — structurally identical to `.bundle-preview__stack`
    / `.bundle-preview__cover`. Same tile, same cover size, same anchor
    point within the tile. The *only* difference is how the N covers
-   stack: bundles fan out with hardcoded back/mid/front rotations and
-   translates (-9°/-2°/+5°, ±12% translate); series uses a gentle
-   continuous --i/--n rotation (±3°) with NO translate, so the covers
-   sit in a near-flat pile rather than a splayed fan. This is the
-   intended visual contrast on the publications landing — same shape
-   of "tile", different shape of "stack".
+   stack: series fans out with continuous --i/--n rotation (±9°) plus
+   translate (±12% X, ±2% Y), so the leftmost cover leans + slides
+   left, the rightmost leans + slides right; bundles sit in a near-
+   flat pile with shallow rotation only (see `.bundle-preview__cover`
+   above). This is the intended visual contrast on the publications
+   landing — same shape of "tile", different shape of "stack".
 
    Posts series previews override below to keep their flex-row layout
    for landscape hero images. */
@@ -1468,16 +1473,27 @@ article > header > .lede {
   transition: transform 0.35s ease, box-shadow 0.35s ease;
   /* Later-positioned covers (higher --i) stack on top. */
   z-index: calc(var(--i, 0) + 1);
-  /* Rotation interpolates linearly: leftmost ≈ -3°, rightmost ≈ +3°.
-     Deliberately small angle and zero translate — the contrast with
-     the bundle stack's ±9° rotations + ±12% translates is the whole
-     point of this partial. */
-  --max-rot: 3deg;
-  transform: rotate(calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-rot)));
+  /* Splayed fan: rotation AND translate interpolate linearly across
+     the row. For a 3-cover series the leftmost cover ends up at
+     rotate(-9°) translate(-12%, -2%) and the rightmost at
+     rotate(+9°) translate(+12%, +2%) — the same fanned silhouette
+     the bundles partial used to carry, now reassigned to series to
+     contrast with bundles' new flat pile. */
+  --max-rot: 9deg;
+  --max-tx:  12%;
+  --max-ty:  2%;
+  transform:
+    translate(
+      calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-tx)),
+      calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-ty))
+    )
+    rotate(calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-rot)));
 }
 @media (hover: hover) {
   .series-preview__link:hover .series-preview__cover {
-    --max-rot: 5deg;
+    --max-rot: 13deg;
+    --max-tx:  17%;
+    --max-ty:  3%;
   }
 }
 
@@ -1505,10 +1521,17 @@ article > header > .lede {
   top: auto;
   left: auto;
   --max-rot: 6deg;
+  /* Posts use flex margin-based horizontal overlap, not transform
+     translate — zero out the translate tokens inherited from the
+     publications fan above. */
+  --max-tx:  0%;
+  --max-ty:  0%;
 }
 @media (hover: hover) {
   .series-preview--posts .series-preview__link:hover .series-preview__cover {
     --max-rot: 9deg;
+    --max-tx:  0%;
+    --max-ty:  0%;
   }
 }
 
