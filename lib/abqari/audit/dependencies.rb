@@ -113,8 +113,14 @@ module Abqari
         end
       end
 
+      # PATH walk instead of `system("command -v #{cmd} ...")` so the
+      # caller can't inadvertently introduce shell injection. Callers
+      # are hardcoded today, but the argv-free form is the safer default
+      # and matches Search#command_available?.
       def command_available?(cmd)
-        system("command -v #{cmd} > /dev/null 2>&1")
+        ENV['PATH'].to_s.split(File::PATH_SEPARATOR).any? do |dir|
+          File.executable?(File.join(dir, cmd))
+        end
       end
     end
   end

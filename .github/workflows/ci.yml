@@ -22,6 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install libvips
+        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
+        # with libvips preinstalled but the apt step is cheap insurance
+        # against image-name-pinning changes.
+        run: sudo apt-get install -y libvips42
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -44,6 +50,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install libvips
+        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
+        # with libvips preinstalled but the apt step is cheap insurance
+        # against image-name-pinning changes.
+        run: sudo apt-get install -y libvips42
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -74,6 +86,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install libvips
+        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
+        # with libvips preinstalled but the apt step is cheap insurance
+        # against image-name-pinning changes.
+        run: sudo apt-get install -y libvips42
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

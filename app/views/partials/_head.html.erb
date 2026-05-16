@@ -188,15 +188,15 @@
   {
     "@context": "https://schema.org",
     "@type": "Article",
-    "headline": <%== page.title.to_json %>,
+    "headline": <%== script_safe_json(page.title) %>,
     "datePublished": "<%= page.date.iso8601 %>",
-    <% if date_mod %>"dateModified": <%== date_mod.to_json %>,<% end %>
-    <% if page.description %>"description": <%== page.description.to_json %>,<% end %>
-    <% if site.config['url'] %>"url": <%== abs_url.to_json %>,<% end %>
-    <% if site.config['url'] %>"mainEntityOfPage": { "@type": "WebPage", "@id": <%== abs_url.to_json %> },<% end %>
-    <% if share_image %>"image": <%== share_image.to_json %>,<% end %>
+    <% if date_mod %>"dateModified": <%== script_safe_json(date_mod) %>,<% end %>
+    <% if page.description %>"description": <%== script_safe_json(page.description) %>,<% end %>
+    <% if site.config['url'] %>"url": <%== script_safe_json(abs_url) %>,<% end %>
+    <% if site.config['url'] %>"mainEntityOfPage": { "@type": "WebPage", "@id": <%== script_safe_json(abs_url) %> },<% end %>
+    <% if share_image %>"image": <%== script_safe_json(share_image) %>,<% end %>
     <% if word_total.positive? %>"wordCount": <%= word_total %>,<% end %>
-    "author": { "@type": "Person", "name": <%== page_author.to_json %> }
+    "author": { "@type": "Person", "name": <%== script_safe_json(page_author) %> }
   }
   </script>
   <% end %>

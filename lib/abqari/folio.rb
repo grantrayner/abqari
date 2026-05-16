@@ -2,6 +2,7 @@
 
 require 'net/http'
 require 'json'
+require 'openssl'
 require 'yaml'
 require 'fileutils'
 require 'set'
@@ -142,7 +143,7 @@ module Abqari
     def fetch_endpoint(name)
       cache_path = File.join(cache_dir, "#{name}.yml")
       etag_path  = File.join(cache_dir, "etag-#{name}")
-      cached     = File.exist?(cache_path) ? (YAML.safe_load_file(cache_path) || {}) : {}
+      cached     = File.exist?(cache_path) ? (YAML.safe_load_file(cache_path, permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}) : {}
       etag       = File.exist?(etag_path) ? File.read(etag_path).strip : nil
 
       uri = URI("#{base_url.sub(%r{/\z}, '')}/api/v1/authors/#{author_slug}/#{name}.json")
@@ -171,8 +172,19 @@ module Abqari
         Log.warn "Folio: unexpected HTTP #{res.code} from /#{name} — using cached data"
         cached[ENDPOINTS[name]] || []
       end
-    rescue StandardError => e
+    # Narrowed rescue list: the expected failure modes for a Folio
+    # fetch are network (timeouts, DNS, TCP/TLS), an oversized
+    # response, malformed JSON, or filesystem failure writing the
+    # cache. Anything else (a Ruby bug, a programming error) should
+    # surface so we don't silently mask it as "Folio unreachable."
+    # Backtrace logged at debug so `ABQARI_LOG=debug` surfaces the
+    # full stack when triaging upstream issues.
+    rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED,
+           Errno::EHOSTUNREACH, Errno::ENETUNREACH, SocketError, IOError,
+           OpenSSL::SSL::SSLError, HttpSafe::TooLargeError,
+           JSON::ParserError, Psych::SyntaxError, SystemCallError => e
       Log.warn "Folio: fetch /#{name} failed (#{e.class}: #{e.message}) — using cached data"
+      e.backtrace&.first(5)&.each { |line| Log.debug "  #{line}" }
       cached[ENDPOINTS[name]] || []
     end
 

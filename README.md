@@ -46,12 +46,28 @@ Edit `Gemfile`:
 ```ruby
 source 'https://rubygems.org'
 
-gem 'abqari', git: 'https://github.com/your-handle/abqari.git', tag: 'v0.1.0'
+gem 'abqari', '~> 0.2'
 
 group :development do
   gem 'listen', '~> 3.8'    # optional, for the dev-server file watcher
 end
 ```
+
+Or — pin to a git ref while tracking pre-release work:
+
+```ruby
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v0.2.0'
+```
+
+Install the libvips C library once (hard dep for the image pipeline):
+
+```bash
+brew install vips                # macOS
+sudo apt install libvips42       # Ubuntu/Debian
+apk add vips                     # Alpine
+```
+
+GitHub Actions `ubuntu-latest` ships with libvips preinstalled, so the CI workflow needs nothing more than `bundle install`.
 
 Then:
 
@@ -1008,32 +1024,95 @@ Variants: `:outline` (default, 24×24 stroke), `:solid` (24×24 fill),
 
 ## Images
 
-Off by default — when `images.optimise: true`, Abqari generates responsive `<picture>` markup with multiple formats and widths. Source images live in `app/assets/images/`. Reference them in markdown the normal way (`![alt](/assets/images/hero.jpg)`) — the post-process step rewrites `<img>` tags to full `<picture>` blocks at build time.
+**On by default.** Every raster image the engine knows about — `app/assets/images/`, post bundle images (`content/posts/<slug>/hero.jpg`), photo collection items, flat-collection assets — gets processed into a `<picture>` block with AVIF + WebP + an optimised original-format fallback, across multiple widths.
+
+Reference an image in markdown the normal way:
+
+```markdown
+![Hero](hero.jpg)
+```
+
+…and the build's post-process pass rewrites it to:
+
+```html
+<picture>
+  <source type="image/avif" srcset="/posts/foo/hero-400.abc.avif 400w, /posts/foo/hero-800.def.avif 800w, /posts/foo/hero-1200.ghi.avif 1200w" sizes="(min-width: 768px) 50vw, 100vw">
+  <source type="image/webp" srcset="..." sizes="...">
+  <img src="/posts/foo/hero-1200.xyz.jpg" alt="Hero" width="1200" height="800" loading="lazy" decoding="async">
+</picture>
+```
+
+### Defaults
 
 ```yaml
 images:
-  optimise: true
-  processor: auto             # auto | vips | imagemagick
-  formats: [webp, avif]
+  optimise: true                  # turn the pipeline on (default)
+  processor: auto                 # auto | vips-native | vips | imagemagick
+  formats: [avif, webp]           # AVIF first — browser picks first decodable
   widths: [400, 800, 1200]
-  quality: 80
+  quality:
+    avif: 50                      # perceptually ~= JPEG 85, ~40% smaller
+    webp: 80                      # ~30% smaller than JPEG at the same quality
+    original: 85                  # the JPEG/PNG fallback
   sizes: "(min-width: 768px) 50vw, 100vw"
+  source_dir: app/assets/images   # site-wide imagery (not bundle images)
+  preserve_metadata: false        # strip EXIF / GPS / embedded thumbnails by default
 ```
 
-Requires `vips` (preferred) or `magick` on `PATH`:
+### Install libvips
+
+The pipeline uses **libvips** via the `ruby-vips` gem (added to the gemspec; installed automatically by `bundle install`). The Ruby bindings are tiny pure-FFI code; the install footprint is the libvips C library:
 
 ```bash
-brew install vips           # macOS
-apt install libvips-tools   # Ubuntu
+brew install vips             # macOS
+sudo apt install libvips42    # Ubuntu/Debian (since 20.04, AVIF included)
+apk add vips                  # Alpine
 ```
 
-For explicit use in templates:
+GitHub Actions `ubuntu-latest` ships with libvips pre-installed. The legacy shell-out path (`vips` / `magick` CLIs) is still supported as a fallback when ruby-vips can't load — set `processor: vips` or `processor: imagemagick` to force it, or just let auto-detection do the right thing.
 
-```erb
-<%= picture_tag 'hero.jpg', alt: 'A hero image', widths: [600, 1200] %>
-```
+### What gets optimised
 
-When `optimise: false` (the default), images pass through unchanged — no system dependency required.
+- **`app/assets/images/`** — site-wide imagery. Reference via `picture_tag 'hero.jpg', alt: '…'` in any layout, or as `<img src="/assets/images/hero.jpg">` in markdown.
+- **Post bundle images** — `content/posts/<slug>/hero.jpg` and any other raster siblings of `index.md`. Reference via the relative path (`hero.jpg`) in the post body; `rewrite_bundle_urls` + the image pipeline take care of the rest.
+- **Flat collection assets** — files under `content/publications/`, `content/workshops/`, etc. with their permalink URL prefix.
+
+### What doesn't
+
+- **SVG** is vector — nothing to thumbnail. SVGs pass through untouched.
+- **Images smaller than the smallest requested width.** A 300px-wide source with `widths: [400, 800, 1200]` produces a single variant at 300px (its native size). Upscaling is skipped — bigger files, blurrier output, no win.
+- **External URLs** (`<img src="https://…">`) — left alone.
+
+### Storage and quality
+
+A typical 4 MB iPhone JPEG becomes:
+
+| Variant | Size |
+|---|---|
+| `hero-400.<hash>.avif` | ~30 KB |
+| `hero-800.<hash>.avif` | ~80 KB |
+| `hero-1200.<hash>.avif` | ~150 KB |
+| `hero-400.<hash>.webp` | ~50 KB |
+| `hero-800.<hash>.webp` | ~150 KB |
+| `hero-1200.<hash>.webp` | ~300 KB |
+| `hero-1200.<hash>.jpg` (fallback) | ~500 KB |
+
+Roughly half the disk of the original, and each visitor downloads ~150 KB instead of 4 MB. EXIF / GPS / camera serial stripped by default (privacy + 50–500 KB extra savings per photo). Set `preserve_metadata: true` if you publish photography portfolios that surface camera info.
+
+### Cache + determinism
+
+Variants are fingerprinted by `<source-path>:<width>:<format>:<quality>:<source-mtime>`. Subsequent builds skip any variant whose source hasn't changed (mtime-based incrementality, sub-millisecond per variant). Two consecutive cold builds produce byte-identical output.
+
+### Audit
+
+`bin/audit` flags pages with heavy image payloads:
+
+- Single image > 500 KB → warn (> 1 MB → error)
+- Total image weight on one page > 1 MB → warn (> 3 MB → error)
+
+### Disabling
+
+`images.optimise: false` reverts to passthrough — originals copied verbatim, `<img>` left as-is. No libvips dependency required. Use when shipping a text-only site, or when you've pre-optimised your imagery upstream.
 
 ## Deploy artifacts
 
@@ -1423,13 +1502,29 @@ Run a single test file: `bundle exec ruby -Ilib -Itest test/helpers_test.rb`. Ru
 
 1. The build runs incrementally (no `_site/` wipe; mtime-aware copies skip unchanged work).
 2. The build version bumps and the watcher classifies the change scope.
-3. Each rendered page in dev includes a tiny script that polls `/__reload__` and either:
+3. Each rendered page in dev opens a Server-Sent Events stream to `/__reload__`; when the server pushes a rebuild event the client either:
    - **Swaps the `<link rel="stylesheet">` href** in place if only CSS files changed (preserves scroll position and form state), or
    - **Reloads the page** if anything else changed.
 
 **Watcher backend.** When the `listen` gem is installed (it's a development-group dep), the watcher uses native FS events (FSEvents on macOS, inotify on Linux) — zero overhead between changes. Without `listen`, it falls back to 500ms mtime polling. Both modes debounce events by 100ms so editor tools that fire two events per save don't double-rebuild.
 
-No websocket dependency. The script is only injected when `ABQARI_ENV=development`, so production builds are clean.
+**Transport.** Server-Sent Events (SSE) over plain HTTP — no WebSocket dep, works through any proxy. The browser opens a single persistent EventSource per tab; the server pushes events with sub-50ms median latency. Connection auto-reconnects if the dev server restarts. The script is only injected when `ABQARI_ENV=development`, so production builds are clean.
+
+## Plugins
+
+Drop a Ruby file into `<site_root>/plugins/`. It's auto-loaded once at `Site.new` and can register callbacks for lifecycle events:
+
+```ruby
+# plugins/word_counter.rb
+Abqari::Hooks.register(:post_process) do |html, _site, page|
+  next html unless page.respond_to?(:post?) && page.post?
+
+  words = html.gsub(/<[^>]+>/, '').split(/\s+/).size
+  html.sub('</article>', %(<footer>~#{words} words</footer></article>))
+end
+```
+
+Lifecycle events: `:before_build`, `:after_load_pages`, `:after_generate`, `:after_build`. Filters: `:post_process(html, site, page)`. Full reference in [`docs/plugins.md`](docs/plugins.md).
 
 ## Performance
 

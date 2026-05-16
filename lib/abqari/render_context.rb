@@ -28,6 +28,14 @@ module Abqari
 
     attr_reader :page, :site
 
+    # Instance variables intentionally exposed to templates via the
+    # `binding` ERB receives. Anything outside this set should use
+    # the `@_` convention so a stray `<%= @foo %>` is clearly out-of-
+    # contract. The audit test `RenderContextInternalIvarTest` reads
+    # this list and fails if RenderContext grows an ivar that's
+    # neither in the allow-list nor `@_`-prefixed.
+    TEMPLATE_PUBLIC_IVARS = %i[@page @site].freeze
+
     def initialize(page, site, locals = {})
       @page = page
       @site = site
@@ -68,15 +76,23 @@ module Abqari
       parent = layout_fm['layout']
       return inner unless parent
 
-      @yielded_content = inner
+      @_yielded_content = inner
       render_layout(parent.to_s)
     end
 
     # The output of the inner layout, available inside a wrapping layout
     # as `<%== yield_content %>`. Returns '' at the leaf level (the layout
     # being rendered direct from a page, with no inner layout wrapping it).
+    #
+    # The backing ivar is intentionally `@_yielded_content` (leading
+    # underscore = "internal, don't touch"). ERB templates get the full
+    # binding via `get_binding`, so every RenderContext ivar is one
+    # `<%= @whatever %>` typo away from being usable. The underscore
+    # convention plus the `RenderContextInternalIvarTest` audit pin
+    # the contract: only `page` and `site` are intended template-
+    # accessible state; helper method results carry the rest.
     def yield_content
-      @yielded_content.to_s
+      @_yielded_content.to_s
     end
 
     # Render an ERB string against this context. Used by Page#rendered_body
@@ -158,15 +174,14 @@ module Abqari
       site.find_in_paths(File.join('app', 'views', *parts, filename))
     end
 
-    # Layout frontmatter — same `---` ... `---` pattern as content pages,
-    # but only `layout:` is honoured (used to chain into a parent layout).
-    # Returns [parsed_hash, body_after_frontmatter]. Returns [{}, raw] if
-    # no frontmatter is present, so layouts without it work unchanged.
-    LAYOUT_FRONTMATTER_RE = /\A---\s*\n(.*?\n)---\s*\n(.*)/m.freeze
-
+    # Layout frontmatter — same `---` ... `---` pattern as content pages
+    # (Abqari::FRONTMATTER_RE), but only `layout:` is honoured (used to
+    # chain into a parent layout). Returns [parsed_hash,
+    # body_after_frontmatter]. Returns [{}, raw] if no frontmatter is
+    # present, so layouts without it work unchanged.
     def parse_layout_frontmatter(raw)
-      if (match = raw.match(LAYOUT_FRONTMATTER_RE))
-        [YAML.safe_load(match[1]) || {}, match[2]]
+      if (match = raw.match(Abqari::FRONTMATTER_RE))
+        [YAML.safe_load(match[1], permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}, match[2]]
       else
         [{}, raw]
       end

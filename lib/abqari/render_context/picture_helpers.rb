@@ -104,23 +104,43 @@ module Abqari
         "#{base}#{s}"
       end
 
-      # Bundle-aware <picture> renderer. Emits a multi-source picture
-      # element when sibling AVIF or WebP files exist alongside the
-      # given image in the page's bundle directory, falling back to a
-      # plain <img> otherwise.
+      # Bundle-aware <picture> renderer. Three paths, tried in order:
       #
-      # Convention-over-configuration: the engine doesn't process
-      # raster bundle assets at build time (that's image_pipeline's
-      # job, and it currently only operates on `app/assets/images/`).
-      # This helper checks the bundle dir for sibling files at
-      # render time. To take advantage, generate `hero.avif` and
-      # `hero.webp` next to your `hero.jpg`, e.g. via:
-      #     vips webpsave hero.jpg hero.webp --Q 80
-      #     vips avifsave hero.jpg hero.avif --Q 50
-      # SVG sources skip picture entirely — they don't benefit from
-      # format negotiation.
+      #   1. **Pipeline path (preferred).** When `images.optimise` is
+      #      on AND the bundle image is registered with `ImagePipeline`
+      #      (i.e. it's a raster format the pipeline handles), this
+      #      delegates to the pipeline's `picture_tag_for_url`, which
+      #      emits the same `<picture>` shape as auto-rewritten
+      #      markdown `<img>` tags get. Widths/quality/format come
+      #      from `images:` config — no per-call configuration
+      #      needed.
+      #
+      #   2. **Hand-rolled sibling fallback.** SVGs and any raster
+      #      image whose author manually pre-generated `<basename>.avif`
+      #      and `<basename>.webp` next to the source. Useful for
+      #      sites that haven't migrated to the pipeline yet, or for
+      #      cases where you want explicit control over a specific
+      #      hero image.
+      #
+      #   3. **Plain `<img>`.** Last resort when neither of the above
+      #      applies (e.g. SVGs, which don't benefit from format
+      #      negotiation).
       def bundle_picture_tag(page, image, alt:, class_: nil, loading: 'eager', fetchpriority: 'high')
         img_url = sanitized_url(bundle_asset_url_for(page, image))
+
+        # Path 1 — pipeline. Skip for SVGs (vector, nothing to thumbnail).
+        unless image.to_s.end_with?('.svg')
+          extra = { class: class_, loading: loading }
+          extra[:fetchpriority] = fetchpriority if fetchpriority
+          pipeline_html = site.images.picture_tag_for_url(
+            bundle_asset_url_for(page, image),
+            alt: alt,
+            attrs: extra.compact
+          )
+          return pipeline_html if pipeline_html
+        end
+
+        # Path 2 + 3 — hand-rolled siblings or plain <img>.
         attrs = []
         attrs << %(class="#{h(class_)}")            if class_
         attrs << %(src="#{img_url}")
@@ -130,10 +150,7 @@ module Abqari
         attrs << 'decoding="async"'
         plain_img = "<img #{attrs.join(' ')}>"
 
-        # SVG sources don't benefit from a picture wrapper.
         return plain_img if image.to_s.end_with?('.svg')
-
-        # Look up bundle dir on disk to check for AVIF/WebP siblings.
         return plain_img unless page.respond_to?(:bundle_dir) && page.bundle_dir
 
         basename = File.basename(image.to_s, File.extname(image.to_s))

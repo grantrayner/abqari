@@ -35,7 +35,10 @@ module Abqari
   #                          enumeration (with symlink filtering).
   #   - Page::Incremental : `needs_render?`, `lastmod`, `forget_body!`.
   class Page
-    FRONTMATTER_RE = /\A---\s*\n(.*?\n)---\s*\n(.*)/m.freeze
+    # Frontmatter parser — re-exposed here so existing call sites
+    # (`page/parser.rb`) keep their `Page::FRONTMATTER_RE` reference.
+    # The canonical definition lives in `Abqari::FRONTMATTER_RE`.
+    FRONTMATTER_RE = Abqari::FRONTMATTER_RE
     DATE_PREFIX_RE = /\A(\d{4})-(\d{2})-(\d{2})-/.freeze
 
     # `render.unsafe: true` lets authors drop raw HTML directly into a
@@ -94,14 +97,25 @@ module Abqari
     #
     # The auto-derived path truncates to ~200 chars and trims trailing
     # punctuation so it reads as a complete sentence.
+    #
+    # Memoised — listing partials (`_post_list`, related-items, feeds,
+    # sitemap) all call `description` on every page in their slice,
+    # and the auto-derived path re-reads the body from disk if
+    # `forget_body!` has already released it. Without memoisation a
+    # 1000-post archive triggers 1000 cold-cache file reads when it
+    # renders after the per-post pages. Memoised, the cost is one
+    # read per page across the whole build.
     def description
+      return @description if defined?(@description)
+
       explicit = frontmatter['description']
-      return explicit unless explicit.to_s.strip.empty?
-
-      auto = first_paragraph_text
-      return auto unless auto.to_s.strip.empty?
-
-      site.config['description']
+      @description = if !explicit.to_s.strip.empty?
+                       explicit
+                     elsif !(auto = first_paragraph_text).to_s.strip.empty?
+                       auto
+                     else
+                       site.config['description']
+                     end
     end
 
     def date
@@ -223,9 +237,16 @@ module Abqari
     # callers (`first_paragraph_text`) want to be explicit they're
     # reading the un-rendered source markdown, not the ERB-evaluated
     # form that `rendered_body` would emit.
+    #
+    # IO failures are rescued so a transient miss (e.g. a source file
+    # deleted mid-incremental-rebuild) doesn't crash a build that
+    # only wanted a description fallback. The rescue is logged at
+    # `warn` so the operator still sees the issue rather than
+    # silently shipping the site-wide description fallback.
     def raw_body
       body
-    rescue StandardError
+    rescue StandardError => e
+      Log.warn "raw_body failed for #{source_path}: #{e.class}: #{e.message}"
       nil
     end
 
@@ -284,12 +305,19 @@ module Abqari
     end
 
     def first_paragraph_text
+      return @first_paragraph_text if defined?(@first_paragraph_text)
+
       # Source: raw markdown body (everything after frontmatter). We
       # don't render to HTML first because we want plain text, not
       # markup, and rendering is comparatively expensive when this
       # runs once per page during head emission.
+      #
+      # Memoised because `description` falls back to this and is
+      # called from listing partials AFTER `write` has already
+      # released the body via `forget_body!`. Caching prevents the
+      # cold re-read in the listing pass.
       body = raw_body.to_s
-      return nil if body.empty?
+      return @first_paragraph_text = nil if body.empty?
 
       # First paragraph = first run of non-blank lines that isn't a
       # heading / list / blockquote / code fence / ERB tag. The naive
@@ -309,7 +337,7 @@ module Abqari
 
         paragraph_lines << stripped
       end
-      return nil if paragraph_lines.empty?
+      return @first_paragraph_text = nil if paragraph_lines.empty?
 
       raw = paragraph_lines.join(' ')
       # Strip basic markdown decorations so the description reads as
@@ -327,7 +355,7 @@ module Abqari
       plain.gsub!(/\s+/, ' ')
       plain.strip!
 
-      return nil if plain.empty?
+      return @first_paragraph_text = nil if plain.empty?
 
       if plain.length > 200
         snippet = plain[0, 197]
@@ -336,7 +364,7 @@ module Abqari
         snippet = snippet.sub(/\s\S*\z/, '')
         plain = "#{snippet}…"
       end
-      plain
+      @first_paragraph_text = plain
     end
   end
 end

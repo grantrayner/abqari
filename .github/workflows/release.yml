@@ -1,0 +1,80 @@
+# Push a new Abqari version to RubyGems on tag.
+#
+# Trigger: pushing a tag matching `v*.*.*` (e.g. `git tag v0.2.0 && git push origin v0.2.0`).
+# The workflow re-runs the full suite, verifies the tag matches the
+# VERSION constant, builds the gem, and pushes it to RubyGems.
+#
+# Setup once per repo:
+#   1. Get an API key from https://rubygems.org/profile/api_keys
+#   2. Add it as the `RUBYGEMS_API_KEY` secret in GitHub repo Settings.
+#   3. Enable MFA on your RubyGems account (`rubygems_mfa_required` is
+#      set in the gemspec, so unsigned pushes from any account without
+#      MFA will be rejected by RubyGems).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.2.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libvips
+        run: sudo apt-get install -y libvips42
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF##*/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify tag matches VERSION constant
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          expected="${TAG#v}"
+          actual=$(ruby -Ilib -r abqari -e 'puts Abqari::VERSION')
+          if [ "$actual" != "$expected" ]; then
+            echo "Tag $TAG (=> version $expected) doesn't match lib/abqari.rb VERSION ($actual)" >&2
+            exit 1
+          fi
+
+      - name: Run full test suite
+        run: bundle exec bin/test
+
+      - name: Build gem
+        run: gem build abqari.gemspec
+
+      - name: Push to RubyGems
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          gem push abqari-*.gem
+
+      - name: Upload .gem to release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gem-${{ steps.tag.outputs.tag }}
+          path: abqari-*.gem
+          retention-days: 90

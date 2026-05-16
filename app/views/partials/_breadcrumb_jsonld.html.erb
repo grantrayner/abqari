@@ -56,5 +56,5 @@
     "itemListElement" => crumbs
   }
 %>
-<script type="application/ld+json"><%== JSON.generate(jsonld) %></script>
+<script type="application/ld+json"><%== script_safe_json(jsonld) %></script>
 <% end %>

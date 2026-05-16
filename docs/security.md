@@ -56,6 +56,10 @@ against the cases where the cost of getting it wrong is high.
     `[A-Za-z0-9_\-./]+`).
   - `OgImageGenerator#write_file`.
   - `BundleAssets#copy_bundle_assets` and `#copy_flat_collection_assets`.
+  - `Redirects#write_stub` — frontmatter `redirect_from:`.
+  - `FolioShowPage#output_path` and `FolioIndexPage#output_path` —
+    Folio is bounded-trust, so an attacker-controlled `slug:` in a
+    compromised response can't write outside `_site/`.
 - `Site#reset_output` asserts containment under `site_root` before
   `FileUtils.rm_rf` runs. Escape hatch: `ABQARI_ALLOW_EXTERNAL_OUTPUT=true`
   for CI setups that publish to an artifact mount.
@@ -83,9 +87,17 @@ against the cases where the cost of getting it wrong is high.
 
 ### YAML
 
-- All YAML loading uses `YAML.safe_load` (or `safe_load_file`).
-  `permitted_classes: [Date, Time]` is the only allow-list. No
-  `YAML.load`, no `Psych.load`, no `unsafe_load` anywhere in `lib/`.
+- All YAML loading uses `YAML.safe_load` (or `safe_load_file`) with
+  the engine-wide `Abqari::YAML_PERMITTED_CLASSES = [Date, Time]`
+  allow-list (defined in `lib/abqari.rb`). Call sites:
+  - `Page#parse_frontmatter` (content frontmatter)
+  - `SiteLoader#load_config` (`config/site.yml`)
+  - `SiteLoader#load_data` (`data/**/*.{yml,yaml}`)
+  - `Folio#fetch_endpoint` (Folio cache)
+  - `Audit::Content#load_whitelists` (whitelist files)
+  - `Renderer#parent_layout_of` + `RenderContext#parse_layout_frontmatter`
+    (layout frontmatter)
+- No `YAML.load`, no `Psych.load`, no `unsafe_load` anywhere in `lib/`.
 - `Page#parse_frontmatter` passes `filename: source_path` so Psych
   errors carry the offending file path. Other failure modes are
   wrapped with the same context.
@@ -103,15 +115,25 @@ against the cases where the cost of getting it wrong is high.
   (`CGI.escapeHTML`) automatically. The opt-in raw form is `<%== … %>`
   and is reserved for values that are already safe HTML — helper
   output that builds tags (`render`, `link_to`, `picture_tag`,
-  `icon`, `heroicon`, `yield_content`), JSON-LD inside
-  `<script>` blocks, pre-rendered markdown via `page.content`, and a
+  `icon`, `heroicon`, `yield_content`), JSON-LD via
+  `script_safe_json`, pre-rendered markdown via `page.content`, and a
   small handful of explicitly-reviewed locals.
 - `test/erb_escape_audit_test.rb` scans every partial/layout for
   `<%==` and fails the build if any raw interpolation isn't on the
-  allow-list. Friction is the feature: adding a new raw interpolation
-  is a deliberate, reviewer-gated choice.
+  allow-list, OR if it uses `JSON.generate` / `to_json` (forbidden
+  inside `<script>` — they don't escape `<`, `>`, `&`, U+2028/9, so
+  a hostile string in the serialised value can break out of the
+  script tag). Friction is the feature: adding a new raw
+  interpolation is a deliberate, reviewer-gated choice.
+- **JSON-LD inside `<script>` blocks uses `Helpers#script_safe_json`**,
+  which escapes `<`, `>`, `&` and U+2028/9 to their `\uXXXX` JSON
+  escape sequences. The output round-trips through `JSON.parse` and
+  is inert to the host HTML parser. Use this every time a value is
+  interpolated raw between `<script>...</script>`.
 - External URLs are filtered through `Helpers#sanitized_url`, which
-  blocks `javascript:`, `data:`, and `vbscript:` schemes.
+  blocks `javascript:`, `data:`, `vbscript:` schemes AND protocol-
+  relative `//evil.com/x` URLs (browsers treat the latter as a
+  cross-origin redirect under the page's own scheme).
 - `Helpers#slugify` produces only `[a-z0-9-]` — no path separators
   can survive a slug computation.
 
@@ -120,6 +142,23 @@ against the cases where the cost of getting it wrong is high.
 - Inline scripts use SHA256 hashes pre-computed in `ThemeBootstrap`
   and `SpeculationRulesGuard`. The headers file ships those hashes in
   `Content-Security-Policy: script-src`.
+- Defence-in-depth directives: `object-src 'none'` (no
+  `<object>`/`<embed>`), `frame-ancestors 'none'` (no clickjacking),
+  `form-action 'self'` (no cross-origin form POSTs unless explicitly
+  extended via the newsletter config), `base-uri 'self'`.
+- Opt-in features extend the policy narrowly: Plausible adds
+  `plausible.io` to `script-src` + `connect-src`, Folio adds
+  `covers.foliobooks.app` to `img-src`, and a configured
+  `newsletter.action` host is added to `form-action` (and to
+  `script-src`/`connect-src` if `newsletter.script` is set).
+
+### Dev server
+
+- `Server` binds to `127.0.0.1` by default. WEBrick's stdlib default
+  (0.0.0.0) would expose unrendered drafts and future-dated content
+  to anyone on the same LAN. Override with `ABQARI_BIND=0.0.0.0
+  bin/serve` only when you actually need LAN access (e.g. previewing
+  on a phone).
 
 ---
 

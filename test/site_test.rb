@@ -666,20 +666,59 @@ class DisabledPageTest < Minitest::Test
 end
 
 class TimezoneTest < Minitest::Test
-  # Site#new sets ENV['TZ'] from config['timezone']. The test fixture's
-  # config/site.yml sets `timezone: UTC`, so after building the site the
-  # process is anchored to UTC. This guarantees naked dates parse the
-  # same regardless of where the build ran.
-  def test_site_initialization_anchors_process_to_utc
-    TestHelpers.built_site
-    assert_equal 'UTC', ENV['TZ'], 'Site#new should set ENV[TZ] from config[timezone]'
+  # `Site#build` anchors `ENV['TZ']` to `config['timezone']` so naked
+  # dates parse against one consistent zone regardless of where the
+  # build runs. The mutation is scoped to the build call — `ensure`
+  # restores the prior value so the side effect doesn't leak into the
+  # host process (test harnesses, dev-server watchers, embedded use).
+  def test_naked_date_parses_in_configured_timezone_during_build
+    # Page#date parses the frontmatter `date:` value during page
+    # construction inside `build`. Pick a page with a naked date and
+    # confirm its parsed Time landed in the configured zone.
+    page = TestHelpers.built_site.pages.find { |p| p.respond_to?(:date) && p.date && p.frontmatter['date'].is_a?(Date) }
+    assert page, 'fixture should contain at least one page with a naked frontmatter date'
+    assert_equal 'UTC', page.date.zone, 'Naked dates should be anchored to config[timezone] during build'
   end
 
-  def test_naked_date_parses_in_configured_timezone
-    TestHelpers.built_site  # ensures ENV['TZ'] is set
-    parsed = Time.parse('2026-06-15')
-    assert_equal 'UTC', parsed.zone, 'Naked dates should be anchored to the configured zone'
-    assert_equal 0, parsed.hour, 'Midnight in the configured zone, not local'
+  def test_tz_is_restored_after_build
+    original = ENV['TZ']
+    ENV['TZ'] = 'America/New_York'
+
+    site = Abqari::Site.new
+    site.build
+
+    assert_equal 'America/New_York', ENV['TZ'],
+                 'Site#build should restore ENV[TZ] to its pre-build value via ensure'
+  ensure
+    ENV['TZ'] = original
+  end
+
+  def test_tz_is_restored_even_when_build_raises
+    # Use a throwaway site_root + output_dir so the raising build
+    # doesn't wipe the shared test fixture's output. The aim is just
+    # to confirm the `ensure` in `Site#build` runs on the abnormal
+    # path — pre-flight raise from `apply_timezone!` is the simplest
+    # trigger.
+    original_tz   = ENV['TZ']
+    original_root = ENV['ABQARI_SITE_ROOT']
+    original_out  = ENV['ABQARI_OUTPUT_DIR']
+
+    Dir.mktmpdir('abqari-tz-isolated') do |dir|
+      ENV['ABQARI_SITE_ROOT']  = dir
+      ENV['ABQARI_OUTPUT_DIR'] = File.join(dir, '_site')
+      ENV['TZ']                = 'America/New_York'
+
+      site = Abqari::Site.new
+      site.define_singleton_method(:apply_timezone!) { raise 'boom' }
+
+      assert_raises(RuntimeError) { site.build }
+      assert_equal 'America/New_York', ENV['TZ'],
+                   'Site#build should restore ENV[TZ] even when the build itself raises'
+    end
+  ensure
+    ENV['TZ']                = original_tz
+    ENV['ABQARI_SITE_ROOT']  = original_root
+    ENV['ABQARI_OUTPUT_DIR'] = original_out
   end
 end
 

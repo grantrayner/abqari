@@ -2,6 +2,7 @@
 
 require 'cgi'
 require 'date'
+require 'json'
 require 'time'
 require 'uri'
 
@@ -19,17 +20,54 @@ module Abqari
       CGI.escapeHTML(text.to_s)
     end
 
+# JSON serialiser for values that will be interpolated raw into a
+# `<script>` block — JSON-LD, embedded config, etc. Plain
+# `JSON.generate` does NOT escape `<`, `>`, `&`, or the line /
+# paragraph separators U+2028/U+2029, any of which let a hostile
+# string break out of the script tag — a Folio response with
+# `"title": "x</script><script>alert(1)</script>"` ships as working
+# HTML otherwise. Folio data is bounded-trust per docs/security.md
+# §1; this helper closes the gap.
+#
+# Strategy: replace HTML- and JS-significant characters with their
+# JSON `\uXXXX` escape sequences. The output is still valid JSON
+# (round-trips through `JSON.parse`), but contains no literal `<`,
+# `>`, or `&`, so the host HTML parser sees it as inert text right
+# up to the closing `</script>` we emit ourselves.
+#
+# Always use `<%== script_safe_json(value) %>` inside a `<script>`
+# block. Outside `<script>`, prefer `h(value.to_json)`.
+SCRIPT_JSON_ESCAPE = {
+  '<'                    => '\u003c',
+  '>'                    => '\u003e',
+  '&'                    => '\u0026',
+  " "               => '\u2028',
+  " "               => '\u2029'
+}.freeze
+SCRIPT_JSON_RE = /[<>&  ]/.freeze
+
+def script_safe_json(value)
+  JSON.generate(value).gsub(SCRIPT_JSON_RE, SCRIPT_JSON_ESCAPE)
+end
+
     # Validate a URL for use in href / src attributes. Returns the
     # HTML-escaped URL when it's a same-origin path or an http(s) URL;
     # returns nil otherwise. Blocks `javascript:`, `data:` (HTML),
     # `vbscript:` and other scheme-based XSS vectors. Use whenever a
     # URL comes from outside author-controlled content (Folio buy_url,
     # fetched data, etc.).
+    #
+    # Protocol-relative URLs (`//evil.com/x`) are rejected. Browsers
+    # treat them as `<current-scheme>://evil.com/x`, so they're a
+    # cross-origin redirect vector disguised as a same-origin path.
+    # Same-origin paths must start with a single `/` followed by a
+    # non-`/` character (or be a lone `/`).
     def sanitized_url(url)
       return nil if url.nil?
 
       s = url.to_s.strip
       return nil if s.empty?
+      return nil if s.start_with?('//')
       return h(s) if s.start_with?('/', '#')
 
       begin
@@ -44,13 +82,21 @@ module Abqari
       h(uri.to_s)
     end
 
+    # Truncate `text` so the visible result (kept content + omission)
+    # is at most `length` characters. When `omission` is longer than
+    # `length` the budget for content is zero — falling back to a
+    # negative slice would silently return the LAST N chars of the
+    # text (Ruby's `String#[]` with a negative second arg returns nil
+    # or the trailing window). Clamp the slice width to 0 so the
+    # caller gets just the omission, not a surprise suffix.
     def truncate(text, length: 100, omission: '…')
       return '' if text.nil?
 
       text = text.to_s
       return text if text.length <= length
 
-      text[0, length - omission.length].rstrip + omission
+      slice_width = [length - omission.length, 0].max
+      text[0, slice_width].rstrip + omission
     end
 
     def pluralize(count, singular, plural: nil)

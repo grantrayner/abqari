@@ -57,5 +57,5 @@
   # Camera as exifData (free-form). Could also map to `creditText`.
   jsonld["creditText"] = fm['camera'] if fm['camera']
 %>
-<script type="application/ld+json"><%== JSON.generate(jsonld.compact) %></script>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
 <% end %>

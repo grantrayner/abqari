@@ -32,22 +32,38 @@ module Abqari
     # source for `render '...'` calls and is more complexity than the
     # win is worth at the scale Abqari targets. Edits to a partial
     # therefore still invalidate every cached render.
+    #
+    # `themes/**/*` is NOT in this list — it's resolved per-site at
+    # `compute_shared_deps_mtime` time so we only walk the active
+    # theme's directory, not every theme that happens to ship with
+    # the gem.
     GLOBAL_DEP_GLOBS = [
       'app/views/partials/**/*',
       'app/icons/**/*',
       'app/assets/**/*',
       'lib/**/*',
       'config/**/*',
-      'data/**/*',
-      'themes/**/*'
+      'data/**/*'
     ].freeze
 
-    LAYOUT_FRONTMATTER_RE = /\A---\s*\n(.*?\n)---\s*\n/m.freeze
+    # The renderer only needs the frontmatter block (no body), but
+    # reusing `Abqari::FRONTMATTER_RE` and discarding `match[2]` keeps
+    # the three call sites in lockstep — the old duplicate-with-drift
+    # was finding a `---` pair that the page parser wouldn't.
+    LAYOUT_FRONTMATTER_RE = Abqari::FRONTMATTER_RE
 
     def initialize(site)
       @site = site
       @template_cache = {}
       @template_mutex = Mutex.new
+      # Separate mutex for the mtime / layout-chain caches. Different
+      # contention profile from the template cache (computed once per
+      # layout name, then read-only for the rest of the build), and
+      # keeping the mutex separate means a slow first-miss on the
+      # mtime side doesn't block template compilation.
+      @deps_mutex     = Mutex.new
+      @layout_chains  = {}
+      @layout_mtimes  = {}
     end
 
     # Reset between builds (incremental dev server keeps the Site
@@ -56,9 +72,11 @@ module Abqari
     # layout file or a frontmatter `layout:` edit changes the chain.
     def clear_template_cache
       @template_mutex.synchronize { @template_cache = {} }
-      @shared_deps_mtime = nil
-      @layout_chains    = nil
-      @layout_mtimes    = nil
+      @deps_mutex.synchronize do
+        @shared_deps_mtime = nil
+        @layout_chains     = {}
+        @layout_mtimes     = {}
+      end
     end
 
     # Lazily compile and cache a template. Safe to call from threads.
@@ -74,8 +92,15 @@ module Abqari
     # Most-recent mtime across the global dep set (everything except
     # layout files). When this is newer than a page's output, that
     # output is stale regardless of which layout the page uses.
+    #
+    # Mutex-protected. `Page#needs_render?` runs inside the parallel
+    # render loop, so concurrent threads can race on the first miss —
+    # without the mutex they'd each pay the (expensive) directory-
+    # walk cost. With it, one thread computes, the rest wait.
     def shared_deps_mtime
-      @shared_deps_mtime ||= compute_shared_deps_mtime
+      @deps_mutex.synchronize do
+        @shared_deps_mtime ||= compute_shared_deps_mtime
+      end
     end
 
     # Most-recent mtime across `layout_name`'s file plus every ancestor
@@ -84,9 +109,16 @@ module Abqari
     # only invalidates pages that resolve to the `post` layout (or
     # something that extends it), not photo / publication / workshop
     # pages.
+    #
+    # Mutex-protected for the same reason as `shared_deps_mtime`:
+    # called from the parallel render loop, and a torn write of the
+    # underlying hash would be observable on Ruby implementations
+    # without GIL serialisation (TruffleRuby, JRuby).
     def layout_deps_mtime(layout_name)
-      @layout_mtimes ||= {}
-      @layout_mtimes[layout_name.to_s] ||= compute_layout_deps_mtime(layout_name.to_s)
+      key = layout_name.to_s
+      @deps_mutex.synchronize do
+        @layout_mtimes[key] ||= compute_layout_deps_mtime(key)
+      end
     end
 
     # ----------------------------------------------------------------
@@ -246,9 +278,17 @@ module Abqari
     # ----------------------------------------------------------------
 
     def post_process(html, page: nil)
+      # `rewrite_bundle_urls` runs before `images.post_process_html` so
+      # the latter sees absolute paths (`/posts/foo/hero.jpg`) and can
+      # match them against the URL → source registry.
       html = rewrite_bundle_urls(html, page) if page&.respond_to?(:post?) && page.post?
       html = SyntaxHighlighter.process(html) if @site.config['syntax_highlighting']
-      html = @site.images.post_process_html(html) if @site.images.enabled?
+      html = @site.images.post_process_html(html, page: page) if @site.images.enabled?
+      # Plugin filter — runs after the engine's built-in post-processing
+      # so plugin output sees the same shape browsers will. Runs BEFORE
+      # livereload injection + minification so plugin transformations
+      # are minified along with the rest of the page.
+      html = Hooks.run_filter(:post_process, html, @site, page)
       html = inject_livereload(html) if @site.env == :development
       html = Minifier.minify(html) if minify_html?
       html
@@ -258,8 +298,7 @@ module Abqari
     # `minify: false` in site.yml. Off in development so livereload +
     # view-source stay readable.
     def minify_html?
-      cfg = @site.config
-      return cfg['minify'] if cfg.key?('minify')
+      return @site.config['minify'] if @site.config.key?('minify')
 
       @site.env == :production
     end
@@ -289,7 +328,18 @@ module Abqari
 
     def compute_shared_deps_mtime
       roots = [@site.site_root, @site.engine_root].uniq
-      mtimes = GLOBAL_DEP_GLOBS.flat_map do |pattern|
+
+      # Static globs (anchored, no per-site resolution).
+      patterns = GLOBAL_DEP_GLOBS.dup
+
+      # Active-theme glob — only walk the theme this site is actually
+      # using. Without scoping, every build walks every theme the gem
+      # ships (bootstrap, magazine, notebook, sand, …), most of which
+      # have nothing to do with the current site's rendered output.
+      theme = @site.config['theme'].to_s
+      patterns << File.join('themes', theme, '**', '*') unless theme.empty? || theme == 'none'
+
+      mtimes = patterns.flat_map do |pattern|
         roots.flat_map do |root|
           # No `.sort` — we feed every entry into `.max` below, which is
           # order-invariant. Sorting would just add overhead.
@@ -322,8 +372,11 @@ module Abqari
     # absolute paths of every layout file in the chain. Memoised per
     # name. Cycle-safe — a layout that (illegally) extends itself
     # transitively stops at the second visit.
+    #
+    # No internal locking — the only caller is
+    # `compute_layout_deps_mtime`, which runs under `@deps_mutex` (see
+    # `layout_deps_mtime`). Adding a lock here would deadlock.
     def layout_chain(layout_name)
-      @layout_chains ||= {}
       @layout_chains[layout_name] ||= build_layout_chain(layout_name)
     end
 
@@ -348,16 +401,26 @@ module Abqari
     # return its `layout:` key — the parent in the chain — or nil.
     # Layouts without frontmatter, or with empty `layout:`, terminate
     # the chain.
+    #
+    # Failures are not silently swallowed. A YAML syntax error in a
+    # layout's frontmatter used to be treated as "no parent" — the
+    # page rendered against the wrong outer layout, and the operator
+    # got no signal that the chain was broken. Re-raise so the build
+    # fails loudly with a clear message; the layout path is wrapped
+    # into the exception so the operator can find the offending file
+    # without grepping.
     def parent_layout_of(path)
       raw = File.read(path, encoding: 'UTF-8')
       match = raw.match(LAYOUT_FRONTMATTER_RE)
       return nil unless match
 
-      fm = YAML.safe_load(match[1]) || {}
+      fm = YAML.safe_load(match[1], permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}
       parent = fm['layout']
       parent && !parent.to_s.empty? ? parent.to_s : nil
-    rescue StandardError
-      nil
+    rescue Psych::SyntaxError => e
+      raise "invalid YAML frontmatter in layout #{path}: #{e.message}"
+    rescue StandardError => e
+      raise "failed to read layout frontmatter in #{path}: #{e.class}: #{e.message}"
     end
 
     # Resolve the page-size for a paginating page, or nil for "don't paginate."
@@ -420,10 +483,19 @@ module Abqari
       end
     end
 
+    # Livereload client. Uses Server-Sent Events to receive rebuild
+    # events from the dev server as they happen — sub-50 ms latency
+    # vs the ~250 ms median of the old polling implementation. The
+    # browser opens a single persistent EventSource connection per
+    # tab; the server holds it open and pushes a `{version, scope}`
+    # JSON payload on every rebuild.
+    #
+    # Reconnect logic is provided by EventSource itself — if the
+    # server restarts the client auto-reconnects after a short delay.
     LIVERELOAD_SCRIPT = <<~SCRIPT
       <script>
       (function() {
-        let v = null;
+        let firstVersion = null;
         async function swapCss() {
           const html = await fetch(location.pathname, { cache: 'no-store' }).then(r => r.text());
           const matches = [...html.matchAll(/<link\\s+rel="stylesheet"\\s+href="([^"]+)"/gi)].map(m => m[1]);
@@ -433,23 +505,31 @@ module Abqari
             }
           });
         }
-        setInterval(async () => {
+        const sse = new EventSource('/__reload__');
+        sse.onmessage = (e) => {
           try {
-            const { version, scope } = await (await fetch('/__reload__', { cache: 'no-store' })).json();
-            if (v === null) { v = version; return; }
-            if (v === version) return;
-            v = version;
+            const { version, scope } = JSON.parse(e.data);
+            if (firstVersion === null) { firstVersion = version; return; }
+            if (version === firstVersion) return;
+            firstVersion = version;
             scope === 'css' ? swapCss() : location.reload();
-          } catch (e) {}
-        }, 500);
+          } catch (err) {}
+        };
       })();
       </script>
     SCRIPT
 
-    def inject_livereload(html)
-      return html unless html.include?('</body>')
+    # Insert the livereload poller just before the closing body tag.
+    # HTML is case-insensitive, so the match has to be too — a layout
+    # that closes with `</Body>` is legal markup and should still
+    # hot-reload in dev. The substitution preserves the original
+    # casing of the matched tag.
+    CLOSING_BODY_RE = %r{</body>}i.freeze
 
-      html.sub('</body>', "#{LIVERELOAD_SCRIPT}</body>")
+    def inject_livereload(html)
+      return html unless html.match?(CLOSING_BODY_RE)
+
+      html.sub(CLOSING_BODY_RE) { |match| "#{LIVERELOAD_SCRIPT}#{match}" }
     end
   end
 end

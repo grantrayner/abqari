@@ -141,7 +141,6 @@ fonts:
 #   formats: [avif, webp]
 #   widths: [400, 800, 1200]
 #   quality: 80
-    style: normal
 
 # Collections ────────────────────────────────────────────────────────────
 # Each collection is a content type with its own source directory, URL
@@ -989,24 +988,54 @@ footer:
                               # your own site if you don't want it.
 
 # Images ─────────────────────────────────────────────────────────────────
-# Build-time image optimisation. Off by default. When `optimise: true`,
-# Abqari shells out to `vips` (or `magick` as a fallback) to generate
-# resized variants in modern formats. <img> tags in rendered HTML that
-# point to local images get auto-rewritten to <picture>. You can also
-# emit it explicitly: <%= picture_tag 'hero.jpg', alt: '…' %>
+# Build-time responsive image pipeline. ON by default. Generates AVIF,
+# WebP, and an optimised original-format fallback for every raster
+# image the engine sees — site-wide assets under `app/assets/images/`
+# AND post bundle images (`content/posts/<slug>/hero.jpg`, etc.).
+# `<img>` tags in rendered HTML are rewritten to `<picture>` blocks
+# with width-appropriate srcset entries. Authors get responsive
+# variants automatically — no per-image helper calls required.
 #
-# Requires `vips` or ImageMagick on PATH. Install:
-#   macOS:   brew install vips        # or imagemagick
-#   Ubuntu:  apt install libvips-tools # or imagemagick
+# Uses libvips via the `ruby-vips` gem (added to the gemspec). Install
+# the C library once:
+#   macOS:    brew install vips
+#   Ubuntu:   apt install libvips42
+#   Alpine:   apk add vips
+# When libvips is missing the pipeline falls back to shell-out (vips
+# or magick CLI), and ultimately to passthrough mode (originals only,
+# no variants generated) with a clear warning.
+#
+# Defaults are tuned for prose-and-photos publishing: AVIF first
+# (smallest, listed first in <picture>), WebP as a broader-compat
+# fallback, original-format JPEG/PNG as the last-resort fallback.
+# Per-format quality lands at the perceptual-equivalence points —
+# numerically lower for AVIF, higher for original-JPEG.
+#
+# Skip-if-source-smaller: a 600px source with `widths: [400, 800,
+# 1200]` produces variants at 400 and 600 only. Upscaling is never
+# done — would produce blurrier-and-larger output for zero gain.
+#
+# Metadata stripped by default (EXIF / GPS / embedded thumbnails) —
+# 50–500 KB savings per photo plus a privacy bonus. Set
+# `preserve_metadata: true` if you run a photography portfolio that
+# surfaces camera info to readers.
+#
+# Set `optimise: false` to disable entirely (originals copied
+# verbatim, no libvips needed). Useful for text-only sites or when
+# pre-optimised images come in via another pipeline.
 #
 # images:
-#   optimise: true
-#   processor: auto             # auto | vips | imagemagick
-#   formats: [webp, avif]       # generated alongside the original
+#   optimise: true               # default — turn off only if you mean it
+#   processor: auto              # auto | vips-native | vips | imagemagick
+#   formats: [avif, webp]        # in srcset order — first match wins
 #   widths: [400, 800, 1200]
-#   quality: 80
+#   quality:                     # per-format perceptual targets
+#     avif: 50
+#     webp: 80
+#     original: 85
 #   sizes: "(min-width: 768px) 50vw, 100vw"
-#   source_dir: app/assets/images
+#   source_dir: app/assets/images   # site-wide imagery (not bundle images)
+#   preserve_metadata: false     # strip EXIF / GPS by default
 
 # Environments ───────────────────────────────────────────────────────────
 # bin/serve runs with ABQARI_ENV=development.

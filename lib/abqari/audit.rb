@@ -9,6 +9,7 @@ require_relative 'audit/links'
 require_relative 'audit/seo'
 require_relative 'audit/a11y'
 require_relative 'audit/privacy'
+require_relative 'audit/performance'
 require_relative 'audit/dependencies'
 require_relative 'audit/content'
 
@@ -33,6 +34,7 @@ module Abqari
       'seo'     => 'SEO',
       'a11y'    => 'Accessibility',
       'privacy' => 'Privacy',
+      'perf'    => 'Performance',
       'deps'    => 'Dependencies',
       'content' => 'Content'
     }.freeze
@@ -41,7 +43,7 @@ module Abqari
     # output report — findings are grouped by category, not insertion
     # order — but Links first keeps the report scan-friendly: errors
     # appear before warnings.
-    RULES = [Links, SEO, A11y, Privacy, Dependencies, Content].freeze
+    RULES = [Links, SEO, A11y, Privacy, Performance, Dependencies, Content].freeze
 
     attr_reader :findings
 

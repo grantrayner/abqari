@@ -28,8 +28,11 @@ class ErbEscapeAuditTest < Minitest::Test
   # `<%==` is correct — re-escaping would emit literal `<` characters
   # for the inner markup).
   SAFE_PATTERNS = [
-    /\bJSON\.generate\b/,                  # JSON-LD inside <script>
-    /\bto_json\b/,                         # …same
+    /\bscript_safe_json\b/,                # JSON-LD inside <script> — escapes
+                                           # `<`, `>`, `&`, U+2028/9 so a hostile
+                                           # Folio string can't break out of the
+                                           # script tag. Plain JSON.generate is
+                                           # NOT on this list — see helpers.rb.
     /\blink_to\b/,                         # helper returns <a> tag
     /\bpicture_tag\b/,                     # helper returns <picture>
     /\bbundle_picture_tag\b/,
@@ -41,6 +44,17 @@ class ErbEscapeAuditTest < Minitest::Test
     /\byield_content\b/,                   # pre-rendered inner layout
     /\Apage\.content\b/,                   # pre-rendered markdown body
     /\bSCRIPT\b/                           # *::SCRIPT constants (pre-built <script>)
+  ].freeze
+
+  # JSON.generate is explicitly forbidden inside `<%==` blocks. The Ruby
+  # stdlib serializer does NOT escape `<`, `>`, `&`, U+2028/9, so a hostile
+  # string can break out of the surrounding `<script>` tag. Every JSON-LD
+  # partial must use `script_safe_json` instead — see helpers.rb. If a new
+  # template adds `<%== JSON.generate(...) %>` we want it to fail loudly,
+  # not silently inherit the legacy allow.
+  FORBIDDEN_RAW_PATTERNS = [
+    [/\bJSON\.generate\b/, 'JSON.generate inside <%== %> — use script_safe_json instead (see helpers.rb)'],
+    [/\bto_json\b/,        'to_json inside <%== %> — use script_safe_json instead (see helpers.rb)']
   ].freeze
 
   # Intentional raw interpolations that don't match the helper
@@ -81,17 +95,36 @@ class ErbEscapeAuditTest < Minitest::Test
 
   def test_no_unaudited_raw_interpolations
     offenders = []
+    forbidden = []
 
     Dir.glob(File.join(VIEWS_DIR, '**', '*.erb')).sort.each do |path|
       rel = path.sub(VIEWS_DIR + '/', '')
       File.read(path, encoding: 'UTF-8').scan(/<%==\s*([^%]*(?:%(?!>)[^%]*)*)%>/) do |(expr)|
         body = expr.to_s.strip
+
+        FORBIDDEN_RAW_PATTERNS.each do |re, msg|
+          forbidden << "#{rel}: <%== #{body} %> — #{msg}" if body.match?(re)
+        end
+
         next if SAFE_PATTERNS.any? { |re| body.match?(re) }
         next if RAW_ALLOW_LIST.any? { |allowed| body.include?(allowed) }
 
         offenders << "#{rel}: <%== #{body} %>"
       end
     end
+
+    assert forbidden.empty?, <<~MSG
+      Found #{forbidden.size} forbidden raw interpolation(s). These
+      patterns are unsafe inside a `<script>` block — `JSON.generate`
+      and `to_json` don't escape `<`, `>`, `&`, or U+2028/9, so a
+      hostile string in the serialised value can break out of the
+      script tag and ship working HTML.
+
+      Replace with `script_safe_json(...)` (see lib/abqari/helpers.rb).
+
+      Offenders:
+      #{forbidden.map { |o| "  #{o}" }.join("\n")}
+    MSG
 
     assert offenders.empty?, <<~MSG
       Found #{offenders.size} <%== raw interpolation(s) without an

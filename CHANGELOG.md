@@ -7,6 +7,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-16
+
+### Security
+
+- **`script_safe_json` helper** for every JSON-LD partial. Plain
+  `JSON.generate` doesn't escape `<`, `>`, `&`, or U+2028/9, so a
+  hostile string in a Folio response could break out of the host
+  `<script>` tag. Escapes these characters to their `\uXXXX` JSON
+  forms (still valid JSON, round-trips through `JSON.parse`). The
+  ERB escape audit now FORBIDS `JSON.generate` / `to_json` inside
+  `<%==` blocks.
+- **Reject protocol-relative URLs** in `Helpers#sanitized_url`.
+  `//evil.com/x` is a cross-origin redirect disguised as a same-
+  origin path; previously slipped past the `start_with?('/')` short-
+  circuit. Now returns `nil`.
+- **WEBrick dev server binds to `127.0.0.1`** by default. Previously
+  bound to `0.0.0.0`, exposing unrendered drafts and future-dated
+  content to anyone on the same LAN. Override with `ABQARI_BIND=0.0.0.0`
+  for explicit LAN preview.
+- **`PathSafe.join_under` in Folio + Redirects.** Bounded-trust Folio
+  slugs and frontmatter `redirect_from:` paths now go through the
+  same path-safety guard as `permalink:` — a compromised Folio
+  response with `"slug": "../../etc"` can no longer write outside
+  `_site/`.
+- **Uniform YAML `permitted_classes: [Date, Time]`** via the new
+  `Abqari::YAML_PERMITTED_CLASSES` constant. Was inconsistent across
+  the six `safe_load` call sites; now centralised and enforced.
+- **XML escape in sitemap + feed.** Every interpolated URL flows
+  through `CGI.escapeHTML` — one stray `&` no longer breaks the
+  emitted feed for every subscriber.
+- **CSP hardened** with `object-src 'none'` and `form-action 'self'`.
+  Newsletter `action:` and `script:` origins are added narrowly via
+  `apply_newsletter` so external providers (Mailchimp / Buttondown /
+  ConvertKit) still work.
+- **`SiteConfig::KNOWN_KEYS` drift test.** Bi-directional: fails if
+  any source file references a top-level config key missing from
+  `KNOWN_KEYS`, OR if `KNOWN_KEYS` lists keys no source actually
+  reads.
+- **`RenderContext` ivar audit** + `@_yielded_content` rename.
+  Internal-state ivars use the `@_` prefix; the audit asserts only
+  `@page` and `@site` are template-public.
+- **Server watcher supervision.** Dev-server crashes inside the file
+  watcher used to silently kill hot-reload; now restart up to 5 ×
+  per minute with debug-level backtraces, give up loudly past that
+  threshold.
+- **Narrower rescues** in `Folio#fetch_endpoint` (specific exception
+  classes instead of bare `StandardError`) with debug-level
+  backtraces.
+- **`parent_layout_of` surfaces YAML errors** with the offending
+  layout path in the message instead of silently misrouting the
+  chain.
+
+### Added
+
+- **Image pipeline rewrite.** Default `optimise: true`. Per-format
+  quality (AVIF 50 / WebP 80 / JPEG 85 — perceptual-equivalence
+  points). Native libvips backend via `ruby-vips` (now a hard
+  dep — `brew install vips` or `apt install libvips42` covers the
+  C library). Bundle images (`content/posts/<slug>/hero.jpg`,
+  flat-collection assets) now go through the same pipeline as
+  `app/assets/images/` — `<img src="hero.jpg">` in markdown is
+  rewritten to a full `<picture>` block with AVIF + WebP +
+  optimised JPEG fallback across multiple widths. Skip-if-source-
+  smaller prevents upscaled-blurrier-and-larger variants. Metadata
+  (EXIF / GPS / camera serial) stripped by default;
+  `preserve_metadata: true` opts back in.
+- **Performance audit rule.** `bin/audit` flags pages with heavy
+  image payloads (warn at 500 KB single / 1 MB page total; error at
+  1 MB single / 3 MB page total). New "Performance" category in
+  audit reports.
+- **TZ save/restore in `Site#build`.** `apply_timezone!` was
+  process-wide and never restored; now scoped to the build call
+  via `ensure`. Host applications embedding the gem get their TZ
+  back at the value they had before build.
+- **`collection_url_index(name)`** — memoised O(1) url-to-position
+  hash. `Site#next_in_collection` and `Site#related` used O(N)
+  `pages.index { ... }` scans inside the render loop; now O(1) per
+  page, O(N) across the build.
+- **Mutex-protected renderer caches.** `@deps_mutex` synchronises
+  `shared_deps_mtime` and `layout_deps_mtime` so parallel render
+  threads don't race on the first miss.
+- **Per-page `description` memoisation** + scoped first-paragraph
+  caching. Listing partials no longer trigger cold-cache body
+  re-reads after `forget_body!`.
+- **Set-based `tag_cooccurrence_data`** — O(tags² × posts_per_tag)
+  Array scans replaced with single Set intersection; upper-triangle
+  only.
+- **Active-theme scoping in shared-deps mtime.** Only walks the
+  configured `theme:`, not every theme bundled with the gem.
+
+### Changed
+
+- **`Abqari::FRONTMATTER_RE`** consolidates the three duplicate
+  regex constants (Page, RenderContext, Renderer) into one
+  canonical definition.
+- **`Helpers#truncate` clamps** the slice width to 0 when `omission`
+  is longer than `length`. Previously returned the wrong tail slice
+  via Ruby's negative-second-arg `String#[]` behaviour.
+- **`Site#singularize_slug`** treats `news`, `series`, `lens`,
+  `species`, `means`, `physics`, `analytics` as invariant.
+- **`inject_livereload`** matches `</body>` case-insensitively;
+  preserves the source's casing in the substitution.
+- **`Page#raw_body`** logs warnings instead of silently returning
+  nil on rescue.
+- **`audit/dependencies.rb command_available?`** uses a PATH walk
+  instead of `system("command -v ...")` (no shell interpolation
+  footgun).
+
+## [0.1.x]
+
+Final 0.1.x release prior to RubyGems publish. Combines what was
+previously the `[Unreleased]` accumulator (workshops collection,
+newsletter partial, theme system rework, path-source / gem-source
+consumption, etc.) — these features all landed before the 0.2.0
+security + image pipeline overhaul and are listed under 0.1.x for
+historical reference.
+
 ### Added
 
 - **Workshops collection** — fourth built-in collection alongside posts /
@@ -119,5 +236,7 @@ Initial release. All eleven roadmap steps complete:
 - Performance: parallel page rendering, compiled-template cache, mtime-aware copying, HTML minification, content memoization, image dimensions in passthrough mode
 - Minitest suite (~70 tests, 180+ assertions)
 
-[Unreleased]: https://github.com/your-handle/abqari/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/your-handle/abqari/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/your-handle/abqari/compare/v0.1.0...v0.2.0
+[0.1.x]: https://github.com/your-handle/abqari/releases/tag/v0.1.0
 [0.1.0]: https://github.com/your-handle/abqari/releases/tag/v0.1.0

@@ -60,7 +60,7 @@ module Abqari
       # without grepping.
       def parse_frontmatter(yaml)
         YAML.safe_load(yaml,
-                       permitted_classes: [Date, Time],
+                       permitted_classes: Abqari::YAML_PERMITTED_CLASSES,
                        filename: source_path) || {}
       rescue Psych::SyntaxError
         raise # already carries source_path via filename:

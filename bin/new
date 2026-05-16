@@ -51,17 +51,27 @@ def create_post(title)
   File.write(index_path, <<~MD)
     ---
     title: #{title}
+    date: #{date}
     description:
     tags: []
+    # image: hero.jpg              # optional bundle hero — drop hero.jpg
+    #                              #   alongside this index.md and uncomment
+    # share_image:                 # optional explicit OG image override
     ---
 
     Write your post here.
+
+    Reference colocated images by relative name (`![alt](hero.jpg)`) —
+    the build's image pipeline rewrites them into responsive `<picture>`
+    blocks with AVIF + WebP + optimised fallback variants automatically.
   MD
 
   puts "✓ Created content/posts/#{date}-#{slug}/index.md"
   puts ''
-  puts 'Drop colocated images, downloads, etc. into the same directory and reference them'
-  puts 'by relative name in your markdown — they get copied next to the rendered post.'
+  puts 'Next:'
+  puts '  - Drop colocated images alongside index.md (they go through the image pipeline).'
+  puts '  - bin/serve to preview locally.'
+  puts '  - Set `published: false` while drafting; it stays out of production builds.'
 end
 
 # --- Subcommand: bin/new page "Title" --------------------------------------
