@@ -51,23 +51,41 @@ module Abqari
 
       server.mount_proc('/__reload__', &method(:handle_reload_endpoint))
 
-      # Signal traps may NOT call Mutex#synchronize — Ruby raises
-      # `ThreadError: can't be called from trap context`. So the trap
-      # only flips WEBrick's shutdown flag (signal-safe), and the
-      # subscriber cleanup runs after `server.start` unblocks below,
-      # where regular locking is allowed.
-      trap('INT')  { server.shutdown }
-      trap('TERM') { server.shutdown }
+      # Shutdown choreography is delicate:
+      #
+      #   - The trap handler can't call `Mutex#synchronize` itself
+      #     (`ThreadError: can't be called from trap context`).
+      #   - But every open SSE connection has a WEBrick request thread
+      #     parked in `queue.pop` (waiting for an event or the 30-second
+      #     heartbeat tick). `server.shutdown` only sets a flag — it
+      #     doesn't kill those threads. WEBrick's main loop waits for
+      #     them to finish before `server.start` returns.
+      #   - So if we just call `server.shutdown` from the trap, WEBrick
+      #     hangs until every parked SSE thread times out (~30s each).
+      #
+      # The fix: the trap spawns a fresh Ruby thread (allowed from a
+      # trap context, runs in normal context). That thread closes the
+      # subscriber queues FIRST — which unblocks the parked SSE
+      # threads — then calls `server.shutdown` so WEBrick can drain
+      # cleanly.
+      # Block form (not lambda): Ruby passes the signal number as the
+      # block argument and lambdas are strict about arity. The block
+      # form ignores extra args, so a clean Ctrl-C doesn't crash with
+      # `wrong number of arguments (given 1, expected 0)`.
+      shutdown_hook = proc do
+        Thread.new do
+          shutdown_subscribers
+          server.shutdown
+        end
+      end
+
+      trap('INT',  shutdown_hook)
+      trap('TERM', shutdown_hook)
 
       host = @bind == '0.0.0.0' ? 'localhost' : @bind
       Log.info "Abqari serving on http://#{host}:#{@port} (bind: #{@bind})"
       Log.info "Watching for changes via #{watcher_kind} (Ctrl-C to stop)."
       server.start
-
-      # WEBrick has stopped accepting connections; tell every active
-      # SSE subscriber to exit its `queue.pop` loop so the request-
-      # handling threads unwind cleanly before the process exits.
-      shutdown_subscribers
     end
 
     # SSE endpoint at /__reload__. Browsers open one EventSource per
