@@ -100,11 +100,12 @@ module Abqari
 
     def rss
       entries = items.map do |item|
+        item_url = xml_escape("#{base_url}#{item.url}")
         <<~ITEM.chomp
             <item>
               <title>#{xml_escape(item.title)}</title>
-              <link>#{base_url}#{item.url}</link>
-              <guid isPermaLink="true">#{base_url}#{item.url}</guid>
+              <link>#{item_url}</link>
+              <guid isPermaLink="true">#{item_url}</guid>
               <pubDate>#{item.date.rfc822}</pubDate>
               <description>#{xml_escape(item.description.to_s)}</description>
             </item>
@@ -116,10 +117,10 @@ module Abqari
         <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
           <channel>
             <title>#{xml_escape(feed_title)}</title>
-            <link>#{base_url}#{absolute_path_segment}/</link>
+            <link>#{xml_escape("#{base_url}#{absolute_path_segment}/")}</link>
             <description>#{xml_escape(@site.config['description'].to_s)}</description>
-            <language>#{@site.config['locale'] || 'en'}</language>
-            <atom:link href="#{feed_url('feed.xml')}" rel="self" type="application/rss+xml"/>
+            <language>#{xml_escape(@site.config['locale'] || 'en')}</language>
+            <atom:link href="#{xml_escape(feed_url('feed.xml'))}" rel="self" type="application/rss+xml"/>
         #{entries.join("\n")}
           </channel>
         </rss>

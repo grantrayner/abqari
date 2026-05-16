@@ -84,11 +84,16 @@ module Abqari
       # do `config['indexable']` instead of `config.fetch(..., true)`.
       # Dynamic defaults (minify, env-based) stay in their callers.
       @config = SiteConfig.with_defaults(raw)
-      apply_timezone!
       @pages           = []
       @generated_pages = []
       @renderer  = Renderer.new(self)
       @artifacts = ArtifactWriter.new(self)
+
+      # Load site-local plugins (plugins/**/*.rb). Plugins register
+      # themselves with `Abqari::Hooks.register(...)` at top level —
+      # the registrations land in the global hook table and fire on
+      # subsequent `Hooks.run` / `run_filter` calls during build.
+      PluginLoader.load_from(site_root)
     end
 
     # ------------------------------------------------------------------
@@ -98,14 +103,30 @@ module Abqari
     # build(incremental: false) wipes _site/ and rebuilds everything (default).
     # build(incremental: true) preserves _site/ and uses mtime-aware copying
     # so unchanged files are skipped — used by the dev-server watcher.
+    #
+    # `apply_timezone!` mutates `ENV['TZ']` so naked dates parse against
+    # one consistent zone regardless of where the build runs. That's a
+    # process-wide side effect, so we save the prior value and restore
+    # it in `ensure` — host processes (test harnesses, dev-server
+    # watchers calling `build` repeatedly, applications embedding the
+    # gem) get TZ back at the value they had before the build, not
+    # `'UTC'` (or whatever the site configured).
     def build(incremental: false)
       @incremental = incremental
+      prev_tz = ENV['TZ']
+      apply_timezone!
+
+      Hooks.run(:before_build, self)
+
       @artifacts.reset_output unless incremental
       reset_state_for_rebuild!
 
       @pages = @loader.load_pages
+      Hooks.run(:after_load_pages, self)
+
       Folio.new(self).fetch                 # publications + bundles, derives series
       @renderer.generate_all                # tag pages, paginated shards, viz, folio, related
+      Hooks.run(:after_generate, self)
 
       assets.process
       images.process
@@ -120,6 +141,9 @@ module Abqari
       Search.new(self).run
 
       Log.info "Built #{all_pages.size} page(s) in #{env}#{incremental ? ' (incremental)' : ''} → _site/"
+    ensure
+      Hooks.run(:after_build, self) if defined?(@incremental)
+      ENV['TZ'] = prev_tz
     end
 
     def incremental?
@@ -202,8 +226,24 @@ module Abqari
     #   books        → book      (s → '')
     #   photos       → photo     (s → '')
     #   publications → publication
-    # Words ending in `ss` (boss, press) stay as-is.
+    #
+    # English exceptions — words that look plural but aren't, or whose
+    # singular form matches a different rule. Without the allow-list:
+    #   news    → new   (wrong)
+    #   series  → serie (wrong; the singular is also "series")
+    #   lens    → len   (wrong)
+    # Words ending in `ss` (boss, press) also stay as-is — covered by
+    # the explicit guard so adding new exceptions only requires one
+    # place to edit.
+    #
+    # The narrow scope is deliberate: collection slugs are usually
+    # short English nouns, not arbitrary text. If a consuming site
+    # picks a slug that doesn't singularize cleanly here, the docs
+    # recommend setting `layout:` explicitly in the collection config.
+    INVARIANT_SLUGS = %w[news series lens species means physics analytics].freeze
+
     def singularize_slug(word)
+      return word if INVARIANT_SLUGS.include?(word)
       return word if word.end_with?('ss')
 
       word.sub(/ies$/, 'y').sub(/s$/, '')
@@ -270,6 +310,21 @@ module Abqari
       end
     end
 
+    # url → index hash for `collection(name)`. Built once on first
+    # access per collection and cached. Lets `next_in_collection` and
+    # `related` answer "which slot is this page in?" in O(1) instead
+    # of O(N) — and since both are called once per show-view render,
+    # the total cost across a build is O(pages) instead of O(pages²).
+    def collection_url_index(name)
+      canonical = resolve_collection_name(name)
+      @collection_url_index_cache ||= {}
+      @collection_url_index_cache[canonical] ||= begin
+        index = {}
+        collection(canonical).each_with_index { |page, i| index[page.url] = i }
+        index
+      end
+    end
+
     # Featured-item lookup. `site.featured('publications', 'the-field-guide')`
     # returns the matching page or nil — useful for "show this one item
     # prominently on the home page" patterns.
@@ -298,7 +353,14 @@ module Abqari
 
       effective_match_by = Array(match_by || cfg.fetch('match_by', 'tags'))
 
-      candidates = collection(page.collection).reject { |p| p.url == page.url }
+      # Use the url-index lookup to skip the source page in O(1); the
+      # earlier `.reject { |p| p.url == page.url }` did an O(N) scan
+      # per page rendered, which the related-list call sites repeat
+      # across the whole collection.
+      idx_map    = collection_url_index(page.collection)
+      pages_in   = collection(page.collection)
+      source_idx = idx_map[page.url]
+      candidates = source_idx ? pages_in.reject.with_index { |_, i| i == source_idx } : pages_in
 
       # Earlier fields in match_by weight more — count them with a
       # multiplier so "matches series first, then country" comes out
@@ -329,7 +391,7 @@ module Abqari
       return nil if cfg['enabled'] == false
 
       pages = collection(page.collection) # newest first
-      idx = pages.index { |p| p.url == page.url }
+      idx   = collection_url_index(page.collection)[page.url]
       return nil unless idx
 
       # Newer neighbour sits at the smaller index. When idx is 0 we're
@@ -572,15 +634,21 @@ module Abqari
 
     private
 
-    # Anchor every Time.parse call in this process to a single zone, so
+    # Anchor every Time.parse call during a build to a single zone so
     # naked dates like "2026-06-15" mean the same moment regardless of
-    # whether the build runs on a US laptop, a Singapore phone, or a UTC
-    # CI runner. Without this, a future-dated post would publish at
-    # different wall-clock times in different deploys.
+    # whether the build runs on a US laptop, a Singapore phone, or a
+    # UTC CI runner. Without this, a future-dated post would publish
+    # at different wall-clock times in different deploys.
     #
     # Dates with explicit offsets (e.g. "2026-06-15T08:00:00+08:00")
     # still honour their offset; this only affects naked dates and
     # `Time.now`.
+    #
+    # Called from `build` (not `initialize`) and paired with an
+    # `ensure` block that restores the prior `ENV['TZ']`. Process-wide
+    # side effects are scoped to the duration of a single build —
+    # tests and host applications that share the Ruby process see
+    # their TZ environment untouched outside of build calls.
     def apply_timezone!
       tz = (config['timezone'] || 'UTC').to_s.strip
       ENV['TZ'] = tz unless tz.empty?
@@ -591,14 +659,15 @@ module Abqari
     # partition-view caches (posts, posts_by_tag, taxonomy_pages,
     # collection) so a content edit isn't masked by a stale memo.
     def reset_state_for_rebuild!
-      @generated_pages       = []
-      @assets                = nil
-      @images                = nil
-      @data                  = nil
-      @posts_cache           = nil
-      @posts_by_tag_cache    = nil
-      @taxonomy_pages_cache  = nil
-      @collection_cache      = nil
+      @generated_pages           = []
+      @assets                    = nil
+      @images                    = nil
+      @data                      = nil
+      @posts_cache               = nil
+      @posts_by_tag_cache        = nil
+      @taxonomy_pages_cache      = nil
+      @collection_cache          = nil
+      @collection_url_index_cache = nil
       @renderer.clear_template_cache
     end
 

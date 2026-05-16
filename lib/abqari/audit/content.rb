@@ -61,7 +61,7 @@ module Abqari
           full = File.join(@site.site_root, path.to_s)
           next unless File.exist?(full)
 
-          data = YAML.safe_load_file(full) || {}
+          data = YAML.safe_load_file(full, permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}
           whitelists[field] = data.keys.map { |k| k.to_s.downcase } if data.is_a?(Hash)
         end
         whitelists

@@ -16,6 +16,16 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = '>= 3.3'
   spec.license               = 'MIT'
+  spec.homepage              = 'https://github.com/grantrayner/abqari'
+  spec.metadata              = {
+    # Note: `homepage_uri` is intentionally omitted — `spec.homepage`
+    # above is the canonical source. RubyGems warns when both are set.
+    'source_code_uri'       => 'https://github.com/grantrayner/abqari',
+    'changelog_uri'         => 'https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md',
+    'documentation_uri'     => 'https://github.com/grantrayner/abqari#readme',
+    'bug_tracker_uri'       => 'https://github.com/grantrayner/abqari/issues',
+    'rubygems_mfa_required' => 'true'
+  }
 
   # The gem ships its lib code, the structural app/ (views, icons,
   # _common.css and other assets), the bundled themes, and the
@@ -42,5 +52,25 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'commonmarker', '~> 1.1'
   spec.add_dependency 'erubi',        '~> 1.13'
   spec.add_dependency 'rouge',        '~> 4.0'
+  # ruby-vips: native libvips bindings for the image pipeline. The gem
+  # is small pure-FFI Ruby; the install footprint is the libvips C
+  # library (`brew install vips` / `apt install libvips42`). The
+  # pipeline falls back to shell-out (vips / magick CLI) if libvips
+  # is missing at runtime, so deploys that don't ship libvips still
+  # work — just slower per image.
+  spec.add_dependency 'ruby-vips',    '~> 2.2'
   spec.add_dependency 'webrick',      '~> 1.8'
+
+  spec.post_install_message = <<~MSG
+    Abqari's image pipeline uses libvips for responsive image
+    generation. Install the C library once:
+
+      macOS:    brew install vips
+      Ubuntu:   sudo apt install libvips42
+      Alpine:   apk add vips
+
+    If libvips isn't available, the build falls back to shell-out to
+    `vips` / `magick` (slower) and ultimately to passthrough mode
+    (originals only, no responsive variants).
+  MSG
 end

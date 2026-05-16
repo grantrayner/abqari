@@ -23,6 +23,18 @@ class HelpersTest < Minitest::Test
     assert_equal '', truncate(nil)
   end
 
+  def test_truncate_clamps_when_omission_longer_than_length
+    # `omission` is 3 chars, `length` is 2. The earlier implementation
+    # computed `text[0, -1]` and returned a tail slice of the text — a
+    # surprise leak. The clamped slice width should be 0, so the result
+    # is just the omission.
+    assert_equal '...', truncate('hello world', length: 2, omission: '...')
+  end
+
+  def test_truncate_clamps_when_omission_equals_length
+    assert_equal '...', truncate('hello world', length: 3, omission: '...')
+  end
+
   # pluralize
 
   def test_pluralize_one_uses_singular
@@ -144,6 +156,49 @@ class HelpersTest < Minitest::Test
     refute_includes html, 'javascript:'
   end
 
+  # script_safe_json
+
+  def test_script_safe_json_escapes_closing_script_tag
+    out = script_safe_json('name' => 'Evil </script><script>alert(1)</script>')
+    refute_includes out, '</script>'
+    refute_includes out, '<script>'
+    # Round-trip: the escaped JSON is still valid and parses back to the
+    # original string (we escape the host-HTML problem, not the data).
+    assert_equal 'Evil </script><script>alert(1)</script>', JSON.parse(out)['name']
+  end
+
+  def test_script_safe_json_escapes_html_comment_delimiters
+    # `<!--` and `-->` inside a <script> block can break out under HTML5
+    # script-data parsing rules (--> in particular ends a comment-state
+    # script). Escaping `<` and `>` handles both.
+    out = script_safe_json('html' => '<!--bad-->')
+    refute_includes out, '<!--'
+    refute_includes out, '-->'
+    assert_equal '<!--bad-->', JSON.parse(out)['html']
+  end
+
+  def test_script_safe_json_escapes_ampersand
+    # An unescaped `&` doesn't break out of <script>, but it does break
+    # out of HTML attribute context if someone later moves the partial.
+    # Cheap to escape and keeps the audit story consistent.
+    out = script_safe_json('owner' => 'Tom & Jerry')
+    refute_includes out, '&'
+    assert_equal 'Tom & Jerry', JSON.parse(out)['owner']
+  end
+
+  def test_script_safe_json_escapes_line_separators
+    # U+2028 and U+2029 terminate JS string literals (legal JSON, illegal
+    # inside a literal in pre-ES2019 JS). Replace with their `\u202X`
+    # forms so the JSON stays parseable everywhere.
+    out = script_safe_json('s' => "a b c")
+    refute_includes out, " "
+    refute_includes out, " "
+  end
+
+  def test_script_safe_json_passes_through_safe_values
+    assert_equal '{"a":1,"b":"hello"}', script_safe_json('a' => 1, 'b' => 'hello')
+  end
+
   # h
 
   def test_h_escapes_html
@@ -190,6 +245,20 @@ class HelpersTest < Minitest::Test
 
   def test_sanitized_url_blocks_vbscript
     assert_nil sanitized_url('vbscript:msgbox(1)')
+  end
+
+  def test_sanitized_url_blocks_protocol_relative
+    # //evil.com/x is parsed as <current-scheme>://evil.com/x by browsers — a
+    # cross-origin redirect disguised as a same-origin path. The legacy short-
+    # circuit on `start_with?('/')` let these through; the new guard rejects
+    # any string starting with `//`.
+    assert_nil sanitized_url('//evil.com/foo')
+    assert_nil sanitized_url('//evil.com')
+    assert_nil sanitized_url(' //evil.com/foo')
+  end
+
+  def test_sanitized_url_allows_root
+    assert_equal '/', sanitized_url('/')
   end
 
   def test_sanitized_url_handles_nil_and_empty

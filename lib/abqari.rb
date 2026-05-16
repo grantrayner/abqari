@@ -1,11 +1,40 @@
 # frozen_string_literal: true
 
+require 'date'
+require 'time'
+
 module Abqari
   ROOT = File.expand_path('..', __dir__)
-  VERSION = '0.1.0'
+  VERSION = '0.2.0'
+
+  # Classes the engine accepts from any YAML input — site config,
+  # data files, frontmatter, Folio cache, audit whitelists. Date +
+  # Time so naked dates like `date: 2026-06-15` and ISO timestamps
+  # round-trip. Anything else (Symbol, ranges, arbitrary classes)
+  # raises Psych::DisallowedClass before any deserialised object
+  # touches the engine. Keep this set minimal — adding a class here
+  # is the security-sensitive equivalent of widening a sandbox.
+  YAML_PERMITTED_CLASSES = [Date, Time].freeze
+
+  # Jekyll-style YAML frontmatter — opening `---`, body, closing
+  # `---`, then everything after.
+  #
+  # Match groups:
+  #   [1] = the YAML body between the `---` markers
+  #   [2] = everything after the closing `---\n` (page body / layout
+  #         markup / whatever follows)
+  #
+  # Used in three places — Page (content files), RenderContext (layout
+  # files chaining via `layout:`), and Renderer (parent-layout lookup
+  # for the dep-mtime walker). Centralised here so the three callers
+  # stay in lockstep; previously the regex was duplicated and one copy
+  # had drifted (no body capture group), which made consolidation
+  # easy to put off.
+  FRONTMATTER_RE = /\A---\s*\n(.*?\n)---\s*\n(.*)/m.freeze
 end
 
 require_relative 'abqari/log'
+require_relative 'abqari/hooks'
 require_relative 'abqari/path_safe'
 require_relative 'abqari/http_safe'
 require_relative 'abqari/site_config'

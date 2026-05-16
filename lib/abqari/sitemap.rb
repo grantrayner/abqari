@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'cgi'
+
 module Abqari
   class Sitemap
     XMLNS = 'http://www.sitemaps.org/schemas/sitemap/0.9'
@@ -33,7 +35,7 @@ module Abqari
     def url_entry(base, page)
       return nil if skip?(page)
 
-      lines = ['  <url>', "    <loc>#{base}#{page.url}</loc>"]
+      lines = ['  <url>', "    <loc>#{xml_escape("#{base}#{page.url}")}</loc>"]
 
       lastmod = format_lastmod(page)
       lines << "    <lastmod>#{lastmod}</lastmod>" if lastmod
@@ -45,7 +47,7 @@ module Abqari
         # through as-is, externals are filtered out. So we just
         # prepend the site base.
         lines << '    <image:image>'
-        lines << "      <image:loc>#{base}#{image_url_path}</image:loc>"
+        lines << "      <image:loc>#{xml_escape("#{base}#{image_url_path}")}</image:loc>"
         lines << '    </image:image>'
       end
 
@@ -67,6 +69,14 @@ module Abqari
 
     def images_for(page)
       page.respond_to?(:bundle_images) ? page.bundle_images : []
+    end
+
+    # Page URLs are constrained by `PERMALINK_ALLOWED` to URL-safe
+    # ASCII, so the practical risk is the `base` URL or a frontmatter
+    # image path carrying `&`/`<`/`>`. Escape every interpolation so
+    # one stray ampersand can't poison the whole feed.
+    def xml_escape(text)
+      CGI.escapeHTML(text.to_s)
     end
   end
 end

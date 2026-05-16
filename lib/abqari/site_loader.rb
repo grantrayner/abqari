@@ -33,7 +33,7 @@ module Abqari
       path = File.join(site_root, 'config', 'site.yml')
       return {} unless File.exist?(path)
 
-      raw = YAML.safe_load_file(path) || {}
+      raw = YAML.safe_load_file(path, permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}
       envs = raw.delete('environments') || {}
       env  = @site.env.to_s
       overrides = envs[env] || {}
@@ -79,8 +79,10 @@ module Abqari
     #   data/foo/bar.yml         → result['foo_bar']
     #   data/testimonials.yml    → result['testimonials']
     #
-    # YAML files use safe_load with no class allow-list — data files are
-    # plain values only; if you need Time/Date convert at read time.
+    # YAML files use `YAML.safe_load` with `permitted_classes:
+    # [Date, Time]` (the engine-wide allow-list) so naked dates and
+    # ISO timestamps round-trip without opening up arbitrary class
+    # instantiation.
     def load_data
       result = {}
       data_dir = File.join(@site.site_root, 'data')
@@ -90,7 +92,11 @@ module Abqari
         rel = path.sub("#{data_dir}/", '')
         key = rel.sub(/\.(yml|yaml|json)\z/, '').tr('/', '_')
         raw = File.read(path, encoding: 'UTF-8')
-        result[key] = path.end_with?('.json') ? JSON.parse(raw) : YAML.safe_load(raw)
+        result[key] = if path.end_with?('.json')
+                        JSON.parse(raw)
+                      else
+                        YAML.safe_load(raw, permitted_classes: Abqari::YAML_PERMITTED_CLASSES)
+                      end
       end
       result
     end

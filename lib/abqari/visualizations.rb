@@ -73,15 +73,29 @@ module Abqari
 
     # Tag co-occurrence — square matrix where matrix[i][j] is the number of
     # posts that have both tags[i] and tags[j].
+    #
+    # Previously O(tags² × posts_per_tag): the inner cell did an Array
+    # membership scan against the second tag's post list. For a tag
+    # cloud with 200 tags and a thousand posts the cost is multiple
+    # seconds, all inside the build's render phase.
+    #
+    # Now: convert each tag's post list to a Set once (O(posts)), then
+    # compute each cell as a Set intersection (O(min(set sizes))).
+    # Cells below the diagonal mirror the cells above it — compute the
+    # upper triangle once and copy.
     def tag_cooccurrence_data
       grouped = @site.posts_by_term('tags')
-      tags = grouped.keys.sort
+      tags    = grouped.keys.sort
+      sets    = grouped.transform_values { |posts| posts.to_set }
 
-      matrix = tags.map do |tag_a|
-        tags.map do |tag_b|
-          next 0 if tag_a == tag_b
+      size   = tags.size
+      matrix = Array.new(size) { Array.new(size, 0) }
 
-          grouped[tag_a].count { |post| grouped[tag_b].include?(post) }
+      tags.each_with_index do |tag_a, i|
+        ((i + 1)...size).each do |j|
+          shared = (sets[tag_a] & sets[tags[j]]).size
+          matrix[i][j] = shared
+          matrix[j][i] = shared
         end
       end
 

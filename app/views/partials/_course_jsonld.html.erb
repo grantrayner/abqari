@@ -91,5 +91,5 @@
     end
   end
 %>
-<script type="application/ld+json"><%== JSON.generate(course.compact) %></script>
+<script type="application/ld+json"><%== script_safe_json(course.compact) %></script>
 <% end %>

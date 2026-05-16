@@ -118,5 +118,5 @@
 
   jsonld["organizer"] = { "@type" => "Person", "name" => site.config['author'] } if site.config['author']
 %>
-<script type="application/ld+json"><%== JSON.generate(jsonld.compact) %></script>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
 <% end %>

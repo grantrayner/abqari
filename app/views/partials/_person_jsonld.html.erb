@@ -42,5 +42,5 @@
     jsonld["image"] = img.start_with?('http') ? img : "#{site_url}#{img}"
   end
 %>
-<script type="application/ld+json"><%== JSON.generate(jsonld.compact) %></script>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
 <% end %>

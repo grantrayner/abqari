@@ -154,8 +154,12 @@ module Abqari
       @url
     end
 
+    # Folio is bounded-trust per docs/security.md §1, and the Folio
+    # `slug` flows directly into this URL. Route through PathSafe so a
+    # hostile or accidental `"slug": "../../etc"` in a Folio response
+    # raises a build error instead of writing outside `_site/`.
     def output_path
-      File.join(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
+      PathSafe.join_under(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
     end
 
     def write
@@ -221,8 +225,9 @@ module Abqari
       @url
     end
 
+    # See FolioIndexPage#output_path — same trust boundary, same routing.
     def output_path
-      File.join(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
+      PathSafe.join_under(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
     end
 
     def write
