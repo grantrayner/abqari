@@ -11,6 +11,7 @@ buy_url: https://example.com/buy/last-light
 series: light-notebooks
 series_position: 2
 order: 5
+tags: [light]
 ---
 
 The second of the *Light Notebooks*. Same form as *First Light* —

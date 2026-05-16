@@ -88,7 +88,7 @@ timezone: UTC                 # e.g. America/Los_Angeles, Asia/Singapore
 #               the palette, fonts, components without affecting the
 #               built-in themes.
 #   none      — no theme CSS at all; bring your own in app/assets/
-theme: notebook                # change to one of the names above
+theme: minimal                # change to one of the names above
 
 # Fonts ──────────────────────────────────────────────────────────────────
 # Self-hosted Google Fonts. After adding/changing this block, run

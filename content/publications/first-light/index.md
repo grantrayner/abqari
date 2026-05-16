@@ -11,6 +11,7 @@ buy_url: https://example.com/buy/first-light
 series: light-notebooks
 series_position: 1
 order: 4
+tags: [light]
 ---
 
 A small book about beginnings. Twenty-two short pieces — call them
