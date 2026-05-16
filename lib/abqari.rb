@@ -5,7 +5,7 @@ require 'time'
 
 module Abqari
   ROOT = File.expand_path('..', __dir__)
-  VERSION = '0.2.0'
+  VERSION = '0.3.0'
 
   # Classes the engine accepts from any YAML input — site config,
   # data files, frontmatter, Folio cache, audit whitelists. Date +
@@ -42,6 +42,7 @@ require_relative 'abqari/erbi_template'
 require_relative 'abqari/helpers'
 require_relative 'abqari/render_context'
 require_relative 'abqari/paginator'
+require_relative 'abqari/publication_normaliser'
 require_relative 'abqari/page'
 require_relative 'abqari/taxonomy_page'
 require_relative 'abqari/paginated_shard'

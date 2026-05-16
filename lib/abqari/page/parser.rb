@@ -26,6 +26,22 @@ module Abqari
           @frontmatter = {}
           @body = raw
         end
+        # Per-collection normalisation — expands `price: "$16.00"`
+        # shorthand into the canonical { cents, currency, formatted }
+        # Hash so the rest of the engine never has to think about
+        # which form the author used. See docs/publications.md.
+        #
+        # `collection` requires a full Site (it iterates
+        # `site.collections`). Tests that construct a Page against a
+        # stub site won't have that — in which case skip
+        # normalisation and pass the raw frontmatter through.
+        @frontmatter = PublicationNormaliser.call(@frontmatter, safe_collection_for_normalisation)
+      end
+
+      def safe_collection_for_normalisation
+        collection
+      rescue StandardError
+        nil
       end
 
       # Re-read just the body section from disk. Used by `#body` when a

@@ -1,13 +1,13 @@
 ---
 title: Margin Notes
-description: A collection of essays on observation, attention, and craft.
-cover: /publications/margin-notes/cover.svg
+excerpt: A collection of essays on observation, attention, and craft.
+cover_url: /publications/margin-notes/cover.svg
 price: $14.00
 isbn: 978-981-94-0000-2
 language: English
 pages: 132
 published_at: 2025-11-12
-buy_url: https://example.com/buy/margin-notes
+buy_now_url: https://example.com/buy/margin-notes
 order: 2
 ---
 

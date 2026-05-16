@@ -2,73 +2,58 @@
 layout: application
 ---
 <!--
-  Single-bundle detail page. Reads from `page.data` (Folio's bundle
-  payload) when the page is an auto-generated FolioShowPage, with
-  `page.frontmatter` as a graceful fallback for manual override pages
-  at `content/bundles/<slug>/index.md`.
+  Single-bundle detail page. Reads canonical fields from
+  `page.frontmatter` (see docs/publications.md). Whether the page is
+  a manual `content/bundles/<slug>/index.md` or a Folio-generated
+  FolioShowPage with `kind: 'bundle'`, the field names are the same.
 
-  Manual override frontmatter shape — for sites without Folio, or
-  to override a Folio-generated bundle:
+  Frontmatter shape:
 
       ---
       layout: bundle
-      title: The Assassin Books              # or `name:` — same field, Folio-style alias
-      description: Both novels in the series, packaged together.
-      price: $16.98                           # display only — no Shopify/etc. wiring
-      buy_url: https://...                    # optional legacy buy button
-      publications:                           # books in this bundle
-        - memoirs-of-an-assassin              # bare slug
-        - the-russia-assignment               # bare slug
-      # Or, for richer entries:
-      # publications:
-      #   - slug: memoirs-of-an-assassin
-      #   - slug: the-russia-assignment
+      name: The Light Notebooks Bundle
+      description: Both volumes packaged together.
+      price: $28.00                        # string shorthand or Hash form
+      buy_now_url: https://...             # optional
+      add_to_cart_url: https://...         # optional
+      publications:                        # array of slugs
+        - first-light
+        - last-light
       ---
 
-  Each entry in `publications:` is cross-referenced against
-  `site.data['folio_publications']` (Folio) AND
-  `site.collection('publications')` (manual publication pages) — so
-  cards carry the full publication metadata regardless of where each
-  book is sourced.
+  Each slug in `publications:` is resolved against
+  `site.collection('publications')` — which after the canonical-
+  schema migration includes both manual and Folio sources. So the
+  bundle's contents render with consistent metadata regardless of
+  where each member book lives.
 -->
 <article class="bundle">
-  <% folio = folio_data %>
-  <% fm    = page.frontmatter %>
+  <% fm = page.frontmatter %>
 
   <header>
-    <h1><%= folio['name'] || fm['name'] || fm['title'] || page.title %></h1>
+    <h1><%= page.title %></h1>
 
-    <% if (price = folio.dig('price', 'formatted') || fm['price']) %>
+    <% if (price = fm.dig('price', 'formatted')) %>
       <p class="bundle__price"><%= price %></p>
     <% end %>
 
     <p class="bundle__buttons">
-      <%== folio_buy_button(page.respond_to?(:slug) ? page.slug : nil, kind: :bundle) %>
-      <%== folio_cart_button(page.respond_to?(:slug) ? page.slug : nil, kind: :bundle) %>
-      <%# Legacy frontmatter buy button — for manual bundles without
-          Folio. Renders only when neither Folio button covers it AND
-          a buy_url is set in frontmatter. %>
-      <% if folio['buy_now_url'].nil? && folio['add_to_cart_url'].nil? &&
-           fm['buy_url'] && (safe_buy_url = sanitized_url(fm['buy_url'])) %>
-        <a class="folio-button folio-button--buy" href="<%= safe_buy_url %>" rel="noopener noreferrer">
-          <%= fm['buy_label'] || 'Buy now' %>
-        </a>
-      <% end %>
+      <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
+      <%== cart_button(fm) %>
     </p>
   </header>
 
-  <%# Description: Folio when present, frontmatter as fallback. The
-      selected source is exposed as `data-source="…"` for DevTools
-      visibility. Same two-level chain as publication.html.erb —
-      keep them in sync.
-      `description_html` is pre-rendered by Folio and trusted as your
-      own server's output. See publication.html.erb for the full caveat. %>
+  <%# Description — `description_html` (pre-rendered, Folio) when
+      present, otherwise the markdown `description` source HTML-
+      escaped. Both fields are canonical-shape per
+      docs/publications.md. The selected source is exposed as
+      `data-source="…"` for DevTools visibility. %>
   <%
     description_source, description_content =
-      if (html = folio['description_html']) && !html.to_s.strip.empty?
-        [:folio,       html]
-      elsif (fm_d = fm['description']) && !fm_d.to_s.strip.empty?
-        [:frontmatter, h(fm_d)]
+      if (html = fm['description_html']) && !html.to_s.strip.empty?
+        [:description_html, html]
+      elsif (text = fm['description']) && !text.to_s.strip.empty?
+        [:description, h(text)]
       else
         [nil, nil]
       end
@@ -81,25 +66,20 @@ layout: application
 
   <%== page.content %>
 
-  <%# Books in this bundle. Folio bundles ship a `publications:`
-      array on `page.data`; manual override pages provide one in
-      `frontmatter`. Each entry can be a bare slug or a hash with
-      slug + extra fields. Cards render via the shared
-      `_publication_card` partial, so visual treatment matches the
-      publications-index and the series detail page. %>
+  <%# Books in this bundle. `publications:` is an array of slugs (the
+      canonical shape). Folio bundles carry richer entries (with
+      embedded title + cover_url) so we still honour any inline data
+      that's been preserved. Cards use the shared `_publication_card`
+      partial so visual treatment matches the publications-index. %>
   <%
-    folio_pubs  = Array(folio['publications'])
-    manual_pubs = Array(fm['publications'])
-    source_pubs = folio_pubs.any? ? folio_pubs : manual_pubs
+    source_pubs = Array(fm['publications'])
+    pubs_cfg = site.collection_config('publications')
+    pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+      pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+      "/#{pubs_cfg['slug']}/"
+    pubs_prefix = '/publications/' if pubs_prefix.empty?
   %>
   <% if source_pubs.any? %>
-    <%
-      pubs_cfg = site.collection_config('publications')
-      pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
-        pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
-        "/#{pubs_cfg['slug']}/"
-      pubs_prefix = '/publications/' if pubs_prefix.empty?
-    %>
     <section class="bundle__contents">
       <h2>What's included</h2>
       <ul class="publications-index">
@@ -108,9 +88,9 @@ layout: application
             entry    = { 'slug' => entry } if entry.is_a?(String)
             slug     = entry['slug']
             card_pub = publication_card_data(slug)
-            # Folio bundle entries carry their own title / cover when
-            # the cross-reference doesn't find a fuller record. Prefer
-            # whatever's already on the entry over the fallbacks.
+            # Inline entries (e.g. Folio's bundle payload) carry their
+            # own title / cover_url. Honour those over the looked-up
+            # publication's fields if both exist.
             card_pub[:title] = entry['title']     if entry['title']
             card_pub[:cover] = entry['cover_url'] if entry['cover_url']
           %>

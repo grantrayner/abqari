@@ -1,9 +1,9 @@
 ---
 layout: series
-title: Light Notebooks
+name: Light Notebooks
 description: A two-volume set on the edges of the working day — *First Light* on beginnings, *Last Light* on endings. Same form in both books; either one stands alone.
 price: $28.00
-buy_url: https://example.com/buy/light-notebooks
+buy_now_url: https://example.com/buy/light-notebooks
 publications:
   - slug: first-light
     position: 1

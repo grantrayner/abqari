@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-16
+
+### Breaking
+
+**Frontmatter for publications / bundles / series is now aligned with
+the Folio v1 API contract.** Field names changed across all three
+collections to match Folio's serializer output, so manual content
+and Folio-fetched data speak the same vocabulary throughout the
+engine. See `docs/publications.md` for the full schema.
+
+Migration required for existing content (hard cutover — no deprecation
+shim). Posts, photos, and workshops are unaffected.
+
+| 0.2.x frontmatter | 0.3.0 frontmatter |
+|---|---|
+| `description:` on publications | `excerpt:` (`description` still used on posts / photos / workshops / bundles / series) |
+| `cover:` / `cover_image:` | `cover_url:` |
+| `buy_url:` | `buy_now_url:` |
+| `series: foo` + `series_position: 1` | `in_series: { slug: foo, name: …, position: 1 }` |
+| `title:` on bundles / series | `name:` |
+| `price: "$16.00"` (String) | `price: { cents: 1600, currency: USD, formatted: "$16.00" }` (still accepts shorthand and expands) |
+
+### Added
+
+- **`docs/publications.md`** — canonical reference for the publication
+  / bundle / series schema. Every field name documented with type,
+  source (frontmatter or Folio), and intent.
+- **`Abqari::PublicationNormaliser`** — runs at frontmatter-parse time
+  on publication, bundle, and series frontmatter. Expands the
+  `price: "$16.00"` String shorthand into the canonical Hash form
+  (`{ cents, currency, formatted }`) so call sites read one shape.
+  Currency inferred from the symbol; supports `$`, `A$`, `C$`,
+  `NZ$`, `S$`, `£`, `€`, `¥`.
+- **`FolioShowPage#collection`** — returns `'publications'` /
+  `'bundles'` / `'series'`, so Folio-sourced pages join their
+  collection automatically. `Site#collection(name)` widened to
+  return BOTH manual `Page` objects AND `FolioShowPage` entries;
+  manual pages win on slug collision.
+- **`buy_button(subject, label:)` + `cart_button(subject, label:)`** —
+  publisher-agnostic helpers in `RenderContext`. Render whenever the
+  canonical `buy_now_url` / `add_to_cart_url` field is set, whether
+  from native frontmatter or any external integration. `subject`
+  accepts a frontmatter Hash, a Page-like object, or a slug string.
+- **`Page#title` / `Page#description` per-collection vocabulary.**
+  Bundles + series use `name:` (Folio convention). Publications
+  prefer `tagline:` then `excerpt:` for the short summary. Posts /
+  photos / workshops continue to use `title:` / `description:`.
+
+### Changed
+
+- **`_book_related`** rewritten — reads `site.collection('publications')`
+  filtered by `in_series.slug`. Works for native sites with manual
+  publications AND for Folio-configured sites, no source branching.
+- **`publication.html.erb`, `bundle.html.erb`, `series.html.erb`,
+  `publications_index.html.erb`, `publications_archive.html.erb`,
+  `_publication_header`, `_publication_card`, `_book_jsonld`,
+  `_folio_book_grid`, `_folio_bundle_cta`** — all read canonical
+  field names from `page.frontmatter` directly. The old
+  `folio['x'] || fm['x']` chains are gone; templates speak one
+  language.
+- **`publication_card_data(slug)`** — simplified. Now a single
+  `site.collection('publications').find` lookup instead of the
+  legacy two-source merge.
+- **`folio_buy_button` / `folio_cart_button`** — kept as deprecated
+  aliases over the new generic helpers. Existing layouts continue
+  to work; new layouts should use `buy_button` / `cart_button`.
+- **Bundle / series show-view "buy the whole set" buttons** — render
+  whenever `buy_now_url:` is set on the bundle/series frontmatter.
+  Native authors can point at Payhip, Gumroad, or any external
+  storefront; Folio bundle integration supplies the same field.
+
+### Migration
+
+For sites running 0.2.x:
+
+1. Rename frontmatter keys per the table above. Mechanical search-
+   and-replace handles most cases:
+   - `^description:` → `^excerpt:` (in `content/publications/**/*.md` only)
+   - `^cover:` → `^cover_url:` (in `content/publications/**/*.md` only)
+   - `^buy_url:` → `^buy_now_url:` (publications + bundles + series)
+   - `^title:` → `^name:` (in `content/bundles/**/*.md` and
+     `content/series/**/*.md`)
+   - Replace `series: foo\nseries_position: N` with the `in_series`
+     Hash form.
+2. The price string shorthand (`price: "$16.00"`) still works — no
+   change needed for that field.
+3. Wipe `vendor/folio/` and re-run `bin/build` so the Folio cache
+   re-fetches under the new processing path.
+4. Any custom layouts that read `folio['cover_url'] || fm['cover']`-
+   style chains can be simplified to read `page.frontmatter['cover_url']`
+   directly. The old chains keep working but become redundant.
+
 ## [0.2.0] — 2026-05-16
 
 ### Security
@@ -236,7 +328,8 @@ Initial release. All eleven roadmap steps complete:
 - Performance: parallel page rendering, compiled-template cache, mtime-aware copying, HTML minification, content memoization, image dimensions in passthrough mode
 - Minitest suite (~70 tests, 180+ assertions)
 
-[Unreleased]: https://github.com/your-handle/abqari/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/your-handle/abqari/compare/v0.1.0...v0.2.0
-[0.1.x]: https://github.com/your-handle/abqari/releases/tag/v0.1.0
-[0.1.0]: https://github.com/your-handle/abqari/releases/tag/v0.1.0
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/grantrayner/abqari/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/grantrayner/abqari/compare/v0.1.0...v0.2.0
+[0.1.x]: https://github.com/grantrayner/abqari/releases/tag/v0.1.0
+[0.1.0]: https://github.com/grantrayner/abqari/releases/tag/v0.1.0

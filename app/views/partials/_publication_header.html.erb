@@ -1,67 +1,62 @@
 <%#
-  Publication detail header — cover image (left) + title/metadata
-  /buy buttons (right), on a single 2-column grid on tablet and up.
-  Extracted from publication.html.erb so the layout can read as a
-  high-level sequence (banners → header → description → body →
-  sections) rather than ~50 lines of header plumbing.
+  Publication detail header — cover image (left) + title/metadata /
+  buy buttons (right), on a single 2-column grid on tablet and up.
 
-  Required local: `folio` (Hash — Folio payload or {}).
-  Reads `show.*` from collection_config('publications')['show'].
+  Reads canonical fields from `page.frontmatter` directly (see
+  docs/publications.md). Whether the page is a manual content file
+  or a Folio-sourced FolioShowPage, the field names are the same —
+  no source-aware branching here.
 
-  Field resolution: frontmatter wins per-field over Folio (so a manual
-  override page can patch any single field without re-stating the rest).
+  Toggles come from `collections.publications.show.*` in config.
 %>
 <%
   fm   = page.frontmatter
   show = (site.collection_config('publications')['show'] || {})
 %>
 <header class="publication__header">
-  <% cover = folio['cover_url'] || fm['cover'] || fm['cover_image'] %>
-  <% if cover %>
-    <img class="publication__cover" src="<%= sanitized_url(cover) %>" alt="<%= folio['title'] || fm['title'] || page.title %> cover">
+  <% if (cover = fm['cover_url']) %>
+    <img class="publication__cover" src="<%= sanitized_url(cover) %>" alt="<%= fm['cover_alt'] || "#{page.title} cover" %>">
   <% end %>
 
   <div class="publication__intro">
-    <h1><%= folio['title'] || fm['title'] || page.title %></h1>
+    <h1><%= page.title %></h1>
 
-    <% if show.fetch('show_tagline', true) && (tagline = folio['tagline'] || fm['tagline']) %>
+    <% if show.fetch('show_tagline', true) && (tagline = fm['tagline']) %>
       <p class="publication__tagline"><%= tagline %></p>
     <% end %>
 
     <%# Optional metadata fields — ISBN, pages, published date —
         rendered as a small muted block of detail lines. %>
-    <% if show.fetch('show_isbn', true) && (isbn = folio['isbn'] || fm['isbn']) %>
+    <% if show.fetch('show_isbn', true) && (isbn = fm['isbn']) %>
       <p class="publication__isbn">ISBN <%= isbn %></p>
     <% end %>
 
-    <% if show.fetch('show_pages', true) && (pages = folio['pages'] || fm['pages']) %>
+    <% if show.fetch('show_pages', true) && (pages = fm['pages']) %>
       <p class="publication__pages"><%= pluralize(pages, 'page') %></p>
     <% end %>
 
-    <% if show.fetch('show_published', true) && (published = folio['published_at'] || fm['published_at'] || fm['publish_date']) %>
+    <% if show.fetch('show_published', true) && (published = fm['published_at']) %>
       <p class="publication__published">First published <time datetime="<%= published %>"><%= local_time(published) %></time></p>
+    <% end %>
+
+    <%# Pre-order / availability banner — Folio-only fields, harmless
+        when absent. %>
+    <% if fm['preorder'] && fm['release_date'] %>
+      <p class="publication__preorder">Pre-order — releases <time datetime="<%= fm['release_date'] %>"><%= local_time(fm['release_date']) %></time></p>
     <% end %>
 
     <%# Purchase area — price sits adjacent to the buy buttons so
         they read as a single unit (e-commerce convention). %>
-    <% if show.fetch('show_price', true) && (price = folio.dig('price', 'formatted') || fm['price']) %>
+    <% if show.fetch('show_price', true) && (price = fm.dig('price', 'formatted')) %>
       <p class="publication__price"><%= price %></p>
     <% end %>
 
-    <%# Folio-driven buy / cart buttons (when Folio data is present
-        for this slug). Helpers return '' when no URL is loaded. %>
+    <%# Buy / cart buttons. Generic — render whenever the
+        corresponding URL field is set (frontmatter OR Folio data;
+        canonical schema means they look the same). %>
     <p class="publication__buttons">
-      <%== folio_buy_button(page.respond_to?(:slug) ? page.slug : nil, kind: :book) %>
-      <%== folio_cart_button(page.respond_to?(:slug) ? page.slug : nil, kind: :book) %>
-      <%# Legacy frontmatter buy button — for manual publications without
-          Folio. Renders only when neither Folio button covers it AND a
-          buy_url is set in frontmatter. %>
-      <% if folio['buy_now_url'].nil? && folio['add_to_cart_url'].nil? &&
-           fm['buy_url'] && (safe_buy_url = sanitized_url(fm['buy_url'])) %>
-        <a class="folio-button folio-button--buy" href="<%= safe_buy_url %>" rel="noopener noreferrer">
-          <%= fm['buy_label'] || 'Buy now' %>
-        </a>
-      <% end %>
+      <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
+      <%== cart_button(fm) %>
     </p>
   </div>
 </header>

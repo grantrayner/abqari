@@ -1,15 +1,17 @@
 ---
 title: First Light
-description: Short meditations on the first hours of the day — light, quiet, and the work that gets done before anyone calls.
-cover: /publications/first-light/cover.svg
+excerpt: Short meditations on the first hours of the day — light, quiet, and the work that gets done before anyone calls.
+cover_url: /publications/first-light/cover.svg
 price: $16.00
 isbn: 978-981-94-0000-4
 language: English
 pages: 116
 published_at: 2026-05-01
-buy_url: https://example.com/buy/first-light
-series: light-notebooks
-series_position: 1
+buy_now_url: https://example.com/buy/first-light
+in_series:
+  slug: light-notebooks
+  name: Light Notebooks
+  position: 1
 order: 4
 tags: [light]
 ---

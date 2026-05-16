@@ -1,13 +1,13 @@
 ---
 title: An Atlas of Small Things
-description: Photographs and notes from places that don't make the news.
-cover: /publications/atlas-of-small-things/cover.svg
+excerpt: Photographs and notes from places that don't make the news.
+cover_url: /publications/atlas-of-small-things/cover.svg
 price: $32.00
 isbn: 978-981-94-0000-3
 language: English
 pages: 240
 published_at: 2026-02-28
-buy_url: https://example.com/buy/atlas-of-small-things
+buy_now_url: https://example.com/buy/atlas-of-small-things
 order: 3
 ---
 

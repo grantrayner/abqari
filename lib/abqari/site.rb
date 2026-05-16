@@ -152,8 +152,19 @@ module Abqari
 
     # Internal — collaborators only. Generators push into the list with
     # `site.add_generated_page(page)` so the public API stays read-only.
+    #
+    # Adding a page invalidates the per-collection caches because
+    # generated pages that implement `#collection` (FolioShowPage in
+    # particular) join their collection — a memoised `collection(name)`
+    # result from before this add is now stale. The pagination /
+    # related generators call `site.collection` mid-`generate_all`, so
+    # invalidating at every add keeps the memo honest without
+    # requiring careful generator-ordering.
     def add_generated_page(page)
       @generated_pages << page
+      @collection_cache = nil
+      @collection_url_index_cache = nil
+      @posts_cache = nil if page.respond_to?(:post?) && page.post?
     end
 
     # ------------------------------------------------------------------
@@ -301,9 +312,24 @@ module Abqari
       canonical = resolve_collection_name(name)
       @collection_cache ||= {}
       @collection_cache[canonical] ||= begin
-        pages_in = @pages.select { |p| p.collection == canonical }
-        if pages_in.any?(&:date)
-          pages_in.sort_by { |p| p.date || Time.at(0) }.reverse
+        # Manual content pages (Page objects) AND generated pages that
+        # opt in by exposing `#collection` returning the canonical
+        # name. FolioShowPage is the primary example — Folio
+        # publications, bundles, and series join their respective
+        # collections so templates iterate one merged list.
+        manual    = @pages.select { |p| p.collection == canonical }
+        generated = @generated_pages.select do |p|
+          p.respond_to?(:collection) && p.collection == canonical
+        end
+        # Manual wins on slug collision — an override page at
+        # `content/publications/<slug>/index.md` suppresses the
+        # auto-generated Folio entry for the same slug.
+        manual_slugs = manual.map { |p| p.respond_to?(:slug) ? p.slug : nil }.compact.to_set
+        generated.reject! { |p| p.respond_to?(:slug) && manual_slugs.include?(p.slug) }
+
+        pages_in = manual + generated
+        if pages_in.any? { |p| p.respond_to?(:date) && p.date }
+          pages_in.sort_by { |p| (p.respond_to?(:date) && p.date) || Time.at(0) }.reverse
         else
           pages_in.sort_by { |p| p.title.to_s }
         end

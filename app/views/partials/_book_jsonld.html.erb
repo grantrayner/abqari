@@ -1,35 +1,17 @@
 <!--
-  Schema.org Book JSON-LD for publication detail pages. Reads from
-  EITHER Folio data (when configured) OR the page's frontmatter,
-  whichever is richer. Renders for every publication that has a
-  title (i.e. always).
+  Schema.org Book JSON-LD for publication detail pages. Reads
+  canonical fields from `page.frontmatter` directly — whether the
+  publication is a manual content file or Folio-sourced, the field
+  names are the same (see docs/publications.md).
 
-  Required locals:
-    folio  Hash (the Folio payload, possibly empty `{}` for manual
-           publications that have no Folio counterpart)
-    page   the current Page
-
-  Frontmatter shape for manual publications:
-      title:         An Atlas of Small Things
-      description:   …
-      tagline:       …
-      cover:         /publications/<slug>/cover.svg
-      price:         $32.00
-      isbn:          978-981-94-0000-3
-      language:      English
-      pages:         240
-      published_at:  2026-02-28
-      buy_url:       https://…
-
-  Falls back gracefully — missing fields are omitted from the
-  emitted JSON-LD rather than emitted as nulls.
+  Renders for every publication that has a title (i.e. always).
+  Missing fields are omitted from the emitted JSON-LD rather than
+  emitted as nulls.
 -->
 <%
-  fm        = page.frontmatter || {}
-  folio_h   = folio.is_a?(Hash) ? folio : {}
-  site_url  = site.config['url'].to_s.sub(%r{/\z}, '')
-
-  title     = folio_h['title'] || folio_h['name'] || fm['title'] || page.title
+  fm       = page.frontmatter || {}
+  site_url = site.config['url'].to_s.sub(%r{/\z}, '')
+  title    = page.title
 %>
 <% if title %>
 <%
@@ -42,68 +24,48 @@
   jsonld["url"] = "#{site_url}#{page.url}" unless site_url.empty?
   jsonld["mainEntityOfPage"] = { "@type" => "WebPage", "@id" => "#{site_url}#{page.url}" } unless site_url.empty?
 
-  # Author — folio first, then a per-page `author:`, then site-wide.
-  author_raw = folio_h['author'] ||
-               fm['author'] ||
-               site.config['author']
+  # Author — page-level `author:` (Folio shape: { slug, name } Hash,
+  # or a plain string) wins over site-wide.
+  author_raw = fm['author'] || site.config['author']
   if author_raw
     author_name = author_raw.is_a?(Hash) ? author_raw['name'] : author_raw.to_s
     jsonld["author"] = { "@type" => "Person", "name" => author_name } unless author_name.to_s.empty?
   end
 
-  jsonld["isbn"]          = folio_h['isbn'] || fm['isbn']             if folio_h['isbn'] || fm['isbn']
-  jsonld["inLanguage"]    = folio_h['language'] || fm['language']     if folio_h['language'] || fm['language']
-  jsonld["numberOfPages"] = (folio_h['pages'] || fm['pages']).to_i    if folio_h['pages'] || fm['pages']
-  jsonld["description"]   = folio_h['tagline'] || fm['tagline'] || fm['description'] || page.description
+  jsonld["isbn"]          = fm['isbn']            if fm['isbn']
+  jsonld["inLanguage"]    = fm['language']        if fm['language']
+  jsonld["numberOfPages"] = fm['pages'].to_i      if fm['pages']
+  jsonld["description"]   = fm['tagline'] || fm['excerpt'] || page.description
 
-  # Image: prefer Folio cover_url, then frontmatter cover / image / cover_image.
-  raw_cover = folio_h['cover_url'] || fm['cover'] || fm['image'] || fm['cover_image']
-  if raw_cover
-    jsonld["image"] = if raw_cover.start_with?('http://', 'https://')
-                       raw_cover
-                     elsif raw_cover.start_with?('/')
-                       "#{site_url}#{raw_cover}"
-                     else
-                       "#{site_url}#{bundle_asset_url_for(page, raw_cover)}"
-                     end
+  # Image — canonical `cover_url`. Absolute URL or site-relative path.
+  if (cover = fm['cover_url'])
+    jsonld["image"] = if cover.start_with?('http://', 'https://')
+                        cover
+                      elsif cover.start_with?('/')
+                        "#{site_url}#{cover}"
+                      else
+                        "#{site_url}#{bundle_asset_url_for(page, cover)}"
+                      end
   end
 
   # Date published — Folio carries ISO timestamps; frontmatter may
   # carry plain dates. Normalise to ISO when possible.
-  raw_date = folio_h['published_at'] || fm['published_at'] || fm['publish_date']
-  if raw_date
+  if (raw_date = fm['published_at'])
     jsonld["datePublished"] = raw_date.respond_to?(:iso8601) ? raw_date.iso8601 : raw_date.to_s
   end
 
-  # Offers — Folio's price is structured (cents + currency); manual
-  # frontmatter's is a display string ("$32.00"). Handle both.
-  if (folio_price = folio_h['price']).is_a?(Hash) && folio_price['cents']
+  # Offers — canonical price is a Hash { cents, currency, formatted }
+  # (the publication normaliser expands string shorthands at parse
+  # time, so this is the only shape we need to read).
+  if (price = fm['price']).is_a?(Hash) && price['cents']
+    available = fm.key?('available_for_purchase') ? fm['available_for_purchase'] : true
     jsonld["offers"] = {
       "@type"         => "Offer",
-      "price"         => (folio_price['cents'].to_f / 100).round(2),
-      "priceCurrency" => folio_price['currency'] || 'USD',
-      "availability"  => folio_h['available_for_purchase'] ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
-      "url"           => folio_h['buy_now_url'] || folio_h['shop_url']
+      "price"         => (price['cents'].to_f / 100).round(2),
+      "priceCurrency" => price['currency'] || 'USD',
+      "availability"  => available ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
+      "url"           => fm['buy_now_url'] || fm['shop_url']
     }.compact
-  elsif (price_str = fm['price'])
-    digits = price_str.to_s.gsub(/[^\d.]/, '')
-    if !digits.empty?
-      currency = case price_str.to_s
-                 when /\A\$/                 then 'USD'
-                 when /\A£/                  then 'GBP'
-                 when /\A€/                  then 'EUR'
-                 when /\A¥/                  then 'JPY'
-                 when /\AS\$/, /SGD/         then 'SGD'
-                 else                             'USD'
-                 end
-      jsonld["offers"] = {
-        "@type"         => "Offer",
-        "price"         => digits,
-        "priceCurrency" => currency,
-        "availability"  => 'https://schema.org/InStock',
-        "url"           => fm['buy_url']
-      }.compact
-    end
   end
 %>
 <script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>

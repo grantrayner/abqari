@@ -5,9 +5,15 @@ layout: application
   Publications archive — the canonical full grid of every publication
   in the `publications` collection, paginated. Pairs with
   `publications_index.html.erb`: when
-  `collections.publications.archive.enabled: true`, the front
-  publications page is a curated landing (showcase + latest N +
-  bundles + series), and this page holds the full list.
+  `collections.publications.archive.enabled: true`, the front page is
+  a curated landing (showcase + latest N + bundles + series), and
+  this page holds the full list.
+
+  After the canonical-schema migration (docs/publications.md),
+  `site.collection('publications')` returns BOTH manual content
+  pages AND Folio-sourced entries — the paginator slices the merged
+  list automatically. Folio-only publications appear here without
+  needing a manual override page.
 
   Wire it up by creating `content/publications-archive.md` (NOT
   inside `content/publications/` — that would make the page a
@@ -24,22 +30,8 @@ layout: application
 
   `paginate: true` reads the page count from
   `collections.publications.pagination.per_page` in config/site.yml.
-  Set an explicit integer (`paginate: 16`) here only when this
-  archive needs to deviate from the site-wide setting.
-
   `paginate_collection: publications` is **required** — without it
-  the paginator falls back to the default `'posts'` collection and
-  the archive would silently show posts instead of publications.
-
-  Caveat — Folio-only publications: the paginator slices
-  `site.collection('publications')`, which contains only
-  manually-defined Pages. Folio publications without a matching
-  override page in `content/publications/<slug>/index.md` appear on
-  the LANDING (it merges Folio + manual at render time) but won't
-  show up in the paginated archive. Sites that want every Folio
-  book listed here should create an override page per Folio slug —
-  the override can be minimal (just `title:` + `tagline:`); the
-  rest of the metadata still falls through to Folio.
+  the paginator falls back to the default `'posts'` collection.
 -->
 <%
   cfg       = (site.collection_config('publications') || {})
@@ -58,9 +50,8 @@ layout: application
     "/#{cfg['slug']}/"
   pubs_prefix = '/publications/' if pubs_prefix.empty?
 
-  # Page.paginator carries the slice of manual publications for this
-  # page; fall back to the full collection in the rare case the
-  # paginator wasn't built (e.g. `paginate: false`).
+  # Paginator carries this page's slice of the collection;
+  # fall back to the full collection if pagination is disabled.
   pubs = page.paginator&.posts || site.collection('publications')
 %>
 <article>
@@ -75,10 +66,9 @@ layout: application
   <% if pubs.any? %>
     <ul class="publications-index">
       <% pubs.each_with_index do |pub_page, idx| %>
-        <%# Each tile reuses the shared `_publication_card` partial. The
-            `publication_card_data` helper merges Folio data for the
-            same slug when present, so even when Folio is configured
-            the archive uses the same rich-card visual as the landing. %>
+        <%# `publication_card_data(slug)` returns the normalised hash
+            the `_publication_card` partial expects — reads canonical
+            frontmatter fields directly. %>
         <%== render 'partials/publication_card',
                    pub: publication_card_data(pub_page.slug),
                    idx: idx,

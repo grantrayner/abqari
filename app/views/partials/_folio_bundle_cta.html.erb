@@ -1,22 +1,26 @@
 <!--
-  CTA box on a book page nudging the reader toward a bundle that contains
-  this book. Required local: bundle_slug. Pulls the bundle payload from
-  site.data and emits nothing if the bundle isn't loaded (e.g. fetch failed
-  or bundle was unpublished).
+  CTA box on a publication page nudging the reader toward a bundle
+  that contains this book. Required local: `bundle_slug`. Looks the
+  bundle up in `site.collection('bundles')` so the partial works
+  whether the bundle is manual content or Folio-sourced (after the
+  canonical-schema migration both are in the same collection).
+
+  Emits nothing if the bundle isn't found.
 -->
-<% bundle = site.data.dig('folio_bundles', bundle_slug) %>
+<% bundle = site.collection('bundles').find { |b| b.slug == bundle_slug } %>
 <% if bundle %>
+  <% fm = bundle.frontmatter %>
   <aside class="folio-bundle-cta">
     <h3>Save with the bundle</h3>
     <p>
-      <a href="/bundles/<%= bundle['slug'] %>/"><%= bundle['name'] %></a>
-      <% if (price = bundle.dig('price', 'formatted')) %>
+      <a href="<%= bundle.url %>"><%= bundle.title %></a>
+      <% if (price = fm.dig('price', 'formatted')) %>
         — <%= price %>
       <% end %>
     </p>
     <p class="folio-bundle-cta__buttons">
-      <%== folio_buy_button(bundle['slug'], kind: :bundle) %>
-      <%== folio_cart_button(bundle['slug'], kind: :bundle) %>
+      <%== buy_button(fm, label: fm['buy_label'] || 'Buy bundle') %>
+      <%== cart_button(fm) %>
     </p>
   </aside>
 <% end %>

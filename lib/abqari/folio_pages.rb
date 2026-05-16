@@ -188,10 +188,25 @@ module Abqari
     end
   end
 
-  # Show page for a single book / bundle / series. Exposes the underlying
-  # Folio data via `page.data` so layouts can do `<%= page.data['title'] %>`
-  # without going through the helper indirection.
+  # Show page for a single publication / bundle / series. Looks like a
+  # regular `Page` to the rest of the engine: same `frontmatter`,
+  # `title`, `description`, `collection` interface, so templates
+  # iterate `site.collection('publications')` and don't need to know
+  # whether a particular entry came from `content/` or Folio.
+  #
+  # The Folio payload IS the frontmatter — the API returns canonical
+  # field names (`title`, `excerpt`, `cover_url`, `price`,
+  # `buy_now_url`, `in_series`, …) per docs/publications.md, so no
+  # translation layer is needed.
   class FolioShowPage
+    # Map `kind:` to the collection name `site.collection` exposes.
+    # Folio's three kinds line up 1:1 with Abqari's three collections.
+    KIND_TO_COLLECTION = {
+      'publication' => 'publications',
+      'bundle'      => 'bundles',
+      'series'      => 'series'
+    }.freeze
+
     attr_reader :site, :kind, :slug, :data
 
     def initialize(site, kind:, slug:, data:, layout:, url:)
@@ -203,22 +218,43 @@ module Abqari
       @url    = url
     end
 
+    # Collection membership. Returns `'publications'` / `'bundles'` /
+    # `'series'`, which lets `Site#collection(name)` include this page
+    # in its iteration alongside manual Pages.
+    def collection
+      KIND_TO_COLLECTION[@kind.to_s]
+    end
+
+    # Publications use `title`; bundles + series use `name`. Falls
+    # back to the slug so callers always get a string.
     def title
       @data['title'] || @data['name'] || @slug
     end
 
+    # `description` is the page's short-summary text — used by
+    # sitemap, RSS, OG, JSON-LD. Per docs/publications.md:
+    # publications use `tagline` then `excerpt`; bundles + series use
+    # `description`. The first line keeps it summary-shaped.
     def description
-      @data['tagline'] ||
-        @data['excerpt'].to_s.lines.first&.strip ||
-        @data['description'].to_s.lines.first&.strip
+      raw = case collection
+            when 'publications'
+              @data['tagline'] || @data['excerpt']
+            else
+              @data['description']
+            end
+      raw.to_s.lines.first&.strip
     end
 
     def content
       ''
     end
 
+    # Folio payload IS the frontmatter. Adds two engine-only
+    # bookkeeping keys (`folio_kind`, `folio_slug`) for any partial
+    # that needs to know this is a Folio-sourced entry — but
+    # everything else lives under canonical names.
     def frontmatter
-      { 'folio_kind' => @kind, 'folio_slug' => @slug }
+      @data.merge('folio_kind' => @kind, 'folio_slug' => @slug)
     end
 
     def url

@@ -2,16 +2,11 @@
 layout: application
 ---
 <!--
-  Publication detail page. One layout, two data sources:
-
-  1. **Manual publications** (content/publications/<slug>/index.md
-     or content/publications/<slug>.md): all data comes from
-     frontmatter (title, description, cover, price, isbn, etc.).
-
-  2. **Folio publications** (auto-generated when Folio is configured):
-     data comes from `page.data` (Folio payload) — title, cover_url,
-     excerpt, isbn, price, buy_now_url, in_series, in_bundles, etc.
-     Manual overrides in frontmatter take precedence.
+  Publication detail page. One layout, one data source: the page's
+  frontmatter, in canonical Folio-aligned shape (see
+  docs/publications.md). Whether the page is a manual
+  `content/publications/<slug>/index.md` or a Folio-generated
+  `FolioShowPage`, the field names are the same.
 
   Driven by `collections.publications.show.*` config toggles:
 
@@ -20,32 +15,15 @@ layout: application
       show_isbn, show_pages, show_published
 
     Hero image (between header and body, driven by `hero_image:`
-    frontmatter on the override page):
+    frontmatter):
       show_hero
 
-    Section toggles (default true when Folio is configured):
+    Section toggles:
       testimonials       filter data/testimonials.yml by slug
       related_books      other publications in the series
       related_bundles    bundles this publication is part of
 -->
 <%
-  # Folio data lookup, with two paths:
-  #   1. FolioShowPage (auto-generated pages) carries Folio data on
-  #      `page.data` directly — use it.
-  #   2. Manual override pages (content/publications/<slug>/index.md)
-  #      are regular Page instances without a `data` method. Look up
-  #      by slug in site.data['folio_publications'] so cover, ISBN,
-  #      price, etc. still come from Folio.
-  # Either way, frontmatter overrides on individual fields take
-  # precedence (handled inside `_publication_header` and below with
-  # `fm['…'] || folio['…']`).
-  folio = if page.respond_to?(:data) && page.data
-            page.data
-          elsif page.respond_to?(:slug) && page.slug
-            (site.data['folio_publications'] || {})[page.slug] || {}
-          else
-            {}
-          end
   fm    = page.frontmatter
   show  = (site.collection_config('publications')['show'] || {})
 
@@ -58,37 +36,31 @@ layout: application
   <%== render 'partials/future_banner' %>
   <%== render 'partials/back_to_index' %>
 
-  <%== render 'partials/publication_header', folio: folio %>
+  <%== render 'partials/publication_header' %>
 
-  <%# Hero image — wide banner-style image placed between the header
-      metadata and the body description. Driven by the override page's
-      `hero_image:` frontmatter (and optional `hero_alt:`). Renders
-      nothing when the frontmatter is absent or `show_hero` is false. %>
+  <%# Hero image — wide banner image placed between the header
+      metadata and the body description. Driven by frontmatter
+      `hero_image:` (and optional `hero_alt:`). Renders nothing when
+      absent or `show_hero` is false. %>
   <% if show_hero && (hero_image = fm['hero_image']) %>
     <figure class="publication__hero">
       <img src="<%= sanitized_url(hero_image) %>"
-           alt="<%= fm['hero_alt'] || folio['title'] || fm['title'] || page.title %>"
+           alt="<%= fm['hero_alt'] || page.title %>"
            loading="lazy">
     </figure>
   <% end %>
 
-  <%# Description: Folio when present, frontmatter as fallback. The
-      selected source is exposed as `data-source="…"` so you can see
-      in DevTools where the prose came from (folio / frontmatter).
-      `excerpt_html` is rendered raw — the trust assumption is that
-      Folio is *your* server. For an untrusted Folio, swap to
-      `h(folio['excerpt'])` and accept the loss of rich formatting.
-
-      Body content is rendered unconditionally below — it's for
-      ADDITIONAL content (CTAs, related links, etc.), not a third
-      synopsis fallback. If you have neither Folio nor a `description:`
-      in frontmatter, the description block is simply omitted. %>
+  <%# Description — Folio's `excerpt_html` (pre-rendered) when present,
+      otherwise the `excerpt` source escaped. Both fields are in
+      canonical shape. The selected source is exposed as
+      `data-source="…"` so you can see in DevTools which path the
+      data came from. %>
   <%
     description_source, description_content =
-      if (html = folio['excerpt_html']) && !html.to_s.strip.empty?
-        [:folio,       html]
-      elsif (fm_d = fm['description']) && !fm_d.to_s.strip.empty?
-        [:frontmatter, h(fm_d)]
+      if (html = fm['excerpt_html']) && !html.to_s.strip.empty?
+        [:excerpt_html, html]
+      elsif (excerpt = fm['excerpt']) && !excerpt.to_s.strip.empty?
+        [:excerpt, h(excerpt)]
       else
         [nil, nil]
       end
@@ -99,18 +71,18 @@ layout: application
     </div>
   <% end %>
 
-  <%# Markdown body from content/publications/<slug>/index.md — for
-      content that is NOT in Folio (CTAs, related-content links,
-      etc.). Synopsis prose belongs in Folio (or in frontmatter
-      `description:` as the fallback), not here. %>
+  <%# Markdown body — additional content (CTAs, related-content links,
+      etc.) that is NOT in the excerpt. Synopsis prose belongs in
+      `excerpt:`, not here. %>
   <%== page.content %>
 
-  <% if folio['in_series'] %>
+  <%# Series — canonical `in_series` Hash. Reads from frontmatter
+      whether the source is manual or Folio. %>
+  <% if (in_series = fm['in_series']).is_a?(Hash) && in_series['slug'] %>
     <p class="publication__series">
       Part of the
-      <a href="/series/<%= folio['in_series']['slug'] %>/"><%= folio['in_series']['name'] %></a>
-      series
-      <% if folio['in_series']['position'] %> (#<%= folio['in_series']['position'] %>)<% end %>.
+      <a href="/series/<%= in_series['slug'] %>/"><%= in_series['name'] || in_series['slug'] %></a>
+      series<% if in_series['position'] %> (#<%= in_series['position'] %>)<% end %>.
     </p>
   <% end %>
 
@@ -122,13 +94,23 @@ layout: application
     <%== render 'partials/book_related' %>
   <% end %>
 
+  <%# Bundle CTAs — derive from canonical `in_bundles` (Folio supplies
+      it directly) AND from the inverse lookup (bundles that list
+      this publication's slug, native or Folio). %>
   <% if show.fetch('related_bundles', true) %>
-    <% Array(folio['in_bundles']).each do |bundle| %>
-      <%== render 'partials/folio_bundle_cta', bundle_slug: bundle['slug'] %>
+    <%
+      explicit_bundles = Array(fm['in_bundles']).map { |b| b.is_a?(Hash) ? b['slug'] : b.to_s }
+      inverse_bundles  = site.collection('bundles').select do |b|
+        Array(b.frontmatter['publications']).map { |x| x.is_a?(Hash) ? x['slug'] : x.to_s }.include?(page.slug)
+      end.map(&:slug)
+      bundle_slugs = (explicit_bundles + inverse_bundles).uniq
+    %>
+    <% bundle_slugs.each do |bundle_slug| %>
+      <%== render 'partials/folio_bundle_cta', bundle_slug: bundle_slug %>
     <% end %>
   <% end %>
 
-  <%== render 'partials/book_jsonld', folio: folio, page: page %>
+  <%== render 'partials/book_jsonld' %>
 </article>
 
 <%== render 'partials/related_items' %>

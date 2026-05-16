@@ -40,7 +40,11 @@ class ErbEscapeAuditTest < Minitest::Test
     /\bheroicon\b/,
     /\brender\s+['"]/,                     # render 'partials/foo'
     /\brender\s*\(/,                       # render('partials/foo')
-    /\bfolio_(buy|cart)_button\b/,
+    /\bfolio_(buy|cart)_button\b/,         # legacy aliases (deprecated; see folio_helpers.rb)
+    /\b(buy|cart)_button\b/,               # generic publisher-agnostic helpers —
+                                           # return a <a class="folio-button"> tag
+                                           # with `sanitized_url`-validated href.
+                                           # Empty string when no URL is set.
     /\byield_content\b/,                   # pre-rendered inner layout
     /\Apage\.content\b/,                   # pre-rendered markdown body
     /\bSCRIPT\b/                           # *::SCRIPT constants (pre-built <script>)

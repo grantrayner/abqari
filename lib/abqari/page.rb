@@ -83,12 +83,19 @@ module Abqari
     # Identity
     # --------------------------------------------------------------
 
+    # Title resolution: publications use `title`; bundles + series use
+    # `name` (matching Folio's vocabulary — see docs/publications.md).
+    # Posts, photos, workshops, and untyped pages continue to use
+    # `title`.
     def title
-      frontmatter['title'] || derived_title
+      key = title_key_for_collection
+      frontmatter[key] || frontmatter['title'] || derived_title
     end
 
     # Resolution chain:
-    #   1. Frontmatter `description:` (explicit, wins).
+    #   1. Frontmatter explicit value (per-collection key:
+    #        - publications → `tagline` then `excerpt`
+    #        - everything else → `description`)
     #   2. The page's first paragraph, with markdown stripped. Lets
     #      writers ship a post without setting `description:` and still
     #      get a useful meta description / lede for SEO and social
@@ -108,7 +115,7 @@ module Abqari
     def description
       return @description if defined?(@description)
 
-      explicit = frontmatter['description']
+      explicit = explicit_description_value
       @description = if !explicit.to_s.strip.empty?
                        explicit
                      elsif !(auto = first_paragraph_text).to_s.strip.empty?
@@ -302,6 +309,33 @@ module Abqari
 
     def derived_title
       File.basename(source_path, '.md').sub(DATE_PREFIX_RE, '').tr('-_', ' ').capitalize
+    end
+
+    # Which frontmatter key carries the title for this collection.
+    # `bundles` and `series` use `name` (Folio's vocabulary, see
+    # docs/publications.md); everything else uses `title`. Falls back
+    # to `title` if the collection isn't recognised.
+    def title_key_for_collection
+      case collection
+      when 'bundles', 'series' then 'name'
+      else 'title'
+      end
+    end
+
+    # Per-collection description source. Publications use Folio's
+    # vocabulary (`tagline` for the short marketing line, `excerpt`
+    # for the long-form blurb). Bundles + series use `description`
+    # (matches Folio's bundle / series serializer shape). Everything
+    # else (posts, photos, workshops) uses `description` too.
+    def explicit_description_value
+      case collection
+      when 'publications'
+        v = frontmatter['tagline']
+        return v unless v.to_s.strip.empty?
+        frontmatter['excerpt']
+      else
+        frontmatter['description']
+      end
     end
 
     def first_paragraph_text

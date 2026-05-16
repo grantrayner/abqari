@@ -2,79 +2,64 @@
 layout: application
 ---
 <!--
-  Single-series detail page. Reads from `page.data` (Folio's series
-  payload) when the page is an auto-generated FolioShowPage, with
-  `page.frontmatter` as a graceful fallback for manual override pages
-  at `content/series/<slug>/index.md`.
+  Single-series detail page. Reads canonical fields from
+  `page.frontmatter` (see docs/publications.md). Whether the page is
+  a manual `content/series/<slug>/index.md` or a Folio-generated
+  FolioShowPage with `kind: 'series'`, the field names are the same.
 
-  Folio series payload shape (auto-generated):
-      { slug, name, description_html, publications:
-          [{ slug, title, cover_url, position }, ...] }
+  Folio note: series in Folio have NO commerce attached — no price,
+  no buy URLs. A native author CAN set `buy_now_url:` here to point
+  at e.g. a Payhip series bundle; the engine renders the button
+  whenever the field is set, regardless of source.
 
-  Manual override frontmatter shape — for sites without Folio, or
-  to override a Folio-generated series:
+  Frontmatter shape:
 
       ---
       layout: series
-      title: Memoirs of an Assassin            # or `name:` — Folio-style alias
-      description: Dark psychological thrillers from the perspective of …
-      tagline: A series of fictional memoirs.
-      price: $24.99                            # optional — display only,
-                                               #   no Shopify/etc. wiring
-      buy_url: https://www.example.com/buy     # optional — single-CTA button
-      buy_label: Buy the complete series       # default 'Buy now'
-      publications:                            # books in this series
-        - slug: memoirs-of-an-assassin
+      name: Light Notebooks
+      description: A two-volume set on the edges of the working day.
+      tagline: Beginnings and endings.            # optional
+      price: $28.00                               # optional (native only)
+      buy_now_url: https://...                    # optional (native only)
+      publications:
+        - slug: first-light
           position: 1
-        - slug: the-russia-assignment
+        - slug: last-light
           position: 2
-      # Or bare-slug entries if position doesn't matter:
-      # publications:
-      #   - memoirs-of-an-assassin
-      #   - the-russia-assignment
       ---
-
-  Each entry in `publications:` is cross-referenced against
-  `site.data['folio_publications']` (Folio) AND
-  `site.collection('publications')` (manual publication pages) — so
-  cards carry the full publication metadata regardless of where each
-  book is sourced.
 -->
 <article class="series">
-  <% folio = folio_data %>
-  <% fm    = page.frontmatter %>
+  <% fm = page.frontmatter %>
 
   <header>
-    <h1><%= folio['name'] || fm['name'] || fm['title'] || page.title %></h1>
+    <h1><%= page.title %></h1>
     <% if (tagline = fm['tagline']) %>
       <p class="series__tagline"><%= tagline %></p>
     <% end %>
 
-    <% if (price = fm['price']) %>
+    <% if (price = fm.dig('price', 'formatted')) %>
       <p class="series__price"><%= price %></p>
     <% end %>
 
-    <%# Optional single-CTA buy button — Folio doesn't expose buy URLs
-        for series (they're aggregations, not products), so this is
-        frontmatter-only. Useful for "buy the complete series" links
-        when the series IS sold as a single product elsewhere. %>
-    <% if fm['buy_url'] && (safe_buy_url = sanitized_url(fm['buy_url'])) %>
+    <%# Buy button — native sites can point at a series-bundle URL.
+        Folio never supplies one for series. %>
+    <% if fm['buy_now_url'] || fm['add_to_cart_url'] %>
       <p class="series__buttons">
-        <a class="folio-button folio-button--buy" href="<%= safe_buy_url %>" rel="noopener noreferrer">
-          <%= fm['buy_label'] || 'Buy now' %>
-        </a>
+        <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
+        <%== cart_button(fm) %>
       </p>
     <% end %>
   </header>
 
-  <%# Description: Folio when present, frontmatter as fallback.
-      Two-level chain matching publication.html.erb and bundle.html.erb. %>
+  <%# Description — pre-rendered `description_html` (Folio) when
+      present, else markdown `description` HTML-escaped. Canonical
+      shape per docs/publications.md. %>
   <%
     description_source, description_content =
-      if (html = folio['description_html']) && !html.to_s.strip.empty?
-        [:folio,       html]
-      elsif (fm_d = fm['description']) && !fm_d.to_s.strip.empty?
-        [:frontmatter, h(fm_d)]
+      if (html = fm['description_html']) && !html.to_s.strip.empty?
+        [:description_html, html]
+      elsif (text = fm['description']) && !text.to_s.strip.empty?
+        [:description, h(text)]
       else
         [nil, nil]
       end
@@ -87,25 +72,18 @@ layout: application
 
   <%== page.content %>
 
-  <%# Books in this series. Folio series ship a `publications:` array
-      on `page.data`; manual override pages provide one in
-      `frontmatter`. Each entry can be a bare slug or a hash with
-      slug + position. Cards render via the shared `_publication_card`
-      partial with `:position` set so each card shows its series
-      position as a small "#N" prefix. %>
+  <%# Books in this series. `publications:` is an array of slugs or
+      `{slug, position}` Hashes. Cards render with `:position` set so
+      each card shows its series position as a small "#N" prefix. %>
   <%
-    folio_pubs  = Array(folio['publications'])
-    manual_pubs = Array(fm['publications'])
-    source_pubs = folio_pubs.any? ? folio_pubs : manual_pubs
+    source_pubs = Array(fm['publications'])
+    pubs_cfg = site.collection_config('publications')
+    pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+      pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+      "/#{pubs_cfg['slug']}/"
+    pubs_prefix = '/publications/' if pubs_prefix.empty?
   %>
   <% if source_pubs.any? %>
-    <%
-      pubs_cfg = site.collection_config('publications')
-      pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
-        pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
-        "/#{pubs_cfg['slug']}/"
-      pubs_prefix = '/publications/' if pubs_prefix.empty?
-    %>
     <section class="series__contents">
       <h2>Books in this series</h2>
       <ul class="publications-index">
@@ -114,8 +92,6 @@ layout: application
             entry    = { 'slug' => entry } if entry.is_a?(String)
             slug     = entry['slug']
             card_pub = publication_card_data(slug)
-            # Folio entries carry their own title / cover; prefer them
-            # over the fallbacks from the cross-reference.
             card_pub[:title]    = entry['title']     if entry['title']
             card_pub[:cover]    = entry['cover_url'] if entry['cover_url']
             card_pub[:position] = entry['position']

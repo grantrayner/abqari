@@ -1,9 +1,9 @@
 ---
 layout: bundle
-title: The Starter Library
+name: The Starter Library
 description: Three books to begin with — the field guide, the essay collection, and the photographic atlas. Sold together at a small discount.
 price: $58.00
-buy_url: https://example.com/buy/starter-library
+buy_now_url: https://example.com/buy/starter-library
 publications:
   - the-field-guide
   - margin-notes
