@@ -7,9 +7,9 @@
 # REQUIRED — these appear in <title>, RSS, social-share previews, and
 # every page header. Edit them now, or run `bin/new --name "My Blog"
 # --description "..."` to set them via the CLI.
-title: Your Site Name
-description: One-line summary of your site
-author: Your Name
+title: Abqari
+description: A static site generator for Ruby
+author: Grant Rayner
 
 # Locale ─────────────────────────────────────────────────────────────────
 # ISO 639-1 code (en, es, fr, de, ja, …). Wires up <html lang>, the RSS
