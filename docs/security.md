@@ -57,9 +57,10 @@ against the cases where the cost of getting it wrong is high.
   - `OgImageGenerator#write_file`.
   - `BundleAssets#copy_bundle_assets` and `#copy_flat_collection_assets`.
   - `Redirects#write_stub` — frontmatter `redirect_from:`.
-  - `FolioShowPage#output_path` and `FolioIndexPage#output_path` —
-    Folio is bounded-trust, so an attacker-controlled `slug:` in a
-    compromised response can't write outside `_site/`.
+  - `PublisherShowPage#output_path` and `PublisherIndexPage#output_path`
+    — publisher integrations (e.g. Folio) are bounded-trust, so an
+    attacker-controlled `slug:` in a compromised response can't write
+    outside `_site/`.
 - `Site#reset_output` asserts containment under `site_root` before
   `FileUtils.rm_rf` runs. Escape hatch: `ABQARI_ALLOW_EXTERNAL_OUTPUT=true`
   for CI setups that publish to an artifact mount.

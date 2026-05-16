@@ -3,20 +3,17 @@
 require 'fileutils'
 
 module Abqari
-  # Auto-generates index + show pages for Folio publications, bundles, and
-  # series. Runs only when `folio:` config is set. Each generated page can
-  # be overridden by creating a markdown file at the matching path
-  # (e.g. content/publications/<slug>/index.md) — abqari skips
-  # auto-generation for any URL that already has a Page from content/.
+  # Auto-generates index + show pages for publications, bundles, and
+  # series whose data comes from an external publisher integration
+  # (currently Folio — `apps/folio` — with the door open for others
+  # that emit canonical-shape data per docs/publications.md).
   #
-  # Folio publications populate the canonical `publications` collection.
-  # No separate `books` collection — sites that want /books/ URLs set
-  # `publications.slug: books` in config.
-  #
-  # Bundles and series are meta-collections (groups of publications) and
-  # remain separate. Their URLs default to /bundles/ and /series/ but
-  # also follow the `bundles.slug` / `series.slug` overrides if set.
-  class FolioPages
+  # Runs only when `folio:` config is set (today). Each generated page
+  # can be overridden by creating a markdown file at the matching path
+  # (e.g. `content/publications/<slug>/index.md`); the engine skips
+  # auto-generation for any URL that already has a Page from
+  # `content/`. The override page wins on slug collision.
+  class PublisherPages
     def initialize(site)
       @site = site
     end
@@ -26,8 +23,8 @@ module Abqari
     end
 
     # Returns auto-generated pages: up to three index pages (publications
-    # / bundles / series) and one show page per Folio publication, bundle,
-    # and series.
+    # / bundles / series) and one show page per externally-sourced
+    # publication, bundle, and series.
     def pages
       return [] unless enabled?
 
@@ -56,14 +53,19 @@ module Abqari
       perm.empty? ? "/#{fallback}/" : perm.sub(':slug/', '').sub(':slug', '')
     end
 
-    # Generate one index page per Folio kind (publications / bundles /
+    # Generate one index page per kind (publications / bundles /
     # series). Skip when:
     #   - The user has a hand-written page at that URL (their override wins).
-    #   - The underlying collection is empty — shipping a `/series/` index
-    #     when Folio returned zero series produces a placeholder page that
-    #     just says "Series" with no entries. Better to omit entirely; the
-    #     URL becomes a 404, which is honest. The page reappears the
-    #     moment Folio returns at least one item.
+    #   - The publisher returned zero items for the kind — auto-
+    #     generating an empty `/series/` placeholder isn't useful.
+    #     The page reappears the moment the publisher returns at
+    #     least one item.
+    #
+    # Manual-only sites (no publisher configured) get no auto-index
+    # here — but the bundles_index / book_series_index layouts read
+    # from `site.collection(...)`, so a user who creates
+    # `content/bundles/index.md` (or `content/series/index.md`) sees
+    # their manual entries listed without any further wiring.
     def index_pages
       kinds = [
         { name: 'publications', layout: 'publications_index', data: 'folio_publications' },
@@ -75,13 +77,14 @@ module Abqari
         next if existing_urls.include?(url)
         next if (@site.data[kind[:data]] || {}).empty?
 
-        FolioIndexPage.new(@site, kind[:name], kind[:layout], url)
+        PublisherIndexPage.new(@site, kind[:name], kind[:layout], url)
       end
     end
 
-    # Folio publications → pages in the `publications` collection. Layout
-    # comes from the collection config so `publications.layout: book` (or
-    # default `publication`) routes through the right template.
+    # Externally-sourced publications → pages in the `publications`
+    # collection. Layout comes from the collection config so
+    # `publications.layout: book` (or default `publication`) routes
+    # through the right template.
     def publication_pages
       cfg = @site.collection_config('publications')
       url_prefix = kind_url_prefix('publications', 'publications')
@@ -91,7 +94,7 @@ module Abqari
         url = "#{url_prefix}#{slug}/"
         next if existing_urls.include?(url)
 
-        FolioShowPage.new(@site, kind: 'publication', slug: slug, data: pub, layout: layout, url: url)
+        PublisherShowPage.new(@site, kind: 'publication', slug: slug, data: pub, layout: layout, url: url)
       end
     end
 
@@ -104,7 +107,7 @@ module Abqari
         url = "#{url_prefix}#{slug}/"
         next if existing_urls.include?(url)
 
-        FolioShowPage.new(@site, kind: 'bundle', slug: slug, data: bundle, layout: layout, url: url)
+        PublisherShowPage.new(@site, kind: 'bundle', slug: slug, data: bundle, layout: layout, url: url)
       end
     end
 
@@ -117,14 +120,15 @@ module Abqari
         url = "#{url_prefix}#{slug}/"
         next if existing_urls.include?(url)
 
-        FolioShowPage.new(@site, kind: 'series', slug: slug, data: series, layout: layout, url: url)
+        PublisherShowPage.new(@site, kind: 'series', slug: slug, data: series, layout: layout, url: url)
       end
     end
   end
 
-  # Index page for a kind (books/bundles/series). Renders the matching
-  # _index layout, which iterates over site.data['folio_*'] internally.
-  class FolioIndexPage
+  # Index page for a kind (publications / bundles / series). Renders
+  # the matching collection-index layout, which iterates the merged
+  # `site.collection(name)` (manual + externally-sourced).
+  class PublisherIndexPage
     attr_reader :site, :kind
 
     def initialize(site, kind, layout, url)
@@ -154,10 +158,10 @@ module Abqari
       @url
     end
 
-    # Folio is bounded-trust per docs/security.md §1, and the Folio
-    # `slug` flows directly into this URL. Route through PathSafe so a
-    # hostile or accidental `"slug": "../../etc"` in a Folio response
-    # raises a build error instead of writing outside `_site/`.
+    # Bounded-trust external data per docs/security.md §1. The `slug`
+    # flows into this URL — route through `PathSafe` so a hostile or
+    # accidental `"slug": "../../etc"` raises a build error instead
+    # of writing outside `_site/`.
     def output_path
       PathSafe.join_under(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
     end
@@ -188,19 +192,18 @@ module Abqari
     end
   end
 
-  # Show page for a single publication / bundle / series. Looks like a
-  # regular `Page` to the rest of the engine: same `frontmatter`,
-  # `title`, `description`, `collection` interface, so templates
-  # iterate `site.collection('publications')` and don't need to know
-  # whether a particular entry came from `content/` or Folio.
+  # Show page for a single externally-sourced publication / bundle /
+  # series. Looks like a regular `Page` to the rest of the engine —
+  # same `frontmatter`, `title`, `description`, `collection` interface
+  # — so templates iterate `site.collection('publications')` (etc.)
+  # and don't need to know whether a particular entry came from
+  # `content/` or an external publisher.
   #
-  # The Folio payload IS the frontmatter — the API returns canonical
-  # field names (`title`, `excerpt`, `cover_url`, `price`,
-  # `buy_now_url`, `in_series`, …) per docs/publications.md, so no
-  # translation layer is needed.
-  class FolioShowPage
+  # The publisher's payload IS the frontmatter — the canonical schema
+  # (docs/publications.md) lines up with what the publisher emits, so
+  # no translation layer is needed.
+  class PublisherShowPage
     # Map `kind:` to the collection name `site.collection` exposes.
-    # Folio's three kinds line up 1:1 with Abqari's three collections.
     KIND_TO_COLLECTION = {
       'publication' => 'publications',
       'bundle'      => 'bundles',
@@ -225,16 +228,17 @@ module Abqari
       KIND_TO_COLLECTION[@kind.to_s]
     end
 
-    # Publications use `title`; bundles + series use `name`. Falls
-    # back to the slug so callers always get a string.
+    # Publications use `title`; bundles + series use `name` (matches
+    # Folio's vocabulary — see docs/publications.md). Falls back to
+    # the slug so callers always get a string.
     def title
       @data['title'] || @data['name'] || @slug
     end
 
-    # `description` is the page's short-summary text — used by
-    # sitemap, RSS, OG, JSON-LD. Per docs/publications.md:
-    # publications use `tagline` then `excerpt`; bundles + series use
-    # `description`. The first line keeps it summary-shaped.
+    # Page short-summary text — used by sitemap, RSS, OG, JSON-LD.
+    # Per docs/publications.md: publications use `tagline` then
+    # `excerpt`; bundles + series use `description`. The first line
+    # keeps it summary-shaped.
     def description
       raw = case collection
             when 'publications'
@@ -249,19 +253,19 @@ module Abqari
       ''
     end
 
-    # Folio payload IS the frontmatter. Adds two engine-only
-    # bookkeeping keys (`folio_kind`, `folio_slug`) for any partial
-    # that needs to know this is a Folio-sourced entry — but
-    # everything else lives under canonical names.
+    # The data payload IS the frontmatter. No bookkeeping keys — the
+    # canonical schema covers everything templates need to know;
+    # templates can't and shouldn't care whether the data came from
+    # an external publisher.
     def frontmatter
-      @data.merge('folio_kind' => @kind, 'folio_slug' => @slug)
+      @data
     end
 
     def url
       @url
     end
 
-    # See FolioIndexPage#output_path — same trust boundary, same routing.
+    # See PublisherIndexPage#output_path — same trust boundary, same routing.
     def output_path
       PathSafe.join_under(@site.output_dir, @url.sub(%r{\A/}, '').chomp('/'), 'index.html')
     end
@@ -277,7 +281,7 @@ module Abqari
       output_mtime = File.mtime(output_path)
       return true if @site.shared_deps_mtime > output_mtime
 
-      # If the Folio cache is newer than this page's output, re-render —
+      # If the publisher cache is newer than this page's output, re-render —
       # the underlying data may have changed since last build.
       cache_path = File.join(@site.site_root, 'vendor', 'folio', "#{kind}s.yml")
       File.exist?(cache_path) && File.mtime(cache_path) > output_mtime
@@ -298,4 +302,5 @@ module Abqari
       RenderContext.new(self, @site).render_layout(@layout)
     end
   end
+
 end

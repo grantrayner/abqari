@@ -4,17 +4,18 @@ require_relative 'test_helper'
 require 'ostruct'
 require 'tmpdir'
 
-# Negative-path tests for the secondary writers that flow user / Folio
-# input into filesystem paths. docs/security.md §2 promises that
-# "every place the engine joins user-controlled input into a filesystem
-# path is routed through PathSafe.join_under" — these tests pin the
-# promise to executable behaviour.
+# Negative-path tests for the secondary writers that flow user /
+# publisher input into filesystem paths. docs/security.md §2 promises
+# that "every place the engine joins user-controlled input into a
+# filesystem path is routed through PathSafe.join_under" — these tests
+# pin the promise to executable behaviour.
 #
 # Covered:
-#   - FolioIndexPage / FolioShowPage `output_path` (bounded-trust slug).
+#   - PublisherIndexPage / PublisherShowPage `output_path` (bounded-
+#     trust slug).
 #   - Redirects#write_stub (trusted frontmatter `redirect_from:`, still
 #     routed for symmetry).
-class FolioRedirectsPathSafeTest < Minitest::Test
+class PublisherRedirectsPathSafeTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir('abqari-pathsafe-test')
     @site = OpenStruct.new(
@@ -31,39 +32,39 @@ class FolioRedirectsPathSafeTest < Minitest::Test
     FileUtils.rm_rf(@tmpdir)
   end
 
-  # --- Folio show page --------------------------------------------------
+  # --- Publisher show page ----------------------------------------------
 
-  def test_folio_show_page_legal_slug_lands_under_output_dir
-    page = Abqari::FolioShowPage.new(@site,
-                                     kind: 'publication',
-                                     slug: 'the-field-guide',
-                                     data: { 'title' => 'x' },
-                                     layout: 'publication',
-                                     url: '/publications/the-field-guide/')
+  def test_publisher_show_page_legal_slug_lands_under_output_dir
+    page = Abqari::PublisherShowPage.new(@site,
+                                         kind: 'publication',
+                                         slug: 'the-field-guide',
+                                         data: { 'title' => 'x' },
+                                         layout: 'publication',
+                                         url: '/publications/the-field-guide/')
     expected = File.join(@site.output_dir, 'publications', 'the-field-guide', 'index.html')
     assert_equal expected, page.output_path
   end
 
-  def test_folio_show_page_traversal_slug_is_blocked
-    # A compromised Folio response with `"slug": "../../etc"` would
-    # otherwise let an attacker write a file outside _site/.
-    page = Abqari::FolioShowPage.new(@site,
-                                     kind: 'publication',
-                                     slug: '../../etc/passwd',
-                                     data: { 'title' => 'x' },
-                                     layout: 'publication',
-                                     url: '/publications/../../etc/passwd/')
+  def test_publisher_show_page_traversal_slug_is_blocked
+    # A compromised publisher response with `"slug": "../../etc"`
+    # would otherwise let an attacker write a file outside _site/.
+    page = Abqari::PublisherShowPage.new(@site,
+                                         kind: 'publication',
+                                         slug: '../../etc/passwd',
+                                         data: { 'title' => 'x' },
+                                         layout: 'publication',
+                                         url: '/publications/../../etc/passwd/')
     assert_raises(Abqari::PathSafe::Error) { page.output_path }
   end
 
-  def test_folio_index_page_legal_url
-    page = Abqari::FolioIndexPage.new(@site, 'publications', 'publications_index', '/publications/')
+  def test_publisher_index_page_legal_url
+    page = Abqari::PublisherIndexPage.new(@site, 'publications', 'publications_index', '/publications/')
     expected = File.join(@site.output_dir, 'publications', 'index.html')
     assert_equal expected, page.output_path
   end
 
-  def test_folio_index_page_traversal_url_is_blocked
-    page = Abqari::FolioIndexPage.new(@site, 'publications', 'publications_index', '/../../etc/')
+  def test_publisher_index_page_traversal_url_is_blocked
+    page = Abqari::PublisherIndexPage.new(@site, 'publications', 'publications_index', '/../../etc/')
     assert_raises(Abqari::PathSafe::Error) { page.output_path }
   end
 

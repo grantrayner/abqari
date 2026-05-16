@@ -84,9 +84,8 @@ module Abqari
     # --------------------------------------------------------------
 
     # Title resolution: publications use `title`; bundles + series use
-    # `name` (matching Folio's vocabulary — see docs/publications.md).
-    # Posts, photos, workshops, and untyped pages continue to use
-    # `title`.
+    # `name` (per the canonical schema in docs/publications.md). Posts,
+    # photos, workshops, and untyped pages continue to use `title`.
     def title
       key = title_key_for_collection
       frontmatter[key] || frontmatter['title'] || derived_title
@@ -142,9 +141,9 @@ module Abqari
     end
 
     # The collection-relative slug. Used externally by Site#featured and
-    # by book/bundle layouts to look up Folio data. For bundle-style
-    # content (`content/<col>/<slug>/index.md`) this returns the parent
-    # dir name; for flat content (`content/<col>/<slug>.md`) the
+    # by book/bundle layouts to look up publication data. For bundle-
+    # style content (`content/<col>/<slug>/index.md`) this returns the
+    # parent dir name; for flat content (`content/<col>/<slug>.md`) the
     # filename minus date prefix. Returns nil for top-level pages
     # outside any collection.
     def slug
@@ -312,9 +311,9 @@ module Abqari
     end
 
     # Which frontmatter key carries the title for this collection.
-    # `bundles` and `series` use `name` (Folio's vocabulary, see
-    # docs/publications.md); everything else uses `title`. Falls back
-    # to `title` if the collection isn't recognised.
+    # `bundles` and `series` use `name` (see docs/publications.md);
+    # everything else uses `title`. Falls back to `title` if the
+    # collection isn't recognised.
     def title_key_for_collection
       case collection
       when 'bundles', 'series' then 'name'
@@ -322,11 +321,11 @@ module Abqari
       end
     end
 
-    # Per-collection description source. Publications use Folio's
-    # vocabulary (`tagline` for the short marketing line, `excerpt`
-    # for the long-form blurb). Bundles + series use `description`
-    # (matches Folio's bundle / series serializer shape). Everything
-    # else (posts, photos, workshops) uses `description` too.
+    # Per-collection description source. Publications use `tagline`
+    # for the short marketing line, falling back to `excerpt` for the
+    # long-form blurb. Bundles + series use `description`. Everything
+    # else (posts, photos, workshops) uses `description` too. See
+    # docs/publications.md for the canonical schema.
     def explicit_description_value
       case collection
       when 'publications'

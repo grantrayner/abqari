@@ -4,7 +4,7 @@
 
   Reads canonical fields from `page.frontmatter` directly (see
   docs/publications.md). Whether the page is a manual content file
-  or a Folio-sourced FolioShowPage, the field names are the same —
+  or an externally-sourced entry, the field names are the same —
   no source-aware branching here.
 
   Toggles come from `collections.publications.show.*` in config.
@@ -39,7 +39,7 @@
       <p class="publication__published">First published <time datetime="<%= published %>"><%= local_time(published) %></time></p>
     <% end %>
 
-    <%# Pre-order / availability banner — Folio-only fields, harmless
+    <%# Pre-order / availability banner — optional fields, harmless
         when absent. %>
     <% if fm['preorder'] && fm['release_date'] %>
       <p class="publication__preorder">Pre-order — releases <time datetime="<%= fm['release_date'] %>"><%= local_time(fm['release_date']) %></time></p>
@@ -52,8 +52,7 @@
     <% end %>
 
     <%# Buy / cart buttons. Generic — render whenever the
-        corresponding URL field is set (frontmatter OR Folio data;
-        canonical schema means they look the same). %>
+        corresponding URL field is set, regardless of source. %>
     <p class="publication__buttons">
       <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
       <%== cart_button(fm) %>

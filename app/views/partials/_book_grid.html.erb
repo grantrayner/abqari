@@ -1,10 +1,9 @@
 <!--
   Book grid — a card grid of every publication, ordered by
-  `in_series.position` then alphabetically by title. After the
-  canonical-schema migration this reads from
-  `site.collection('publications')` and includes manual + Folio
-  sources together; the partial name is kept for back-compat with
-  layouts that already use `render 'partials/folio_book_grid'`.
+  `in_series.position` then alphabetically by title. Reads from
+  `site.collection('publications')`, which includes both manual
+  pages and any externally-sourced publications a publisher
+  integration (e.g. Folio) has added.
 
   Renders nothing when the publications collection is empty, so it's
   safe to drop into any layout regardless of whether the site has
@@ -12,8 +11,8 @@
 
   Usage from a layout or markdown body (with `erb: true` in
   frontmatter):
-      <%%= render 'partials/folio_book_grid' %>
-      <%%= render 'partials/folio_book_grid', heading: 'The Novels' %>
+      <%%= render 'partials/book_grid' %>
+      <%%= render 'partials/book_grid', heading: 'The Novels' %>
 
   URL prefix follows `publications.slug` aliasing — sites that set
   `publications.slug: books` get `/books/<slug>/` links here

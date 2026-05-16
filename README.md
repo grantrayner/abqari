@@ -372,8 +372,8 @@ Locals passed to `render` are exposed as bare identifiers in the partial:
 | `testimonials` | Quote cards filtered by `data/testimonials.yml` and a book slug |
 | `publication_card` | Single book rendered as a horizontal card; shared between publications index, bundle pages, series pages |
 | `publication_header` | Cover + intro + buy buttons grid; used by the publication detail layout |
-| `folio_book_grid` | Card-grid of books on the home page (with optional heading) |
-| `folio_bundle_cta` | "Save with the bundle" callout on book pages |
+| `book_grid` | Card-grid of books on the home page (with optional heading) |
+| `bundle_cta` | "Save with the bundle" callout on book pages |
 | `book_jsonld` | `Book` schema JSON-LD for SEO |
 | `contact_button` | Spam-resistant mailto button (split-half JS reassembly) |
 | `newsletter_subscribe` | Provider-agnostic newsletter signup form |
@@ -422,17 +422,16 @@ and on `Abqari::RenderContext`, available everywhere ERB runs.
 | `icon(name, **attrs)` | `icon('github', width: 20)` — inline SVG |
 | `heroicon(name, variant:)` | `heroicon('book-open', variant: :solid)` |
 
-**Folio**
+**Publications**
 
 | Helper | Example |
 | --- | --- |
-| `folio_data` | returns the current page's Folio payload, or `{}` |
-| `folio_book(slug)` | look up a publication by slug |
-| `folio_bundle(slug)` | look up a bundle |
-| `folio_series(slug)` | look up a series |
-| `folio_buy_button(slug, kind: :book)` | renders the buy button when Folio has a URL |
-| `folio_cart_button(slug, kind: :book)` | renders the cart button |
-| `publication_card_data(slug)` | normalised hash for the `_publication_card` partial; cross-references Folio + the publications collection |
+| `publication_for(slug)` | look up a publication by slug |
+| `bundle_for(slug)` | look up a bundle |
+| `series_for(slug)` | look up a series |
+| `buy_button(subject, label:)` | renders a buy button when the subject has `buy_now_url` |
+| `cart_button(subject, label:)` | renders a cart button when the subject has `add_to_cart_url` |
+| `publication_card_data(slug)` | normalised hash for the `_publication_card` partial |
 
 **Page resolution**
 
@@ -1328,13 +1327,13 @@ treatment is consistent across all three contexts.
 
 | Helper | What it returns |
 | --- | --- |
-| `folio_book(slug)` | Publication payload hash, or nil |
-| `folio_bundle(slug)` | Bundle payload, or nil |
-| `folio_series(slug)` | Series payload (derived), or nil |
-| `folio_buy_button(slug, kind: :book)` | `<a>` tag or empty string |
-| `folio_cart_button(slug, kind: :book)` | `<a>` tag or empty string |
+| `publication_for(slug)` | Publication frontmatter hash, or nil |
+| `bundle_for(slug)` | Bundle frontmatter hash, or nil |
+| `series_for(slug)` | Series frontmatter hash, or nil |
+| `buy_button(subject, label:)` | `<a>` tag when `buy_now_url` is set, else empty string |
+| `cart_button(subject, label:)` | `<a>` tag when `add_to_cart_url` is set, else empty string |
 
-`kind:` accepts `:book` (default) or `:bundle`.
+`subject` accepts a frontmatter hash, a page-like object, or a slug string.
 
 **Cache.** Folio responses are cached in `vendor/folio/{publications,bundles,series}.yml` with ETag conditional-GET. Subsequent builds get a `304 Not Modified` and reuse the cache. If Folio is briefly unreachable (CI runner offline, etc.), Abqari falls back to the cached data and prints a warning rather than failing the build.
 
@@ -1347,7 +1346,7 @@ bin/fetch-folio    # force-refresh the cache (drops ETags)
 **Layouts and partials.** The engine ships:
 
 - Layouts — `publication.html.erb`, `bundle.html.erb`, `series.html.erb`, `publications_index.html.erb`, `bundles_index.html.erb`, `series_index.html.erb`. (`publication` is named for the canonical collection; `slug: books` on the collection puts it at `/books/<slug>/` without renaming the layout file.)
-- Partials — `_publication_header.html.erb` (cover + intro grid on publication detail pages), `_publication_card.html.erb` (shared between the publications index, bundle "What's included", and series "Books in this series"), `_book_jsonld.html.erb` (Book schema for SEO), `_folio_bundle_cta.html.erb` ("save with the bundle" callout).
+- Partials — `_publication_header.html.erb` (cover + intro grid on publication detail pages), `_publication_card.html.erb` (shared between the publications index, bundle "What's included", and series "Books in this series"), `_book_jsonld.html.erb` (Book schema for SEO), `_bundle_cta.html.erb` ("save with the bundle" callout).
 
 Customise by overriding in your site (Path A — drop a same-pathed file in `app/views/`) or editing in place (Path B — fork).
 
@@ -1749,7 +1748,7 @@ Features added since v0.1.0:
 - **`app/assets/css/site.css` override slot** — site-local CSS that loads after the theme
 - **Path-source / gem-source consumption** — engine code loads as a gem; site repos stay minimal
 - **Sand theme** — fifth theme, framework-free
-- **`taxonomy_url`**, **`folio_data`**, **`publication_card_data`**, **`optional_asset_path`** helpers
+- **`taxonomy_url`**, **`publication_card_data`**, **`optional_asset_path`** helpers
 - **`theme_toggle: false`** and **`footer.signature`** config
 
 See [CHANGELOG.md](CHANGELOG.md) for the full set with rationale.

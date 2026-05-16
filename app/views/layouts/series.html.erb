@@ -4,13 +4,15 @@ layout: application
 <!--
   Single-series detail page. Reads canonical fields from
   `page.frontmatter` (see docs/publications.md). Whether the page is
-  a manual `content/series/<slug>/index.md` or a Folio-generated
-  FolioShowPage with `kind: 'series'`, the field names are the same.
+  a manual `content/series/<slug>/index.md` or auto-generated from
+  an external publisher with `kind: 'series'`, the field names are
+  the same.
 
-  Folio note: series in Folio have NO commerce attached — no price,
-  no buy URLs. A native author CAN set `buy_now_url:` here to point
-  at e.g. a Payhip series bundle; the engine renders the button
-  whenever the field is set, regardless of source.
+  Note on commerce: a publisher integration may or may not attach
+  buy URLs to a series (Folio currently doesn't). A native author
+  CAN set `buy_now_url:` here to point at e.g. a series bundle; the
+  engine renders the button whenever the field is set, regardless
+  of source.
 
   Frontmatter shape:
 
@@ -41,8 +43,7 @@ layout: application
       <p class="series__price"><%= price %></p>
     <% end %>
 
-    <%# Buy button — native sites can point at a series-bundle URL.
-        Folio never supplies one for series. %>
+    <%# Buy button — renders whenever a commerce URL is present. %>
     <% if fm['buy_now_url'] || fm['add_to_cart_url'] %>
       <p class="series__buttons">
         <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
@@ -51,9 +52,9 @@ layout: application
     <% end %>
   </header>
 
-  <%# Description — pre-rendered `description_html` (Folio) when
-      present, else markdown `description` HTML-escaped. Canonical
-      shape per docs/publications.md. %>
+  <%# Description — pre-rendered `description_html` when present,
+      else markdown `description` HTML-escaped. Canonical shape per
+      docs/publications.md. %>
   <%
     description_source, description_content =
       if (html = fm['description_html']) && !html.to_s.strip.empty?

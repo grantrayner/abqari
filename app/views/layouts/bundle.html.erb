@@ -4,8 +4,9 @@ layout: application
 <!--
   Single-bundle detail page. Reads canonical fields from
   `page.frontmatter` (see docs/publications.md). Whether the page is
-  a manual `content/bundles/<slug>/index.md` or a Folio-generated
-  FolioShowPage with `kind: 'bundle'`, the field names are the same.
+  a manual `content/bundles/<slug>/index.md` or auto-generated from
+  an external publisher with `kind: 'bundle'`, the field names are
+  the same.
 
   Frontmatter shape:
 
@@ -22,10 +23,9 @@ layout: application
       ---
 
   Each slug in `publications:` is resolved against
-  `site.collection('publications')` — which after the canonical-
-  schema migration includes both manual and Folio sources. So the
-  bundle's contents render with consistent metadata regardless of
-  where each member book lives.
+  `site.collection('publications')`, which includes both manual and
+  externally-sourced entries, so the bundle's contents render with
+  consistent metadata regardless of where each member book lives.
 -->
 <article class="bundle">
   <% fm = page.frontmatter %>
@@ -43,11 +43,11 @@ layout: application
     </p>
   </header>
 
-  <%# Description — `description_html` (pre-rendered, Folio) when
-      present, otherwise the markdown `description` source HTML-
-      escaped. Both fields are canonical-shape per
-      docs/publications.md. The selected source is exposed as
-      `data-source="…"` for DevTools visibility. %>
+  <%# Description — `description_html` (pre-rendered) when present,
+      otherwise the markdown `description` source HTML-escaped. Both
+      fields are canonical-shape per docs/publications.md. The
+      selected source is exposed as `data-source="…"` for DevTools
+      visibility. %>
   <%
     description_source, description_content =
       if (html = fm['description_html']) && !html.to_s.strip.empty?
@@ -67,8 +67,8 @@ layout: application
   <%== page.content %>
 
   <%# Books in this bundle. `publications:` is an array of slugs (the
-      canonical shape). Folio bundles carry richer entries (with
-      embedded title + cover_url) so we still honour any inline data
+      canonical shape). Some publisher payloads carry richer entries
+      (with embedded title + cover_url) so we honour any inline data
       that's been preserved. Cards use the shared `_publication_card`
       partial so visual treatment matches the publications-index. %>
   <%
@@ -88,9 +88,9 @@ layout: application
             entry    = { 'slug' => entry } if entry.is_a?(String)
             slug     = entry['slug']
             card_pub = publication_card_data(slug)
-            # Inline entries (e.g. Folio's bundle payload) carry their
-            # own title / cover_url. Honour those over the looked-up
-            # publication's fields if both exist.
+            # Inline entries (some publisher payloads carry these)
+            # may include their own title / cover_url. Honour those
+            # over the looked-up publication's fields if both exist.
             card_pub[:title] = entry['title']     if entry['title']
             card_pub[:cover] = entry['cover_url'] if entry['cover_url']
           %>

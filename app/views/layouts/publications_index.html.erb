@@ -3,10 +3,10 @@ layout: application
 ---
 <!--
   Publications index — lists every publication in the `publications`
-  collection. After the canonical-schema migration (see
-  docs/publications.md), `site.collection('publications')` already
-  includes BOTH manual content pages AND Folio-sourced FolioShowPage
-  entries — no merge loop needed here.
+  collection. `site.collection('publications')` already includes BOTH
+  manual content pages AND any externally-sourced entries a publisher
+  integration has added — no merge loop needed here (see
+  docs/publications.md for the canonical schema).
 
   Sites that want /books/ URLs set `publications.slug: books` in
   config — the URL prefix below follows the slug.
@@ -33,13 +33,14 @@ layout: application
   pubs_prefix = '/publications/' if pubs_prefix.empty?
   archive_url = "#{pubs_prefix}archive/"
 
-  # The collection merges manual + Folio sources automatically (see
-  # Site#collection). We just filter out the index page itself.
+  # The collection merges manual + externally-sourced entries
+  # automatically (see Site#collection). We just filter out the index
+  # page itself.
   publications = site.collection('publications').reject { |p| p.url == page.url }
 
   # Normalise each entry into the shape `_publication_card` expects.
   # All fields read from canonical frontmatter — no source-aware
-  # branching, no folio-vs-fm chain.
+  # branching.
   items = publications.map do |pub|
     fm = pub.frontmatter
     {

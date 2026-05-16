@@ -3,10 +3,10 @@ layout: application
 ---
 <!--
   Publication detail page. One layout, one data source: the page's
-  frontmatter, in canonical Folio-aligned shape (see
-  docs/publications.md). Whether the page is a manual
-  `content/publications/<slug>/index.md` or a Folio-generated
-  `FolioShowPage`, the field names are the same.
+  frontmatter, in canonical shape (see docs/publications.md). Whether
+  the page is a manual `content/publications/<slug>/index.md` or
+  auto-generated from an external publisher, the field names are
+  the same.
 
   Driven by `collections.publications.show.*` config toggles:
 
@@ -106,7 +106,7 @@ layout: application
       bundle_slugs = (explicit_bundles + inverse_bundles).uniq
     %>
     <% bundle_slugs.each do |bundle_slug| %>
-      <%== render 'partials/folio_bundle_cta', bundle_slug: bundle_slug %>
+      <%== render 'partials/bundle_cta', bundle_slug: bundle_slug %>
     <% end %>
   <% end %>
 

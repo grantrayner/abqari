@@ -3,7 +3,7 @@
 require 'yaml'
 require_relative 'erbi_template'
 require_relative 'helpers'
-require_relative 'render_context/folio_helpers'
+require_relative 'render_context/publication_helpers'
 require_relative 'render_context/picture_helpers'
 
 module Abqari
@@ -12,18 +12,21 @@ module Abqari
   #
   # Decomposed for readability — the helpers split into:
   #
-  #   - `Helpers`         : core scalar helpers (h, sanitized_url,
-  #                          local_time, pluralize, truncate, link_to,
-  #                          slugify, …). Engine-wide.
-  #   - `FolioHelpers`    : Folio data accessors, buy/cart buttons.
-  #   - `PictureHelpers`  : asset_path, icon, heroicon, picture_tag,
-  #                          bundle_picture_tag, bundle_asset_url.
+  #   - `Helpers`              : core scalar helpers (h, sanitized_url,
+  #                               local_time, pluralize, truncate, link_to,
+  #                               slugify, …). Engine-wide.
+  #   - `PublicationHelpers`   : publication/bundle/series accessors,
+  #                               buy/cart buttons. Publisher-agnostic —
+  #                               see lib/abqari/render_context/
+  #                               publication_helpers.rb.
+  #   - `PictureHelpers`       : asset_path, icon, heroicon, picture_tag,
+  #                               bundle_picture_tag, bundle_asset_url.
   #
   # Templating-specific surface (render, render_layout, render_string,
   # yield_content, get_binding) stays here.
   class RenderContext
     include Helpers
-    include FolioHelpers
+    include PublicationHelpers
     include PictureHelpers
 
     attr_reader :page, :site
@@ -149,11 +152,11 @@ module Abqari
 
     # Resolve a page to its collection name. Handles three shapes:
     #   - Content pages (Page#collection): direct lookup.
-    #   - Folio auto-generated pages (FolioShowPage#kind): map kind to
-    #     the canonical collection ('publication' → 'publications',
+    #   - Externally-sourced pages (PublisherShowPage#kind): map kind
+    #     to the canonical collection ('publication' → 'publications',
     #     'bundle' → 'bundles', 'series' → 'series').
     #   - Anything else (top-level pages, generated index pages): nil.
-    FOLIO_KIND_TO_COLLECTION = {
+    KIND_TO_COLLECTION = {
       'publication' => 'publications',
       'bundle'      => 'bundles',
       'series'      => 'series'
@@ -163,7 +166,7 @@ module Abqari
       if target_page.respond_to?(:collection) && target_page.collection
         target_page.collection
       elsif target_page.respond_to?(:kind)
-        FOLIO_KIND_TO_COLLECTION[target_page.kind.to_s]
+        KIND_TO_COLLECTION[target_page.kind.to_s]
       end
     end
 

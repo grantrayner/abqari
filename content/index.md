@@ -65,7 +65,7 @@ run workshops.
 - Standard helper library: `truncate`, `pluralize`, `local_time`
   (defaults to "1 January 2026"), `time_ago`, `time_until`, `excerpt`,
   `reading_time`, `slugify`, `asset_path`, `picture_tag`, `icon`,
-  `taxonomy_url`, `folio_data`, `publication_card_data`
+  `taxonomy_url`, `publication_card_data`, `buy_button`, `cart_button`
 - Three-layer cascade for nav and footer (data file → frontmatter → fallback)
 - Light/dark theme toggle (opt out with `theme_toggle: false`) with
   hash-pinned CSP, no FOUC

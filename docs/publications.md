@@ -15,17 +15,18 @@ within Abqari 0.x; renames require a major version bump.
 
 | Collection | Source | Frontmatter file |
 |---|---|---|
-| `publications` | manual + Folio | `content/publications/<slug>/index.md` |
-| `bundles` | manual + Folio | `content/bundles/<slug>/index.md` |
-| `series` | manual + Folio | `content/series/<slug>/index.md` |
+| `publications` | manual + publisher integration | `content/publications/<slug>/index.md` |
+| `bundles` | manual + publisher integration | `content/bundles/<slug>/index.md` |
+| `series` | manual + publisher integration | `content/series/<slug>/index.md` |
 
 `site.collection('publications')` returns BOTH manual `Page` objects and
-Folio-sourced `FolioShowPage` objects. Templates iterate one list.
+publisher-sourced `PublisherShowPage` objects. Templates iterate one
+list.
 
-When a slug exists in both manual content and Folio, the manual page
-wins. Manual frontmatter overrides any field; missing fields fall
-through to the Folio payload (which is exposed as the page's
-frontmatter once it's joined to the collection).
+When a slug exists in both manual content and a publisher source, the
+manual page wins. Manual frontmatter overrides any field; missing
+fields fall through to the publisher payload (which is exposed as
+the page's frontmatter once it's joined to the collection).
 
 ---
 
@@ -123,11 +124,12 @@ tags: [light]
 ---
 ```
 
-### Example — minimal Folio publication
+### Example — publisher-sourced publication
 
-Folio supplies the canonical shape directly via the API. No
-frontmatter file is required; `FolioShowPage` is auto-generated at
-build time and joins `site.collection('publications')` automatically.
+A publisher integration (currently Folio) supplies the canonical
+shape directly via the API. No frontmatter file is required;
+`PublisherShowPage` is auto-generated at build time and joins
+`site.collection('publications')` automatically.
 
 ---
 
@@ -223,11 +225,11 @@ publications: [first-light, last-light]
 For any field on a publication / bundle / series page:
 
 1. The page's own frontmatter is the source of truth.
-2. Folio data is folded into the page's frontmatter for `FolioShowPage`
-   objects (auto-generated from Folio fetches). When a manual override
-   page exists for the same slug, the manual file is the page; Folio's
-   data does NOT bleed into it (use the override to explicitly carry
-   the fields you want).
+2. Publisher data is folded into the page's frontmatter for
+   `PublisherShowPage` objects (auto-generated from publisher
+   fetches). When a manual override page exists for the same slug,
+   the manual file is the page; publisher data does NOT bleed into
+   it (use the override to explicitly carry the fields you want).
 
 There is **no `folio['x'] || fm['x']` chain in templates anymore.**
 Templates read `page.frontmatter['x']` (or the shorthand

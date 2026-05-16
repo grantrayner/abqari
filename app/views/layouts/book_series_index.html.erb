@@ -3,6 +3,17 @@ layout: application
 ---
 <%
   description = page.frontmatter['description']
+
+  # URL prefix honours `series.slug:` aliasing.
+  cfg = site.collection_config('series')
+  prefix = cfg['slug'].to_s.empty? ?
+    cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{cfg['slug']}/"
+  prefix = '/series/' if prefix.empty?
+
+  # Merged collection — manual content + any externally-sourced
+  # entries — minus the index page itself.
+  series_list = site.collection('series').reject { |s| s.url == page.url }
 %>
 <article>
   <header>
@@ -15,11 +26,12 @@ layout: application
   <%== page.content %>
 
   <ul class="series-index">
-    <% Array(site.data['folio_series']).each do |slug, series| %>
+    <% series_list.each do |s| %>
+      <% fm = s.frontmatter %>
       <li>
-        <a href="/series/<%= slug %>/">
-          <span class="series-index__name"><%= series['name'] %></span>
-          <% if (count = Array(series['publications']).size) > 0 %>
+        <a href="<%= prefix %><%= s.slug %>/">
+          <span class="series-index__name"><%= s.title %></span>
+          <% if (count = Array(fm['publications']).size) > 0 %>
             <span class="series-index__count"><%= pluralize(count, 'book') %></span>
           <% end %>
         </a>

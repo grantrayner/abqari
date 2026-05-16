@@ -154,12 +154,12 @@ module Abqari
     # `site.add_generated_page(page)` so the public API stays read-only.
     #
     # Adding a page invalidates the per-collection caches because
-    # generated pages that implement `#collection` (FolioShowPage in
-    # particular) join their collection — a memoised `collection(name)`
-    # result from before this add is now stale. The pagination /
-    # related generators call `site.collection` mid-`generate_all`, so
-    # invalidating at every add keeps the memo honest without
-    # requiring careful generator-ordering.
+    # generated pages that implement `#collection` (PublisherShowPage
+    # in particular) join their collection — a memoised
+    # `collection(name)` result from before this add is now stale.
+    # The pagination / related generators call `site.collection`
+    # mid-`generate_all`, so invalidating at every add keeps the memo
+    # honest without requiring careful generator-ordering.
     def add_generated_page(page)
       @generated_pages << page
       @collection_cache = nil
@@ -288,7 +288,7 @@ module Abqari
     # Page#collection, so this helper closes the gap for callers that
     # need "what collection does this index page represent?".
     def collection_index_name(page)
-      # Generated pages (FolioShowPage, RelatedIndexPage, paginated
+      # Generated pages (PublisherShowPage, RelatedIndexPage, paginated
       # shards, etc.) don't have a real source_path — return nil.
       return nil unless page.respond_to?(:source_path) && page.source_path
       return nil unless File.basename(page.source_path) == 'index.md'
@@ -314,16 +314,17 @@ module Abqari
       @collection_cache[canonical] ||= begin
         # Manual content pages (Page objects) AND generated pages that
         # opt in by exposing `#collection` returning the canonical
-        # name. FolioShowPage is the primary example — Folio
-        # publications, bundles, and series join their respective
-        # collections so templates iterate one merged list.
+        # name. PublisherShowPage is the primary example —
+        # externally-sourced publications, bundles, and series join
+        # their respective collections so templates iterate one
+        # merged list.
         manual    = @pages.select { |p| p.collection == canonical }
         generated = @generated_pages.select do |p|
           p.respond_to?(:collection) && p.collection == canonical
         end
         # Manual wins on slug collision — an override page at
         # `content/publications/<slug>/index.md` suppresses the
-        # auto-generated Folio entry for the same slug.
+        # auto-generated externally-sourced entry for the same slug.
         manual_slugs = manual.map { |p| p.respond_to?(:slug) ? p.slug : nil }.compact.to_set
         generated.reject! { |p| p.respond_to?(:slug) && manual_slugs.include?(p.slug) }
 

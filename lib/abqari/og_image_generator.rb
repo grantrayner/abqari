@@ -62,7 +62,7 @@ module Abqari
 
     def eligible_pages
       # All real Pages with URLs. Filters out generated pages
-      # (FolioShowPage, PaginatedShard, RelatedIndexPage,
+      # (PublisherShowPage, PaginatedShard, RelatedIndexPage,
       # TaxonomyPage) — they don't carry their own titles in the
       # same way, and most of them shouldn't be SHARED directly
       # anyway. Pages can opt out with `og_image: false`.

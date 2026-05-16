@@ -123,9 +123,10 @@ allowlisted to `[A-Za-z0-9_\-./]+` — anything else is a typo or an
 attack vector.
 
 **Generated pages.** `TaxonomyPage`, `PaginatedShard`,
-`RelatedIndexPage`, `FolioShowPage`, and Visualizations' VizPage are
-synthetic pages with their own `#write` methods. They don't inherit
-from `Page` — the contract is just "respond to `write` and `url`."
+`RelatedIndexPage`, `PublisherShowPage`, and Visualizations' VizPage
+are synthetic pages with their own `#write` methods. They don't
+inherit from `Page` — the contract is just "respond to `write` and
+`url`."
 
 ---
 
@@ -136,7 +137,7 @@ holds references to the current page and site, includes the
 `Helpers` mixin (for `h`, `local_time`, `pluralize`, `sanitized_url`,
 etc.), and exposes helpers that build HTML markup (`link_to`,
 `picture_tag`, `bundle_picture_tag`, `icon`, `heroicon`,
-`folio_buy_button`).
+`buy_button`).
 
 ```
 Page#write

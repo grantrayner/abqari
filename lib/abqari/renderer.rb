@@ -129,7 +129,7 @@ module Abqari
       generate_tag_pages
       generate_paginated_pages
       generate_visualizations
-      generate_folio_pages
+      generate_publisher_pages
       generate_related_pages
     end
 
@@ -145,11 +145,12 @@ module Abqari
       @site.visualizations.pages.each { |page| @site.add_generated_page(page) }
     end
 
-    # Auto-generate /books/, /bundles/, /series/ index + show pages from
-    # Folio data. No-op when `folio:` config is missing. Pages already
-    # defined via content/ markdown files take precedence.
-    def generate_folio_pages
-      FolioPages.new(@site).pages.each { |page| @site.add_generated_page(page) }
+    # Auto-generate /books/, /bundles/, /series/ index + show pages
+    # from an external publisher's data (currently Folio — see
+    # `folio:` config). No-op when no publisher is configured. Pages
+    # already defined via content/ markdown files take precedence.
+    def generate_publisher_pages
+      PublisherPages.new(@site).pages.each { |page| @site.add_generated_page(page) }
     end
 
     # Generate `/<source url>related/` index pages for any show-view page

@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-16
+
+### Changed
+
+**Publisher-agnostic naming.** Renamed the Folio-named pieces of the
+publication abstraction so the publisher integration (currently Folio)
+is one of several possible sources, not the centre of gravity:
+
+| Before | After |
+|---|---|
+| `Abqari::FolioPages` | `Abqari::PublisherPages` |
+| `Abqari::FolioShowPage` | `Abqari::PublisherShowPage` |
+| `Abqari::FolioIndexPage` | `Abqari::PublisherIndexPage` |
+| `Abqari::RenderContext::FolioHelpers` | `Abqari::RenderContext::PublicationHelpers` |
+| `folio_book(slug)` | `publication_for(slug)` |
+| `folio_bundle(slug)` | `bundle_for(slug)` |
+| `folio_series(slug)` | `series_for(slug)` |
+| `folio_buy_button(slug, kind:)` | `buy_button(subject)` |
+| `folio_cart_button(slug, kind:)` | `cart_button(subject)` |
+| `folio_data` | (removed — use `page.frontmatter` directly) |
+| `lib/abqari/folio_pages.rb` | `lib/abqari/publisher_pages.rb` |
+| `lib/abqari/render_context/folio_helpers.rb` | `lib/abqari/render_context/publication_helpers.rb` |
+| `app/views/partials/_folio_book_grid.html.erb` | `app/views/partials/_book_grid.html.erb` |
+| `app/views/partials/_folio_bundle_cta.html.erb` | `app/views/partials/_bundle_cta.html.erb` |
+
+Hard cutover — the 0.3.0 deprecation aliases for the `folio_*` helpers
+are gone. Layouts that still call them must switch to the new names.
+
+`PublisherShowPage#frontmatter` returns the publisher payload directly
+— the engine-only `folio_kind` / `folio_slug` bookkeeping keys are
+dropped. Templates that referenced them must use `page.kind` /
+`page.slug` instead.
+
+- **`bundles_index.html.erb` / `book_series_index.html.erb`** — now
+  iterate `site.collection('bundles')` / `site.collection('series')`
+  instead of `site.data['folio_*']`, so they show manual content too.
+  A site that creates `content/bundles/index.md` (or
+  `content/series/index.md`) gets a working index page without any
+  publisher integration.
+
+### Internal
+
+- `Renderer#generate_folio_pages` → `Renderer#generate_publisher_pages`.
+- `RenderContext::FOLIO_KIND_TO_COLLECTION` → `KIND_TO_COLLECTION`.
+- Doc-comments and README updated to use neutral "externally-sourced /
+  publisher" language where the code path is publisher-agnostic. The
+  `Folio` class itself, the `folio:` config block, the `vendor/folio/`
+  cache, and `Site#folio` / `#folio_enabled?` are unchanged — they
+  remain the names of the specific publisher implementation.
+
 ## [0.3.0] — 2026-05-16
 
 ### Breaking
