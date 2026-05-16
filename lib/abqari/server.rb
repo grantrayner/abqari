@@ -51,13 +51,23 @@ module Abqari
 
       server.mount_proc('/__reload__', &method(:handle_reload_endpoint))
 
-      trap('INT')  { shutdown_subscribers; server.shutdown }
-      trap('TERM') { shutdown_subscribers; server.shutdown }
+      # Signal traps may NOT call Mutex#synchronize — Ruby raises
+      # `ThreadError: can't be called from trap context`. So the trap
+      # only flips WEBrick's shutdown flag (signal-safe), and the
+      # subscriber cleanup runs after `server.start` unblocks below,
+      # where regular locking is allowed.
+      trap('INT')  { server.shutdown }
+      trap('TERM') { server.shutdown }
 
       host = @bind == '0.0.0.0' ? 'localhost' : @bind
       Log.info "Abqari serving on http://#{host}:#{@port} (bind: #{@bind})"
       Log.info "Watching for changes via #{watcher_kind} (Ctrl-C to stop)."
       server.start
+
+      # WEBrick has stopped accepting connections; tell every active
+      # SSE subscriber to exit its `queue.pop` loop so the request-
+      # handling threads unwind cleanly before the process exits.
+      shutdown_subscribers
     end
 
     # SSE endpoint at /__reload__. Browsers open one EventSource per
