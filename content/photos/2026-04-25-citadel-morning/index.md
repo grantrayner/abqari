@@ -1,5 +1,6 @@
 ---
 title: Citadel morning
+published: true
 caption: First light on the Aleppo Citadel's eastern flank, taken from the souk's rooftops.
 date: 2026-04-25
 city: Aleppo

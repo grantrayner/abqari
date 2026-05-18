@@ -1,5 +1,6 @@
 ---
 title: Photos archive
+published: true
 description: Every photo on the site, newest first.
 layout: photos_archive
 permalink: /photos/archive/

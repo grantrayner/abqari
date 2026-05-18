@@ -1,5 +1,6 @@
 ---
 title: Disabled example
+published: true
 description: "This page is checked into the repo but turned off via the `enabled: false` frontmatter flag. Useful for parking content without deleting it."
 enabled: false
 nav: ~

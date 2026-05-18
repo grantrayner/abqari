@@ -43,13 +43,14 @@ layout: application
   metadata — body markdown still renders, so a workshop page
   with only title + body works fine.
 
-  Hero rendering is gated by `collections.workshops.show.show_image`
-  in config/site.yml — set it to `false` to suppress the hero across
-  the whole collection without editing each workshop's frontmatter.
-  The matching toggle on the index card is
-  `collections.workshops.index.show_image`; the two are intentionally
-  independent so you can show a cover in the listing but not on the
-  detail page (or vice versa).
+  Hero rendering is gated by `collections.workshops.show.cover` in
+  config/site.yml — `photo` (default) renders `image:` if set and
+  nothing otherwise; `photo_or_svg` falls back to a decorative
+  initial-tile SVG; `svg` always renders the decorative SVG; `none`
+  suppresses the hero entirely. The matching enum on the index card
+  is `collections.workshops.index.cover` — independent of this one.
+  Per-workshop override via frontmatter `cover:` (boolean `false`
+  for none, or one of the enum strings).
 -->
 <%
   fm = page.frontmatter
@@ -62,10 +63,7 @@ layout: application
   price            = fm['price']
   registration_url = fm['registration_url']
 
-  has_meta   = date_from || duration || location || format || instructors.any? || price
-
-  show_cfg   = (site.collection_config('workshops')['show'] || {})
-  show_image = show_cfg.fetch('show_image', true)
+  has_meta = date_from || duration || location || format || instructors.any? || price
 %>
 <article class="workshop">
   <%== render 'partials/draft_banner' %>
@@ -77,11 +75,21 @@ layout: application
     <% if (description = fm['description']) && !description.to_s.empty? %>
       <p class="lede"><%= description %></p>
     <% end %>
-    <% if show_image && (hero = fm['image']) %>
+    <%# Hero — `cover_choice_for` resolves frontmatter `cover:` +
+        collection `show.cover` to one of :photo / :placeholder /
+        :svg / :none. We render :photo and :svg; :placeholder maps
+        to "no hero" on the show page (a blank flat-tint banner
+        above the body doesn't read as content). %>
+    <% case cover_choice_for(page, context: :show) %>
+    <% when :photo %>
       <img class="workshop__hero"
-           src="<%= sanitized_url(bundle_asset_url(hero)) %>"
+           src="<%= sanitized_url(bundle_asset_url(fm['image'])) %>"
            alt="<%= page.title %>"
            loading="eager">
+    <% when :svg %>
+      <div class="workshop__hero workshop__hero--svg" aria-hidden="true">
+        <%== cover_svg_for(page) %>
+      </div>
     <% end %>
   </header>
 

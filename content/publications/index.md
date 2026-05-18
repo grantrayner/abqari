@@ -1,5 +1,6 @@
 ---
 title: Publications
+published: true
 description: Books, essays, and other long-form work.
 layout: publications_index
 nav:

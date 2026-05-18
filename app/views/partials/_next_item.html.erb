@@ -5,20 +5,16 @@
   rather than falling back to an older neighbour (which would
   contradict the label).
 
-  Reuses the `_post_list` partial's card markup, so cover and
-  per-card toggles inherit from `collections.posts.index` (`show_image`,
-  `show_date`, `show_description`, etc.). One card per render.
+  Reuses the `_post_list` index card so the single "Up next" entry
+  reads like a regular index row — cover-left, title / date /
+  description on the right at desktop, stacked on mobile. There's
+  only ever one up-next post, so the full index treatment fits;
+  the related grid below uses a different (compact, multi-card)
+  shape for its many-card case.
 
-  Hero behavior:
-    - Next post has `image:` → hero renders on the left of the card
-      at desktop (≥ 480px), pinned to 240px wide so it matches the
-      `.related__cover` thumbnails directly below it. Mobile stacks
-      cover-on-top, body-below — same reflow the related grid does
-      when there's not enough width for two columns.
-    - Next post has no `image:` → no cover renders, card falls back
-      to a text-only single-column layout. No placeholder tile —
-      it's a single emphasized card, so the visual-consistency
-      problem the related grid has (mix of cards) doesn't apply.
+  Heading style matches `.related__heading` (small uppercase muted)
+  so the show-view tail still reads as a coherent run of sections —
+  it's the card body that differs.
 
   Usage:
       <%%= render 'partials/next_item' %>
@@ -31,8 +27,7 @@
             enabled: true       # set false to suppress the section
 
   Renders nothing when the source is the newest in its collection,
-  there's no next page (e.g. the only post in a collection), or
-  `next.enabled` is false.
+  there's no next page, or `next.enabled` is false.
 -->
 <% next_post = site.next_in_collection(page) %>
 <% if next_post %>

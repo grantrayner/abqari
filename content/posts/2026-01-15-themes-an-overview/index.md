@@ -1,5 +1,6 @@
 ---
 title: "Themes: picking a visual language"
+published: true
 description: A short tour of the five themes Abqari ships with — minimal, magazine, notebook, sand, and bootstrap — and how to switch between them.
 date: 2026-01-15
 tags: [themes, design, getting-started]

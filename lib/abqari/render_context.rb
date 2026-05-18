@@ -5,6 +5,7 @@ require_relative 'erbi_template'
 require_relative 'helpers'
 require_relative 'render_context/publication_helpers'
 require_relative 'render_context/picture_helpers'
+require_relative 'render_context/cover_helpers'
 
 module Abqari
   # The binding ERB templates execute against. Holds references to
@@ -28,6 +29,7 @@ module Abqari
     include Helpers
     include PublicationHelpers
     include PictureHelpers
+    include CoverHelpers
 
     attr_reader :page, :site
 

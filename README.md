@@ -501,13 +501,15 @@ collections:
     permalink: /recipes/:slug/
     layout: recipe                 # you supply layouts/recipe.html.erb
     bundle: true                   # content/recipes/<slug>/{index.md, photo.jpg}
-    related:
-      enabled: true
-      match_by: tags
+    show:                          # show-page knobs grouped under show:
+      related:                     #   (mirrors index: for listing-page knobs)
+        enabled: true
+        match_by: tags
 ```
 
 Custom collections work with the same per-collection `index:`,
-`next:`, `related:`, and `feeds:` toggles as the built-ins.
+`show:` (which nests `next:`, `related:`, `toc:`, and `cover:`), and
+`feeds:` toggles as the built-ins.
 
 ### Disabling a built-in
 
@@ -1278,18 +1280,21 @@ are; your markdown body is appended after them.
 
 Bundle and series pages don't *require* Folio. You can hand-author
 them entirely via frontmatter — useful for sites without a
-storefront, or to add manual bundles that aren't in Folio.
+storefront, or to add manual bundles alongside externally-sourced
+ones. Manual pages always win on slug collision.
 
 For a bundle, create `content/bundles/<slug>/index.md`:
 
 ```yaml
 ---
 layout: bundle
-title: The Assassin Books          # or `name:` (Folio-style alias)
+name: The Assassin Books            # bundles + series use `name:`,
+                                    #   not `title:` (per docs/publications.md)
 description: Both novels in the series, packaged together.
-price: $16.98                       # display only — no Shopify/etc. wiring
-buy_url: https://example.com/buy   # optional single-CTA button
-buy_label: Buy the bundle          # default "Buy now"
+price: $16.98                       # auto-expands to the canonical
+                                    #   { cents:, currency:, formatted: } hash
+buy_now_url: https://example.com/buy
+buy_label: Buy the bundle           # default "Buy now"
 publications:
   - memoirs-of-an-assassin          # bare slug
   - the-russia-assignment           # bare slug
@@ -1305,18 +1310,19 @@ layout: series
 name: Memoirs of an Assassin
 description: A series of psychological thrillers.
 tagline: Two novels, one arc.
-buy_url: https://example.com/series
+buy_now_url: https://example.com/series
 publications:
   - { slug: memoirs-of-an-assassin, position: 1 }
   - { slug: the-russia-assignment,  position: 2 }
 ---
 ```
 
-Each entry's slug is cross-referenced against
-`site.data['folio_publications']` AND
-`site.collection('publications')` — so even on a non-Folio site,
-each card carries title + cover + description + price drawn from
-the publication's own frontmatter. **One source of truth per book.**
+Each entry's slug is resolved against `site.collection('publications')`
+— which automatically merges manual content pages with any
+externally-sourced entries (Folio, etc.) — so each card carries
+title + cover + description + price drawn from the publication's
+own canonical frontmatter regardless of source. **One source of
+truth per book.**
 
 The same publication-card markup is used by the publications index,
 bundle "What's included" lists, and series "Books in this series"
@@ -1341,11 +1347,11 @@ treatment is consistent across all three contexts.
 bin/fetch-folio    # force-refresh the cache (drops ETags)
 ```
 
-**JSON-LD.** Each book page emits a `Book` schema with author, ISBN, price, language, and availability — pulled directly from the Folio payload. No extra config needed.
+**JSON-LD.** Each book page emits a `Book` schema with author, ISBN, price, language, and availability — pulled from the page's canonical frontmatter (works equally for manual content and externally-sourced entries). No extra config needed.
 
 **Layouts and partials.** The engine ships:
 
-- Layouts — `publication.html.erb`, `bundle.html.erb`, `series.html.erb`, `publications_index.html.erb`, `bundles_index.html.erb`, `series_index.html.erb`. (`publication` is named for the canonical collection; `slug: books` on the collection puts it at `/books/<slug>/` without renaming the layout file.)
+- Layouts — `publication.html.erb`, `bundle.html.erb`, `series.html.erb`, `publications_index.html.erb`, `bundles_index.html.erb`, `book_series_index.html.erb`. (`publication` is named for the canonical collection; `slug: books` on the collection puts it at `/books/<slug>/` without renaming the layout file.)
 - Partials — `_publication_header.html.erb` (cover + intro grid on publication detail pages), `_publication_card.html.erb` (shared between the publications index, bundle "What's included", and series "Books in this series"), `_book_jsonld.html.erb` (Book schema for SEO), `_bundle_cta.html.erb` ("save with the bundle" callout).
 
 Customise by overriding in your site (Path A — drop a same-pathed file in `app/views/`) or editing in place (Path B — fork).
@@ -1554,6 +1560,62 @@ images:
   optimise: true           # enable libvips/magick image pipeline
 ```
 
+### Slow-page detection
+
+Each page render is timed. If a single page's `write` (render +
+post-process + file write) takes longer than `SLOW_PAGE_THRESHOLD_MS`
+(default 500ms), the build logs a warning in real time with the URL,
+elapsed time, and a short list of likely causes:
+
+```
+[warn] Slow page: /posts/the-big-one/ took 1.2s — 47 inline images · 12 code blocks · 340 KB output · TOC
+```
+
+End-of-build summary, slowest first (top 5), with one "what this
+means + what to try" block per unique cause across the slow set
+— deduped so each explanation appears once even when several pages
+share a cause:
+
+```
+Slow pages (>500ms): 3
+   1.2s  /posts/the-big-one/  (47 inline images · 12 code blocks · 340 KB output)
+   780ms /posts/photo-essay/  (32 inline images)
+   620ms /publications/the-field-guide/  (12 code blocks)
+
+What this means and what to try:
+  many_images:
+    Every `<img>` is matched against the image-pipeline URL registry
+    and rewritten to a responsive `<picture>` block. Per-tag cost is
+    small; it adds up.
+    Try: Reduce images on this page, move large galleries to their
+    own page, or set `images.optimise: false` site-wide if the
+    pipeline isn't needed.
+  many_code_blocks:
+    Rouge tokenises every `<pre>` block separately — long examples
+    and many small blocks both add measurable time.
+    Try: Shorten code examples, link to a gist for the long ones,
+    or set `syntax_highlighting: false` site-wide if you don't need it.
+  large_output:
+    HTML minification and any plugin `:post_process` filters scan
+    the whole document — cost scales with output size.
+    Try: Trim the body, split into multiple pages, or set
+    `minify: false` if the site doesn't need minified output.
+```
+
+Goal: turn a generic "your page is slow" into a specific "here's
+why, and here's what to try." The heuristics that surface causes
+are five sampled signals (inline images, code blocks, output size,
+TOC presence, registered `:post_process` plugin filters); they
+correlate with the most common slow-path explanations. Each carries
+its own one-line "Try:" suggestion in the summary.
+
+Override the threshold per-build, or disable detection entirely:
+
+```bash
+ABQARI_SLOW_PAGE_MS=1000 bin/build    # only flag pages slower than 1s
+ABQARI_SLOW_PAGE_MS=0    bin/build    # disable slow-page warnings
+```
+
 ## Upgrading
 
 Two paths, mirroring the [Quickstart](#quickstart):
@@ -1736,22 +1798,53 @@ extension, RSS, JSON Feed, OG, JSON-LD, redirects, per-env robots,
 responsive `<picture>`, `bin/audit` covering links/SEO/a11y/privacy/
 deps, and a Listen-based livereload dev server.
 
-### Post-roadmap work (in `[Unreleased]`)
+### Post-v0.1.0 work
 
-Features added since v0.1.0:
+Highlights of features added since the original v0.1.0 release.
+For the full list with release dates and rationale, see
+[CHANGELOG.md](CHANGELOG.md).
 
-- **Workshops collection** — fourth built-in (alongside posts / photos / publications)
-- **Newsletter-subscribe partial** — provider-agnostic
-- **Bundle and series manual override** — frontmatter-driven, no Folio required
-- **`.lede` utility class** + Bootstrap-style `.small` / `.muted` / `.text-*` / `.shadow-*` utilities
-- **Density and typography tokens** — `--font-size-body`, `--line-height-body`, `--font-mono`, `--font-sans`
-- **`app/assets/css/site.css` override slot** — site-local CSS that loads after the theme
-- **Path-source / gem-source consumption** — engine code loads as a gem; site repos stay minimal
-- **Sand theme** — fifth theme, framework-free
-- **`taxonomy_url`**, **`publication_card_data`**, **`optional_asset_path`** helpers
-- **`theme_toggle: false`** and **`footer.signature`** config
+**v0.3.x** (current):
 
-See [CHANGELOG.md](CHANGELOG.md) for the full set with rationale.
+- **Canonical publications schema** — frontmatter aligned with the
+  Folio v1 API (cover_url, excerpt, tagline, name for bundles +
+  series, price as `{cents, currency, formatted}`, in_series, etc.).
+  See `docs/publications.md`.
+- **Publisher-agnostic abstraction** — `PublisherShowPage` /
+  `PublisherIndexPage` / `PublicationHelpers`. Folio is one publisher
+  source; the abstraction is generic. Templates iterate
+  `site.collection('publications')` (merged manual + publisher).
+- **Per-collection `show:` grouping** — `next`, `related`, `toc`,
+  `cover` all live under `<collection>.show:` in `config/site.yml`,
+  mirroring `index:` for listing-page knobs.
+- **Cover enum** — `cover: photo | photo_or_svg | svg | none` on
+  posts and workshops. Generates inline decorative initial-tile
+  SVGs for text-first authors who don't supply imagery.
+- **TOC collapse toggle** — native `<details>`/`<summary>`, expanded
+  by default. Per-post `toc:` frontmatter override.
+- **Published-field migration** — `published: true` (default) /
+  `false` (draft) on all collections. Scaffolds and seeds set it
+  explicitly for discoverability.
+- **Home-module priority hints** — first three enabled modules get
+  `loading="eager"` + `fetchpriority="high"` (LCP optimisation).
+- **Consolidated section headings** — every "small section heading"
+  across the app (Related, Up next, What's included, etc.) uses
+  one shared CSS rule.
+
+**v0.2.x**:
+
+- **Workshops collection** — fourth built-in (alongside posts / photos / publications).
+- **Plugin system** — `plugins/*.rb` auto-loaded from the site root, register against named lifecycle hooks. See `docs/plugins.md`.
+- **SSE live-reload** — replaces polling on the dev server.
+- **Image pipeline** — libvips-backed, AVIF + WebP + responsive variants, opt-out via config.
+- **Bundle and series manual override** — frontmatter-driven, no publisher integration required.
+- **`.lede` utility class** + Bootstrap-style `.small` / `.muted` / `.text-*` / `.shadow-*` utilities.
+- **Density and typography tokens** — `--font-size-body`, `--line-height-body`, `--font-mono`, `--font-sans`.
+- **`app/assets/css/site.css` override slot** — site-local CSS that loads after the theme.
+- **Path-source / gem-source consumption** — engine code loads as a gem; site repos stay minimal.
+- **Sand theme** — fifth theme, framework-free.
+- **`taxonomy_url`**, **`publication_card_data`**, **`buy_button`**, **`cart_button`**, **`optional_asset_path`** helpers.
+- **`theme_toggle: false`** and **`footer.signature`** config.
 
 ### Looking ahead
 

@@ -1,5 +1,6 @@
 ---
 title: Testimonials across collections
+published: true
 description: One testimonials system, any collection — posts, publications, workshops can all carry reader quotes via the same partial.
 date: 2026-04-04
 tags: [testimonials, collections]

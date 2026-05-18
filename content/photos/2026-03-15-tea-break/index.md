@@ -1,5 +1,6 @@
 ---
 title: Tea break
+published: true
 caption: An afternoon pause at a quiet streetside café.
 date: 2026-03-15
 city: Damascus

@@ -38,6 +38,29 @@ layout: application
 <%
   description = page.frontmatter['description']
   home_cfg    = site.config['home'] || {}
+
+  # Module render order — fixed in the layout; toggle individual
+  # modules in config/site.yml under the `home:` block. The first
+  # *three* enabled modules receive `priority_image: true` so their
+  # hero is fetched eagerly with `fetchpriority="high"` — they're
+  # the home page's LCP candidates, and `loading="lazy"` on an
+  # above-the-fold image is a known anti-pattern (the browser delays
+  # the fetch until viewport visibility is computed, costing 300-500ms
+  # on cold loads).
+  #
+  # Why three: three modules is a realistic above-the-fold count on
+  # typical desktop viewports, and the first enabled module isn't
+  # guaranteed to actually render an image (e.g. `latest_post`
+  # shows the newest post, which may have no `image:` set, in which
+  # case the hint is silently wasted). Hinting three covers the
+  # fallback chain. Cost when all three render: 2-3 extra eager
+  # fetches — cheap insurance for a much faster LCP on the home
+  # page's actual image candidate.
+  module_order = %w[
+    latest_post random_post featured_publication latest_publication
+    next_workshop latest_photo random_photo photo_gallery contact
+  ]
+  priority_modules = module_order.select { |m| home_cfg[m] }.first(3)
 %>
 <article>
   <header>
@@ -50,17 +73,11 @@ layout: application
 </article>
 
 <%# Home modules — each is a self-contained section that renders nothing
-    when its config flag is false. Order is fixed in the layout; toggle
-    individual modules in config/site.yml under the `home:` block. %>
-<% if home_cfg['latest_post']        %><%== render 'partials/home/latest_post'        %><% end %>
-<% if home_cfg['random_post']        %><%== render 'partials/home/random_post'        %><% end %>
-<% if home_cfg['featured_publication'] %><%== render 'partials/home/featured_publication' %><% end %>
-<% if home_cfg['latest_publication']   %><%== render 'partials/home/latest_publication'   %><% end %>
-<% if home_cfg['next_workshop']        %><%== render 'partials/home/next_workshop'        %><% end %>
-<% if home_cfg['latest_photo']       %><%== render 'partials/home/latest_photo'       %><% end %>
-<% if home_cfg['random_photo']       %><%== render 'partials/home/random_photo'       %><% end %>
-<% if home_cfg['photo_gallery']      %><%== render 'partials/home/photo_gallery'      %><% end %>
-<% if home_cfg['contact']            %><%== render 'partials/home/contact'            %><% end %>
+    when its config flag is false. %>
+<% module_order.each do |m| %>
+  <% next unless home_cfg[m] %>
+  <%== render "partials/home/#{m}", priority_image: priority_modules.include?(m) %>
+<% end %>
 
 <%# Schema.org WebSite — the site-wide entity declaration. Identifies
     the publisher (Person or Organization) and links out to all social

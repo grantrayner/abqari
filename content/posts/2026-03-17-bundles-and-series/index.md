@@ -1,5 +1,6 @@
 ---
 title: "Bundles and series: grouping publications"
+published: true
 description: Two meta-collections that wrap multiple books into a single retailable unit — bundles for sets, series for sequences.
 date: 2026-03-17
 tags: [publications, bundles, series]

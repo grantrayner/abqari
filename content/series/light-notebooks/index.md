@@ -1,6 +1,8 @@
 ---
 layout: series
 name: Light Notebooks
+published: true
+tagline: Beginnings and endings.
 description: A two-volume set on the edges of the working day — *First Light* on beginnings, *Last Light* on endings. Same form in both books; either one stands alone.
 price: $28.00
 buy_now_url: https://example.com/buy/light-notebooks
@@ -13,6 +15,6 @@ order: 1
 ---
 
 Two short books on the parts of the day that don't belong to anyone
-else — the hour before the day starts, and the hour after it ends. The
-volumes share a form (twenty-odd pieces, season-loose, readable in any
-order) but turn opposite directions in temperament.
+else — the hour before the day starts, and the hour after it ends. 
+
+The volumes share a form (twenty-odd pieces, season-loose, readable in any order) but turn opposite directions in temperament.

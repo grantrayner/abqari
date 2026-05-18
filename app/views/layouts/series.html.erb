@@ -36,7 +36,7 @@ layout: application
   <header>
     <h1><%= page.title %></h1>
     <% if (tagline = fm['tagline']) %>
-      <p class="series__tagline"><%= tagline %></p>
+      <p class="lede series__tagline"><%= tagline %></p>
     <% end %>
 
     <% if (price = fm.dig('price', 'formatted')) %>
@@ -53,14 +53,15 @@ layout: application
   </header>
 
   <%# Description — pre-rendered `description_html` when present,
-      else markdown `description` HTML-escaped. Canonical shape per
-      docs/publications.md. %>
+      otherwise the markdown `description` source rendered through
+      Commonmarker so inline emphasis, links, and paragraph breaks
+      come through. Canonical shape per docs/publications.md. %>
   <%
     description_source, description_content =
       if (html = fm['description_html']) && !html.to_s.strip.empty?
         [:description_html, html]
       elsif (text = fm['description']) && !text.to_s.strip.empty?
-        [:description, h(text)]
+        [:description, markdown(text)]
       else
         [nil, nil]
       end
@@ -86,7 +87,7 @@ layout: application
   %>
   <% if source_pubs.any? %>
     <section class="series__contents">
-      <h2>Books in this series</h2>
+      <h2 class="series__contents-heading">Books in this series</h2>
       <ul class="publications-index">
         <% source_pubs.each_with_index do |entry, idx| %>
           <%

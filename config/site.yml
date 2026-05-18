@@ -88,7 +88,7 @@ timezone: UTC                 # e.g. America/Los_Angeles, Asia/Singapore
 #               the palette, fonts, components without affecting the
 #               built-in themes.
 #   none      — no theme CSS at all; bring your own in app/assets/
-theme: minimal                # change to one of the names above
+theme: magazine                # change to one of the names above
 
 # Fonts ──────────────────────────────────────────────────────────────────
 # Self-hosted Google Fonts. After adding/changing this block, run
@@ -203,7 +203,19 @@ collections:
     # `content/posts/index.md`'s frontmatter — they're content, not
     # config. Per-card toggles below.
     index:
-      show_image: true              # hero image when post has `image:` frontmatter
+      # Cover slot on each card. Enum, four values:
+      #   photo         — `image:` if set, basic flat-tint placeholder
+      #                   otherwise (the historical default)
+      #   photo_or_svg  — `image:` if set, decorative initial-tile SVG
+      #                   otherwise. Good for text-first authors who
+      #                   want a polished card without sourcing imagery.
+      #   svg           — always render the decorative initial-tile SVG
+      #                   (ignore `image:`). Uniform tile look across
+      #                   the entire listing.
+      #   none          — no cover slot at all (text-only cards).
+      # Per-post override via frontmatter `cover:` (boolean `false`
+      # for none, or one of the enum strings).
+      cover: photo
       show_date: true
       show_description: true
       description_truncate: 160     # characters, before the ellipsis
@@ -251,27 +263,63 @@ collections:
     # Independent of `index:` — flip `show_image` here off to suppress
     # the hero on the post page itself while still showing covers in
     # the listing, or vice versa.
-    show:
-      show_image: true              # hero image at the top of the post body
-    # "Up next" — a single card below the post body linking to the
-    # chronologically-newer post (falling back to older if at the
-    # newest). Sits ABOVE the related block when both are enabled.
-    next:
-      enabled: true
-
-    # Related-posts block at the bottom of each post. Items are ranked
-    # by overlap on `match_by`; pages with zero overlap are excluded
-    # (the section just won't render). Set enabled: false to turn off.
     #
-    # `show_image: true` keeps the grid visually consistent when some
-    # posts have heroes and others don't — items without `image:` render
-    # a tinted placeholder tile in place of the cover. Set false for
-    # text-only cards.
-    related:
-      enabled: true
-      limit: 3
-      match_by: tags                # field name OR list of names
-      show_image: true              # render cover (or placeholder) on every card
+    # All knobs that affect the show page live here — the hero, the
+    # TOC, the "Up next" card, the related grid. (Mirrors `index:`,
+    # which collects every listing-page knob.) Separate top-level
+    # keys like `archive:`, `pagination:`, and `feeds:` stay outside
+    # `show:` because they're separate pages or artifacts, not part
+    # of the show view.
+    show:
+      # Hero slot at the top of the post body. Same four-value enum
+      # as `index.cover`. See the comment block on `index.cover` for
+      # the full vocabulary; the two are intentionally independent so
+      # a listing can use SVG tiles while detail pages render real
+      # photos (or vice versa).
+      cover: photo
+
+      # Auto-generated table of contents at the top of each post body,
+      # built from body headings.
+      #
+      #   enabled:      set false to suppress globally; override per-
+      #                 post with `toc: true` / `toc: false` in
+      #                 frontmatter (explicit frontmatter always wins).
+      #
+      #   min_headings: quality floor. Renders nothing on posts with
+      #                 fewer than N qualifying headings (default 3 —
+      #                 short posts don't need one).
+      #
+      #   levels:       which heading levels to include in the TOC.
+      #                 h2 + h3 by default; set [2] for "h2 only"
+      #                 (top-section overview), [2, 3, 4] when posts
+      #                 use h4 subheadings worth navigating. h1 is
+      #                 always excluded (it's the page title, set by
+      #                 the layout, not the body markdown).
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]
+
+      # "Up next" — a single card below the post body linking to the
+      # chronologically-newer post (falling back to older if at the
+      # newest). Sits ABOVE the related block when both are enabled.
+      next:
+        enabled: true
+
+      # Related-posts block at the bottom of each post. Items are
+      # ranked by overlap on `match_by`; pages with zero overlap are
+      # excluded (the section just won't render). Set enabled: false
+      # to turn off.
+      #
+      # `show_image: true` keeps the grid visually consistent when
+      # some posts have heroes and others don't — items without
+      # `image:` render a tinted placeholder tile in place of the
+      # cover. Set false for text-only cards.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags              # field name OR list of names
+        show_image: true            # render cover (or placeholder) on every card
     # RSS + JSON Feed for the posts collection. Defaults to
     # `/feed.xml` + `/feed.json` (root paths, for back-compat with
     # subscribers). With `slug: stories` the feed lives at
@@ -360,13 +408,19 @@ collections:
     #      the landing is finite.
     archive:
       enabled: true
-    # Related photos at the bottom of each photo page. `match_by` is a
-    # priority list — series matches weight more than country, country
-    # more than tag. Set enabled: false to turn off.
-    related:
-      enabled: true
-      limit: 3
-      match_by: [series, country, tags]
+
+    # `show:` collects every knob that affects the single-photo detail
+    # page (`photo.html.erb`). Same convention as `posts.show:` and
+    # `publications.show:`.
+    show:
+      # Related photos at the bottom of each photo page. `match_by`
+      # is a priority list — series matches weight more than country,
+      # country more than tag. Set enabled: false to turn off.
+      related:
+        enabled: true
+        limit: 3
+        match_by: [series, country, tags]
+
     # RSS + JSON Feed for the photos collection. Off by default — flip
     # on when you want photo subscribers. Renders to /photos/feed.xml
     # and /photos/feed.json.
@@ -464,12 +518,15 @@ collections:
       testimonials:     true
       related_books:    true
       related_bundles:  true
-    # Related publications at the bottom of each detail page. By default
-    # we match on tags; if you maintain a `category:` field, add it here.
-    related:
-      enabled: true
-      limit: 3
-      match_by: tags
+
+      # Related publications at the bottom of each detail page. By
+      # default we match on tags; if you maintain a `category:` field,
+      # add it here.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+
     # RSS + JSON Feed for the publications collection. Off by default —
     # flip on when you want subscribers to be notified of new books.
     # Renders to /publications/feed.xml and /publications/feed.json.
@@ -524,12 +581,16 @@ collections:
     pagination:
       per_page: 8
 
-    # `index:` controls per-card display on /workshops/. Heroes (when
-    # the workshop has `image:` frontmatter) sit flush at the top of
-    # upcoming-workshop cards; past workshops always render compact,
-    # without the cover, regardless of `show_image`.
+    # `index:` controls per-card display on /workshops/. Heroes sit
+    # flush at the top of upcoming-workshop cards; past workshops
+    # always render compact, without the cover, regardless of the
+    # cover mode.
     index:
-      show_image:       true     # hero image on upcoming-workshop cards
+      # Cover slot on each upcoming-workshop card. Same four-value
+      # enum as `posts.index.cover` — see that block for the full
+      # vocabulary (photo / photo_or_svg / svg / none). Per-workshop
+      # override via frontmatter `cover:`.
+      cover: photo
       show_description: true
       show_dates:       true     # show date_from / date_to (or duration fallback)
       show_location:    true
@@ -541,18 +602,22 @@ collections:
     # the hero on the workshop page itself while still showing covers
     # in the listing, or vice versa.
     show:
-      show_image:       true     # hero image between the lede and the meta dl
-    # Related workshops at the bottom of each detail page. Match by
-    # tags so workshops sharing a topic surface together. Workshop
-    # cards carry richer meta than posts/photos, so the related card
-    # can show dates (date_from – date_to or `duration:` fallback)
-    # and location below the title — toggle each independently.
-    related:
-      enabled: true
-      limit: 3
-      match_by: tags
-      show_dates: true              # date_from – date_to under the title
-      show_location: true           # city / country / "Remote" under the title
+      # Hero between the lede and the meta dl. Same four-value enum
+      # as `index.cover` (photo / photo_or_svg / svg / none).
+      cover: photo
+
+      # Related workshops at the bottom of each detail page. Match by
+      # tags so workshops sharing a topic surface together. Workshop
+      # cards carry richer meta than posts/photos, so the related card
+      # can show dates (date_from – date_to or `duration:` fallback)
+      # and location below the title — toggle each independently.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+        show_dates: true            # date_from – date_to under the title
+        show_location: true         # city / country / "Remote" under the title
+
     # Feeds: typically off for workshops — they're timeless content,
     # not a chronological stream. Flip on if you run dated workshops
     # and want subscribers to be notified of new ones.

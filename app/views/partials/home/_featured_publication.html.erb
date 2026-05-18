@@ -14,9 +14,18 @@
 
   Toggled by `home.featured_publication: true` in config/site.yml.
   Style via `.home-module*` class hooks in your theme.
+
+  Reads canonical publication frontmatter per docs/publications.md:
+  `cover_url`, `tagline`, `excerpt`. Stale pre-0.3.0 keys (`cover`,
+  `cover_image`, `description`) are not honoured — manual
+  publications must use the canonical names.
 -->
 <%
   pub = site.collection('publications').find { |p| p.frontmatter['showcase'] == true }
+  # `priority_image: true` (set by the home layout for the first
+  # enabled module) flips this image to eager + high fetch priority
+  # so the LCP candidate isn't artificially delayed by lazy-loading.
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if pub %>
 <section class="home-module home-module--featured-publication" aria-label="Featured publication">
@@ -25,9 +34,13 @@
     <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('publications')) %>">All <%= collection_index_label('publications') %> &rarr;</a>
   </header>
   <article class="home-module__item">
-    <% if (cover = pub.frontmatter['cover'] || pub.frontmatter['cover_image']) %>
+    <% if (cover = pub.frontmatter['cover_url']) %>
       <a class="home-module__cover" href="<%= sanitized_url(pub.url) %>">
-        <img src="<%= sanitized_url(cover) %>" alt="<%= pub.title %> cover" loading="lazy">
+        <img src="<%= sanitized_url(cover) %>"
+             alt="<%= pub.title %> cover"
+             loading="<%= _priority ? 'eager' : 'lazy' %>"
+             <% if _priority %>fetchpriority="high"<% end %>
+             decoding="async">
       </a>
     <% end %>
     <div class="home-module__body">
@@ -37,7 +50,7 @@
       <% if (tagline = pub.frontmatter['tagline']) %>
         <p class="home-module__tagline"><%= tagline %></p>
       <% end %>
-      <% if (desc = pub.frontmatter['description'].to_s) && !desc.empty? %>
+      <% if (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
         <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
       <% end %>
     </div>

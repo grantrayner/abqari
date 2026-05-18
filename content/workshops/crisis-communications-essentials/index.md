@@ -1,6 +1,7 @@
 ---
 layout: workshop
 title: Crisis Communications Essentials
+published: true
 description: A one-day workshop on briefing internal teams, media, and regulators when something has gone wrong.
 date_from: 2025-11-20
 location: Hong Kong

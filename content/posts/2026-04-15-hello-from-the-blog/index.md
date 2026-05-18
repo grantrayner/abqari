@@ -1,5 +1,6 @@
 ---
 title: Hello from the blog
+published: true
 description: A first post demonstrating the posts collection.
 image: hero.svg
 tags: [introductions, ruby]

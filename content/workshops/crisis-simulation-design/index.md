@@ -1,6 +1,7 @@
 ---
 layout: workshop
 title: Crisis Simulation Design
+published: true
 description: Three-day workshop on designing and delivering realistic crisis simulations for executive teams.
 date_from: 2026-10-13
 date_to: 2026-10-15

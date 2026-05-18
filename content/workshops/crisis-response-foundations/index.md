@@ -1,6 +1,7 @@
 ---
 layout: workshop
 title: Crisis Response Foundations
+published: true
 description: A two-day workshop on building organisational crisis response capability.
 date_from: 2026-06-15
 date_to: 2026-06-16

@@ -13,6 +13,7 @@ layout: application
       ---
       layout: bundle
       name: The Light Notebooks Bundle
+      tagline: Beginnings and endings.     # optional standfirst
       description: Both volumes packaged together.
       price: $28.00                        # string shorthand or Hash form
       buy_now_url: https://...             # optional
@@ -32,6 +33,9 @@ layout: application
 
   <header>
     <h1><%= page.title %></h1>
+    <% if (tagline = fm['tagline']) %>
+      <p class="lede bundle__tagline"><%= tagline %></p>
+    <% end %>
 
     <% if (price = fm.dig('price', 'formatted')) %>
       <p class="bundle__price"><%= price %></p>
@@ -44,16 +48,17 @@ layout: application
   </header>
 
   <%# Description — `description_html` (pre-rendered) when present,
-      otherwise the markdown `description` source HTML-escaped. Both
-      fields are canonical-shape per docs/publications.md. The
-      selected source is exposed as `data-source="…"` for DevTools
-      visibility. %>
+      otherwise the markdown `description` source rendered through
+      Commonmarker so inline emphasis, links, and paragraph breaks
+      come through. Both fields are canonical-shape per
+      docs/publications.md. The selected source is exposed as
+      `data-source="…"` for DevTools visibility. %>
   <%
     description_source, description_content =
       if (html = fm['description_html']) && !html.to_s.strip.empty?
         [:description_html, html]
       elsif (text = fm['description']) && !text.to_s.strip.empty?
-        [:description, h(text)]
+        [:description, markdown(text)]
       else
         [nil, nil]
       end
@@ -81,7 +86,7 @@ layout: application
   %>
   <% if source_pubs.any? %>
     <section class="bundle__contents">
-      <h2>What's included</h2>
+      <h2 class="bundle__contents-heading">What's included</h2>
       <ul class="publications-index">
         <% source_pubs.each_with_index do |entry, idx| %>
           <%

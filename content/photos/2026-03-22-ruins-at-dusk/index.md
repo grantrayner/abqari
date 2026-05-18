@@ -1,5 +1,6 @@
 ---
 title: Ruins at dusk
+published: true
 caption: The last of the day falling across the Tetrapylon, Palmyra.
 date: 2026-03-22
 city: Palmyra

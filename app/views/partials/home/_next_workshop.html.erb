@@ -25,6 +25,7 @@
     [fm['order'] || Float::INFINITY, start_key, w.title.to_s]
   end
   workshop = upcoming.first
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if workshop %>
 <%
@@ -53,7 +54,10 @@
     <% if (img = fm['image']) %>
       <a class="home-module__cover" href="<%= sanitized_url(workshop.url) %>">
         <img src="<%= sanitized_url(bundle_asset_url_for(workshop, img)) %>"
-             alt="<%= workshop.title %>" loading="lazy">
+             alt="<%= workshop.title %>"
+             loading="<%= _priority ? 'eager' : 'lazy' %>"
+             <% if _priority %>fetchpriority="high"<% end %>
+             decoding="async">
       </a>
     <% end %>
     <div class="home-module__body">

@@ -1,5 +1,6 @@
 ---
 title: Desert road
+published: true
 caption: The road east, somewhere between Homs and the ruins at Palmyra.
 date: 2026-04-20
 city: Palmyra

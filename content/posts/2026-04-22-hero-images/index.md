@@ -1,5 +1,6 @@
 ---
 title: "Hero images: natural on show, 4:3 on index"
+published: true
 description: How post hero images render across show and index views — natural aspect on the post page, 4:3 cropping in the listings.
 date: 2026-04-22
 tags: [images, design]

@@ -301,7 +301,7 @@ class RelatedTest < Minitest::Test
   def test_related_returns_empty_when_disabled
     site = Abqari::Site.new
     site.config['collections'] = {
-      'posts' => { 'related' => { 'enabled' => false } }
+      'posts' => { 'show' => { 'related' => { 'enabled' => false } } }
     }
     page = OpenStruct.new(collection: 'posts', frontmatter: { 'tags' => ['ruby'] }, url: '/x/')
     assert_empty site.related(page)
@@ -347,7 +347,7 @@ class RelatedTest < Minitest::Test
   def test_next_in_collection_disabled
     site = Abqari::Site.new
     site.config['collections'] = {
-      'posts' => { 'next' => { 'enabled' => false } }
+      'posts' => { 'show' => { 'next' => { 'enabled' => false } } }
     }
     page = OpenStruct.new(collection: 'posts', frontmatter: {}, url: '/x/')
     assert_nil site.next_in_collection(page)

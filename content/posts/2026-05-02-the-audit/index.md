@@ -1,5 +1,6 @@
 ---
 title: "The audit and frontmatter validation"
+published: true
 description: A build-time check that catches typos in tags, countries, and other taxonomy fields before they ship as broken pages.
 date: 2026-05-02
 tags: [tooling, validation]

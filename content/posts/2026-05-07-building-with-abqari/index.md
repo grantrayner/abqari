@@ -1,5 +1,6 @@
 ---
 title: Building with Abqari
+published: true
 description: How posts, tags, and layouts fit together.
 image: hero.svg
 tags: [ruby, ssg, tutorials]

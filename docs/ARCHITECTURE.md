@@ -67,10 +67,12 @@ order:
 
 1. `@artifacts.reset_output` (wipe + recreate `_site/`)
 2. `@pages = @loader.load_pages`
-3. `Folio.new(self).fetch` (cache-first HTTP pull)
+3. `Folio.new(self).fetch` (cache-first HTTP pull from the
+   currently-supported publisher integration; no-op when `folio:`
+   config is missing)
 4. `@renderer.generate_all` (tag pages, paginated shards, viz,
-   Folio show pages, related-index pages — pushed into
-   `@generated_pages` via `site.add_generated_page(page)`)
+   publisher show pages via `PublisherPages`, related-index pages —
+   pushed into `@generated_pages` via `site.add_generated_page(page)`)
 5. `assets.process` + `images.process` (pipelines)
 6. `@artifacts.copy_fonts` + `copy_d3`
 7. `@renderer.render_pages` (parallel write of HTML)
@@ -194,7 +196,10 @@ Site#build
 │   ├── generate_tag_pages              (TaxonomyPage per term)
 │   ├── generate_paginated_pages        (PaginatedShard per page-2..N)
 │   ├── generate_visualizations         (VizPage)
-│   ├── generate_folio_pages            (auto book/bundle/series pages)
+│   ├── generate_publisher_pages        (PublisherShowPage +
+│   │                                    PublisherIndexPage for
+│   │                                    book/bundle/series pages
+│   │                                    sourced from a publisher)
 │   └── generate_related_pages          (RelatedIndexPage)
 │
 ├── assets.process + images.process     (CSS hashing, image variants)
@@ -347,10 +352,12 @@ These boundaries are deliberate (see `docs/security.md` §3):
   `<%=` is the default for a reason.
 - **Don't open the `erb_in_markdown` gate by default.** Per-site
   opt-in only; per-page `erb: true` is the second layer.
-- **Don't add a plugin API** that loads arbitrary Ruby from sites or
-  third-party themes. The hybrid path system already gives 90% of
-  the value without the security surface.
+- **Don't extend the plugin API to load Ruby from third-party themes
+  or remote URLs.** The current contract auto-loads from
+  `<site_root>/plugins/` only — same trust level as the site's own
+  source. See `docs/plugins.md` for the hook list and authoring guide.
 - **Don't introduce `eval`, `instance_eval`, `class_eval`** in
-  library code. The current codebase has none.
+  library code. The current codebase has none (the plugin system
+  uses `require`, not `eval`).
 - **Don't bypass `PathSafe` / `HttpSafe`** for new code that joins
   user input or fetches external resources.

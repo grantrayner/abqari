@@ -1,5 +1,6 @@
 ---
 title: Photos and galleries
+published: true
 description: How the photos collection works — gallery index, country and series taxonomies, and the showcase photo at the top of /photos/.
 date: 2026-01-28
 tags: [photos, galleries, taxonomies]

@@ -1,5 +1,6 @@
 ---
 title: Workshops as a content type
+published: true
 description: A built-in collection for training offerings — structured metadata, upcoming/past partitioning, instructor lists, and a registration CTA.
 date: 2026-02-18
 tags: [workshops, collections]

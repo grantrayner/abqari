@@ -14,15 +14,18 @@
   default. Renders nothing when there are no related items — never
   pads with unrelated content.
 
-  Config (per collection in config/site.yml):
+  Config (per collection in config/site.yml). Lives under `show:`
+  alongside the other show-page knobs — every show-view section
+  groups there for symmetry with `index:`.
 
       collections:
         posts:
-          related:
-            enabled: true       # set false to disable for this collection
-            limit: 3            # max items to show
-            match_by: tags      # field name or list of names
-            show_image: true    # when true, always render a cover box —
+          show:
+            related:
+              enabled: true     # set false to disable for this collection
+              limit: 3          # max items to show
+              match_by: tags    # field name or list of names
+              show_image: true  # when true, always render a cover box —
                                 #   a placeholder tile (no <img>) for items
                                 #   that don't have `image:` / `cover:` in
                                 #   frontmatter. Keeps the grid visually
@@ -36,16 +39,17 @@
 
       collections:
         workshops:
-          related:
-            show_dates: true     # date_from – date_to (or duration fallback)
-            show_location: true  # city / country / "Remote"
+          show:
+            related:
+              show_dates: true     # date_from – date_to (or duration fallback)
+              show_location: true  # city / country / "Remote"
 -->
 <%
   # Resolve effective limit/match_by — explicit local override > collection
   # config default. Always fetch the full ranked list, then slice for the
   # visible block. Total count drives the "Show all N" CTA.
   source_collection = page.respond_to?(:collection) ? page.collection : nil
-  cfg                = (source_collection ? site.collection_config(source_collection)['related'] : nil) || {}
+  cfg                = (source_collection ? site.collection_config(source_collection).dig('show', 'related') : nil) || {}
   override_limit     = defined?(limit)    && limit    ? limit    : nil
   override_match_by  = defined?(match_by) && match_by ? match_by : nil
   effective_limit    = override_limit || cfg.fetch('limit', 3)
@@ -82,42 +86,12 @@
   <h2 id="related-heading" class="related__heading">Related</h2>
   <ul class="related__list">
     <% visible.each do |item| %>
-      <li class="related__item">
-        <a href="<%= item.url %>">
-          <% if show_image %>
-            <% cover = item.frontmatter['image'] || item.frontmatter['cover'] %>
-            <div class="related__cover<%= ' related__cover--placeholder' unless cover %>">
-              <% if cover %>
-                <img src="<%= sanitized_url(bundle_asset_url_for(item, cover)) %>"
-                     alt="<%= item.frontmatter['caption'] || item.title %>"
-                     loading="lazy"
-                     decoding="async">
-              <% end %>
-            </div>
-          <% end %>
-          <span class="related__title"><%= item.title %></span>
-          <% if is_workshop %>
-            <% fm = item.frontmatter %>
-            <% if ws_show_dates && (df = fm['date_from']) %>
-              <span class="related__date">
-                <time datetime="<%= to_time(df).iso8601 %>"><%= local_time(df) %></time>
-                <% if (dt = fm['date_to']) && dt != df %>
-                  &ndash; <time datetime="<%= to_time(dt).iso8601 %>"><%= local_time(dt) %></time>
-                <% end %>
-              </span>
-            <% elsif ws_show_dates && fm['duration'] %>
-              <span class="related__date"><%= fm['duration'] %></span>
-            <% end %>
-            <% if ws_show_location && fm['location'] %>
-              <span class="related__location"><%= fm['location'] %></span>
-            <% end %>
-          <% elsif item.respond_to?(:date) && item.date %>
-            <span class="related__date">
-              <time datetime="<%= item.date.iso8601 %>"><%= local_time(item.date) %></time>
-            </span>
-          <% end %>
-        </a>
-      </li>
+      <%== render 'partials/related_item',
+                 item:             item,
+                 show_image:       show_image,
+                 is_workshop:      is_workshop,
+                 ws_show_dates:    ws_show_dates,
+                 ws_show_location: ws_show_location %>
     <% end %>
   </ul>
   <% if total > effective_limit %>

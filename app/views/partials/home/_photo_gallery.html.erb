@@ -30,6 +30,11 @@
               site.collection('photos').first(4)
             end
   heading = mode == 'random' ? 'From the gallery' : 'Latest photos'
+  # When the gallery is the priority module only the first thumbnail
+  # gets the eager hint — the other three sit alongside it and the
+  # browser's preloader scans them too, but the first is the LCP
+  # candidate.
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if photos.any? %>
 <section class="home-module home-module--photo-gallery" aria-label="Photo gallery">
@@ -39,14 +44,16 @@
   </header>
   <ul class="gallery-index gallery-index--cols-4">
     <% photos.each_with_index do |photo, idx| %>
-      <% tint = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+      <% tint  = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+      <% _eager = _priority && idx.zero? %>
       <li>
         <a href="<%= sanitized_url(photo.url) %>">
           <div class="gallery-index__cover <%= tint %>">
             <% if (img = photo.frontmatter['image']) %>
               <img src="<%= sanitized_url(img) %>"
                    alt="<%= photo.frontmatter['caption'] || photo.title %>"
-                   loading="lazy"
+                   loading="<%= _eager ? 'eager' : 'lazy' %>"
+                   <% if _eager %>fetchpriority="high"<% end %>
                    decoding="async">
             <% end %>
           </div>

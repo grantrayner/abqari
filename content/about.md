@@ -1,5 +1,6 @@
 ---
 title: About
+published: true
 description: A few words about this site, the people behind it, or what you'll find here.
 layout: about
 nav:

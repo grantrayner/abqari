@@ -1,5 +1,6 @@
 ---
 title: Suq lanterns
+published: true
 caption: Brass lanterns hanging in a covered passage just before evening prayers.
 date: 2026-04-10
 city: Aleppo

@@ -22,6 +22,17 @@ module Abqari
     # `pagination.per_page` config.
     PAGINATION_DEFAULT = 10
 
+    # Slow-page detection. When a single page's `write` (render +
+    # post-process + file write) takes longer than this, the renderer
+    # logs a warning with the URL, elapsed time, and a short list of
+    # heuristic causes (output size, image count, code-block count,
+    # TOC presence). End-of-build summary surfaces the slowest few.
+    #
+    # Default 500ms — high enough to ignore the normal per-page
+    # baseline (~5–50ms), low enough to catch real outliers. Override
+    # with `ABQARI_SLOW_PAGE_MS=N` (set to 0 to disable detection).
+    SLOW_PAGE_THRESHOLD_MS = (ENV['ABQARI_SLOW_PAGE_MS'] || '500').to_i
+
     # Files whose mtime invalidates every cached page render.
     # `app/views/layouts/` is NOT here — layout files are handled
     # per-layout via `layout_deps_mtime(name)` so editing one layout
@@ -157,7 +168,7 @@ module Abqari
     # whose related list is longer than its visible `limit`.
     def generate_related_pages
       @site.pages.select { |p| p.respond_to?(:collection) && p.collection }.each do |page|
-        cfg = @site.collection_config(page.collection)['related'] || {}
+        cfg = @site.collection_config(page.collection).dig('show', 'related') || {}
         next if cfg['enabled'] == false
 
         all = @site.related(page)
@@ -242,9 +253,12 @@ module Abqari
 
       errors = []
       errors_mutex = Mutex.new
+      slow_pages = []
+      slow_mutex = Mutex.new
 
       if pages.size < PARALLEL_THRESHOLD
-        pages.each { |page| render_one(page, errors, errors_mutex) }
+        pages.each { |page| render_one(page, errors, errors_mutex, slow_pages, slow_mutex) }
+        report_slow_pages!(slow_pages)
         return report_render_errors!(errors)
       end
 
@@ -265,12 +279,13 @@ module Abqari
             rescue ThreadError
               break
             end
-            render_one(page, errors, errors_mutex)
+            render_one(page, errors, errors_mutex, slow_pages, slow_mutex)
           end
         end
       end
       threads.each(&:join)
 
+      report_slow_pages!(slow_pages)
       report_render_errors!(errors)
     end
 
@@ -311,10 +326,164 @@ module Abqari
     # default Thread behaviour is to re-raise on join — but only for the
     # FIRST thread that raised; later threads' errors disappear.
     # Collecting explicitly gives us a full report at the end.
-    def render_one(page, errors, mutex)
+    #
+    # Also times each render and surfaces a warning when it crosses
+    # `SLOW_PAGE_THRESHOLD_MS`. Slow pages are collected for the
+    # end-of-build summary.
+    def render_one(page, errors, mutex, slow_pages = nil, slow_mutex = nil)
+      t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       page.write
+      elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0) * 1000).round
+
+      return unless slow_page?(elapsed_ms) && slow_pages && slow_mutex
+
+      causes = infer_slow_causes(page)
+      Log.warn(slow_page_note(page, elapsed_ms, causes))
+      slow_mutex.synchronize { slow_pages << { page: page, ms: elapsed_ms, causes: causes } }
     rescue StandardError, PathSafe::Error => e
       mutex.synchronize { errors << [page.source_path, e] }
+    end
+
+    # Did this page cross the slow threshold? Disabled when the
+    # threshold is set to 0 (operator opted out via env var).
+    def slow_page?(elapsed_ms)
+      SLOW_PAGE_THRESHOLD_MS.positive? && elapsed_ms >= SLOW_PAGE_THRESHOLD_MS
+    end
+
+    # Cause catalogue. Each entry has:
+    #
+    #   label:  short string for the inline warning + summary header
+    #   impact: one-sentence explanation of WHY this signal causes
+    #           slow renders — what work the engine does proportional
+    #           to it.
+    #   advice: one-sentence suggestion the operator can act on.
+    #
+    # The point is to turn a generic "your page is slow" into a
+    # specific "here's why, and here's what to try." The summary at
+    # end-of-build prints one impact + advice block per cause type
+    # that fired across the slow page set (deduped, so the operator
+    # reads each explanation once even if ten pages share the same
+    # cause).
+    SLOW_PAGE_CAUSES = {
+      large_output: {
+        label:  ->(meta) { "#{meta[:kb]} KB output" },
+        impact: 'HTML minification and any plugin `:post_process` filters scan the whole document — cost scales with output size.',
+        advice: 'Trim the body, split into multiple pages, or set `minify: false` if the site doesn\'t need minified output.'
+      },
+      many_images: {
+        label:  ->(meta) { "#{meta[:count]} inline images" },
+        impact: 'Every `<img>` is matched against the image-pipeline URL registry and rewritten to a responsive `<picture>` block. Per-tag cost is small; it adds up.',
+        advice: 'Reduce images on this page, move large galleries to their own page, or set `images.optimise: false` site-wide if the pipeline isn\'t needed.'
+      },
+      many_code_blocks: {
+        label:  ->(meta) { "#{meta[:count]} code blocks" },
+        impact: 'Rouge tokenises every `<pre>` block separately — long examples and many small blocks both add measurable time.',
+        advice: 'Shorten code examples, link to a gist for the long ones, or set `syntax_highlighting: false` site-wide if you don\'t need it.'
+      },
+      toc: {
+        label:  ->(_)    { 'TOC' },
+        impact: 'The TOC partial scans the rendered body for h2/h3 headings on every render. Small per page; meaningful when the body is long.',
+        advice: 'Set `toc: false` in the page\'s frontmatter to skip the TOC for one page, or raise `posts.show.toc.min_headings` to skip shorter pages globally.'
+      },
+      plugin_filter: {
+        label:  ->(_)    { 'plugin filter' },
+        impact: 'A plugin registered against the `:post_process` hook transforms the rendered HTML — the engine can\'t see inside the plugin code.',
+        advice: 'Profile the offending plugin in `plugins/*.rb`, or temporarily disable it (rename to `*.rb.off`) to confirm it\'s the bottleneck.'
+      }
+    }.freeze
+
+    # Human-readable slow-page warning emitted in real-time. Stays
+    # one line so it scans cleanly in CI logs; the end-of-build
+    # summary is where the rich impact + advice goes.
+    def slow_page_note(page, elapsed_ms, causes)
+      url       = page.respond_to?(:url) && page.url ? page.url : page.source_path.to_s
+      cause_str = causes.empty? ? '' : " — #{causes.map { |c| c[:label] }.join(' · ')}"
+      "Slow page: #{url} took #{format_ms(elapsed_ms)}#{cause_str}"
+    end
+
+    # Sample cheap heuristics that often correlate with slow renders.
+    # Re-reads the just-written output once (only fires for pages
+    # that already crossed the threshold, so cost is bounded by the
+    # slow-page count, not the build size).
+    #
+    # Returns an array of `{type:, label:}` hashes — `type` is the
+    # cause-catalogue key, `label` is the populated short string for
+    # the inline warning. The summary uses `type` to look up the
+    # full impact + advice from `SLOW_PAGE_CAUSES`.
+    def infer_slow_causes(page)
+      causes = []
+      return causes unless page.respond_to?(:output_path)
+      path = page.output_path
+      return causes unless File.exist?(path)
+
+      size_kb = (File.size(path) / 1024.0).round
+      causes << build_cause(:large_output, kb: size_kb) if size_kb >= 200
+
+      html = File.read(path, encoding: 'UTF-8')
+      img_count = html.scan(/<img\b/i).size
+      causes << build_cause(:many_images, count: img_count) if img_count >= 20
+      code_count = html.scan(/<pre\b/i).size
+      causes << build_cause(:many_code_blocks, count: code_count) if code_count >= 10
+      causes << build_cause(:toc) if html.include?('class="toc"') || html.include?("class='toc'")
+      causes << build_cause(:plugin_filter) if Hooks.registered_events.include?(:post_process)
+      causes
+    rescue StandardError
+      # Cause inference is best-effort — never let a probe failure
+      # mask the slow-page warning itself.
+      causes
+    end
+
+    def build_cause(type, **meta)
+      { type: type, label: SLOW_PAGE_CAUSES[type][:label].call(meta) }
+    end
+
+    # End-of-build slow-page summary. Three parts:
+    #
+    #   1. Header — count of slow pages and the threshold that fired.
+    #   2. Per-page list (slowest first, top 5) — URL, time,
+    #      cause labels.
+    #   3. "What this means + what to try" block — one entry per
+    #      unique cause type, deduped across all slow pages, so the
+    #      operator sees each explanation once.
+    #
+    # Goal: when the operator reads the summary they know exactly
+    # what's expensive on which pages AND what knob to turn.
+    def report_slow_pages!(slow_pages)
+      return if slow_pages.empty?
+
+      slow_pages.sort_by! { |sp| -sp[:ms] }
+      Log.info("Slow pages (>#{SLOW_PAGE_THRESHOLD_MS}ms): #{slow_pages.size}")
+      slow_pages.first(5).each do |sp|
+        url       = sp[:page].respond_to?(:url) && sp[:page].url ? sp[:page].url : sp[:page].source_path
+        cause_str = sp[:causes].empty? ? '' : "  (#{sp[:causes].map { |c| c[:label] }.join(' · ')})"
+        Log.info("  #{format_ms(sp[:ms]).rjust(7)}  #{url}#{cause_str}")
+      end
+
+      report_slow_page_explanations!(slow_pages)
+    end
+
+    # Unique cause types across the slow set, each printed with its
+    # impact + advice from SLOW_PAGE_CAUSES. Order follows
+    # SLOW_PAGE_CAUSES declaration order (broadest causes first, then
+    # narrower ones). Silent when no causes were inferred.
+    def report_slow_page_explanations!(slow_pages)
+      triggered_types = slow_pages.flat_map { |sp| sp[:causes].map { |c| c[:type] } }.uniq
+      ordered_types   = SLOW_PAGE_CAUSES.keys & triggered_types
+      return if ordered_types.empty?
+
+      Log.info('')
+      Log.info('What this means and what to try:')
+      ordered_types.each do |type|
+        entry = SLOW_PAGE_CAUSES[type]
+        Log.info("  #{type}:")
+        Log.info("    #{entry[:impact]}")
+        Log.info("    Try: #{entry[:advice]}")
+      end
+    end
+
+    # Compact ms / s formatter. `850ms`, `1.2s`, `12.4s`.
+    def format_ms(ms)
+      ms < 1000 ? "#{ms}ms" : format('%.1fs', ms / 1000.0)
     end
 
     def report_render_errors!(errors)

@@ -1,5 +1,6 @@
 ---
 title: A future-dated post
+published: true
 description: An example of a post scheduled to publish in the future.
 image: hero.svg
 tags: []

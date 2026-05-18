@@ -4,9 +4,11 @@
   in the same series. Functionally the series-ordered counterpart of
   `_next_item.html.erb` (which uses chronological order).
 
-  Reuses the `_post_list` partial for the card body so the cover /
-  meta / description follow the same per-card toggles as the rest of
-  the posts collection.
+  Reuses the `_post_list` index card for the same reason as
+  `_next_item`: there's only one next-in-series post, so the
+  prominent index-row treatment (cover-left, title / date /
+  description right) fits. Heading style matches `.related__heading`
+  so the section still sits coherently alongside its siblings.
 
   Required: the page must have BOTH `series:` and `series_position:`
   in frontmatter and there must be a next page in the series.

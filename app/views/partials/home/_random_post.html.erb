@@ -14,6 +14,12 @@
 <%
   pool_cap = 12        # cap the pool size for page-weight predictability
   candidates = site.collection('posts').first(pool_cap)
+  # Only the first card is initially visible (the no-JS fallback);
+  # the rest are `hidden` and only swapped in by random-pool.js
+  # post-load. So even when this module is priority, only the i=0
+  # image gets the eager hint — pre-eagerly fetching all 12 would
+  # waste bandwidth on cards the user never sees.
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if candidates.any? %>
 <section class="home-module home-module--random-post" aria-label="From the archive">
@@ -23,10 +29,15 @@
   </header>
   <div class="home-module__pool" data-random-pool>
     <% candidates.each_with_index do |post, i| %>
+      <% _eager = _priority && i.zero? %>
       <article class="home-module__item"<%= ' hidden' if i.positive? %>>
         <% if (img = post.frontmatter['image']) %>
           <a class="home-module__cover" href="<%= sanitized_url(post.url) %>">
-            <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+            <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>"
+                 alt="<%= post.title %>"
+                 loading="<%= _eager ? 'eager' : 'lazy' %>"
+                 <% if _eager %>fetchpriority="high"<% end %>
+                 decoding="async">
           </a>
         <% end %>
         <div class="home-module__body">

@@ -10,6 +10,10 @@
 <%
   pool_cap = 12
   candidates = site.collection('photos').first(pool_cap)
+  # Same as `_random_post`: only the i=0 card is initially visible,
+  # so only it gets the eager hint when this module is priority. The
+  # hidden cards fetch lazily on JS-swap.
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if candidates.any? %>
 <section class="home-module home-module--random-photo" aria-label="From the gallery">
@@ -19,10 +23,15 @@
   </header>
   <div class="home-module__pool" data-random-pool>
     <% candidates.each_with_index do |photo, i| %>
+      <% _eager = _priority && i.zero? %>
       <article class="home-module__item"<%= ' hidden' if i.positive? %>>
         <% if (img = photo.frontmatter['image']) %>
           <a class="home-module__cover" href="<%= sanitized_url(photo.url) %>">
-            <img src="<%= sanitized_url(img) %>" alt="<%= photo.frontmatter['caption'] || photo.title %>" loading="lazy">
+            <img src="<%= sanitized_url(img) %>"
+                 alt="<%= photo.frontmatter['caption'] || photo.title %>"
+                 loading="<%= _eager ? 'eager' : 'lazy' %>"
+                 <% if _eager %>fetchpriority="high"<% end %>
+                 decoding="async">
           </a>
         <% end %>
         <div class="home-module__body">

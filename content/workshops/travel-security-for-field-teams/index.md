@@ -1,6 +1,7 @@
 ---
 layout: workshop
 title: Travel Security for Field Teams
+published: true
 description: A one-day intensive on managing security risk for teams operating in higher-risk environments.
 date_from: 2026-09-23
 duration: 1 day

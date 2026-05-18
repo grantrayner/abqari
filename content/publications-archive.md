@@ -1,5 +1,6 @@
 ---
 title: Publications archive
+published: true
 description: Every book on the site, newest first.
 layout: publications_archive
 permalink: /publications/archive/

@@ -1,5 +1,6 @@
 ---
 title: "Slug aliasing: putting posts at /stories/"
+published: true
 description: How to rename a built-in collection's URL prefix without forking layouts or moving files around on disk.
 date: 2026-02-05
 tags: [configuration, urls, collections]

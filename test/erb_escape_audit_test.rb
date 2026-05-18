@@ -45,6 +45,10 @@ class ErbEscapeAuditTest < Minitest::Test
                                            # return a <a class="folio-button"> tag
                                            # with `sanitized_url`-validated href.
                                            # Empty string when no URL is set.
+    /\bcover_svg_for\b/,                   # CoverHelpers — returns an inline <svg>
+                                           # with only engine-generated content
+                                           # (slug-hashed gradient + h()-escaped
+                                           # initial). No user-controlled markup.
     /\byield_content\b/,                   # pre-rendered inner layout
     /\Apage\.content\b/,                   # pre-rendered markdown body
     /\bSCRIPT\b/                           # *::SCRIPT constants (pre-built <script>)

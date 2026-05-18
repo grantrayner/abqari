@@ -375,7 +375,7 @@ module Abqari
     def related(page, limit: nil, match_by: nil)
       return [] unless page.respond_to?(:collection) && page.collection
 
-      cfg = collection_config(page.collection)['related'] || {}
+      cfg = collection_config(page.collection).dig('show', 'related') || {}
       return [] if cfg['enabled'] == false
 
       effective_match_by = Array(match_by || cfg.fetch('match_by', 'tags'))
@@ -414,7 +414,7 @@ module Abqari
     def next_in_collection(page)
       return nil unless page.respond_to?(:collection) && page.collection
 
-      cfg = collection_config(page.collection)['next'] || {}
+      cfg = collection_config(page.collection).dig('show', 'next') || {}
       return nil if cfg['enabled'] == false
 
       pages = collection(page.collection) # newest first

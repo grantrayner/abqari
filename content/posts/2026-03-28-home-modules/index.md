@@ -1,5 +1,6 @@
 ---
 title: Home page modules
+published: true
 description: Eight optional modules for the home page — latest post, photo gallery, featured publication, contact — each toggleable in config.
 date: 2026-03-28
 tags: [home, configuration]

@@ -1,5 +1,6 @@
 ---
 title: Margin Notes
+published: true
 excerpt: A collection of essays on observation, attention, and craft.
 cover_url: /publications/margin-notes/cover.svg
 price: $14.00

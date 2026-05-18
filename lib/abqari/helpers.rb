@@ -187,6 +187,21 @@ end
       text.to_s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/\A-|-\z/, '')
     end
 
+    # Render a markdown string to HTML. For frontmatter prose fields
+    # (publication excerpts, bundle/series descriptions) that authors
+    # write with bold, italics, links, paragraphs, lists — the same
+    # markdown they'd use in a page body. Uses the engine's standard
+    # `MARKDOWN_OPTIONS` so the dialect (tables, footnotes, autolinks,
+    # raw HTML) matches what `Page#content` produces.
+    #
+    # Returns '' for nil/empty input so the caller can `<%== markdown(...) %>`
+    # unconditionally without an extra `if` guard.
+    def markdown(text)
+      return '' if text.nil? || text.to_s.strip.empty?
+
+      Commonmarker.to_html(text.to_s, options: Page::MARKDOWN_OPTIONS)
+    end
+
     def to_time(value)
       case value
       when Time then value

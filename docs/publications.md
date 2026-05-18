@@ -21,7 +21,12 @@ within Abqari 0.x; renames require a major version bump.
 
 `site.collection('publications')` returns BOTH manual `Page` objects and
 publisher-sourced `PublisherShowPage` objects. Templates iterate one
-list.
+list — the publications index, the bundle `publications:` lookup, the
+series `publications:` lookup, the home-page `featured_publication` /
+`latest_publication` modules, and the `bundles_index` /
+`book_series_index` layouts all read from this merged collection, so
+the same code path serves native-only sites, publisher-only sites, and
+mixed sites.
 
 When a slug exists in both manual content and a publisher source, the
 manual page wins. Manual frontmatter overrides any field; missing
@@ -36,6 +41,14 @@ Required:
 - `slug` — derived from the bundle directory name; not written in
   frontmatter.
 - `title` — string.
+
+Visibility:
+- `published` — boolean. `true` (or absent) renders the page;
+  `false` treats it as a draft. Drafts are suppressed in production
+  builds; in development they render with a banner so you can
+  preview unpublished work. Same convention as posts / bundles /
+  series / photos / workshops. (Mirrors Folio's `published`
+  column.) Scaffolds and shipped examples default to `true`.
 
 Marketing prose:
 - `tagline` — short one-line subtitle (intended for cards and link
@@ -144,7 +157,13 @@ Required:
   Folio's bundle shape, which is intentionally distinct from
   publication (`title`).
 
+Visibility:
+- `published` — boolean. Same semantics as publications: `false`
+  hides the bundle in production builds and renders with a Draft
+  banner in development. `true` (or absent) ships.
+
 Marketing prose:
+- `tagline` — short one-line subtitle.
 - `description` — long-form, markdown source.
 - `description_html` — pre-rendered HTML (Folio supplies).
 
@@ -162,8 +181,10 @@ Commerce:
 - `add_to_cart_url`
 
 Membership:
-- `publications` — **array of slugs** (string). The engine resolves
-  each slug against `site.collection('publications')` for display.
+- `publications` — array of slugs, or array of `{slug, ...}` Hashes
+  with optional inline overrides (`title:`, `cover_url:`) that win
+  over the looked-up publication's frontmatter. Each slug is
+  resolved against `site.collection('publications')` for display.
 
 ### Example
 
@@ -191,7 +212,11 @@ Required:
 - `slug`
 - `name`
 
+Visibility:
+- `published` — boolean. Same semantics as publications + bundles.
+
 Marketing prose:
+- `tagline` — short one-line subtitle.
 - `description` + `description_html`
 
 Catalogue:

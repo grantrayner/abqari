@@ -1,5 +1,6 @@
 ---
 title: First Light
+published: true
 excerpt: Short meditations on the first hours of the day — light, quiet, and the work that gets done before anyone calls.
 cover_url: /publications/first-light/cover.svg
 price: $16.00

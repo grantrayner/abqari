@@ -1,5 +1,6 @@
 ---
 title: An Atlas of Small Things
+published: true
 excerpt: Photographs and notes from places that don't make the news.
 cover_url: /publications/atlas-of-small-things/cover.svg
 price: $32.00

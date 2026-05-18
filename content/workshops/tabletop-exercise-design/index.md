@@ -1,6 +1,7 @@
 ---
 layout: workshop
 title: Tabletop Exercises — Design & Facilitation
+published: true
 description: A two-day workshop on building and running tabletop exercises that actually produce learning, not just attendance.
 date_from: 2026-01-15
 date_to: 2026-01-16

@@ -1,5 +1,6 @@
 ---
 title: Mosque doorway
+published: true
 caption: A small side entrance to the Umayyad Mosque, before the morning crowds.
 date: 2026-04-15
 city: Damascus

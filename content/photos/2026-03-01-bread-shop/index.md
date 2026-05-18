@@ -1,5 +1,6 @@
 ---
 title: Bread shop
+published: true
 caption: A small bakery in the old city, just before opening for the morning rush.
 date: 2026-03-01
 city: Damascus

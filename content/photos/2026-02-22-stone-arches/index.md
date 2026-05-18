@@ -1,5 +1,6 @@
 ---
 title: Stone arches
+published: true
 caption: The colonnade at Bosra, the basalt darker than expected in winter light.
 date: 2026-02-22
 city: Bosra

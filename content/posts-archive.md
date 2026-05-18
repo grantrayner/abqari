@@ -1,5 +1,6 @@
 ---
 title: Archive
+published: true
 description: Every post on the site, newest first.
 layout: posts_archive
 permalink: /posts/archive/

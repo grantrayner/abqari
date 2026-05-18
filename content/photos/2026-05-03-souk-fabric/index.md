@@ -1,5 +1,6 @@
 ---
 title: Souk fabric
+published: true
 caption: Rolls of dyed fabric stacked at a textile stall, the colour deeper than the photo suggests.
 date: 2026-05-03
 city: Aleppo

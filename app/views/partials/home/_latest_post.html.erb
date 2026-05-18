@@ -9,6 +9,7 @@
 -->
 <%
   post = site.collection('posts').first
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if post %>
 <section class="home-module home-module--latest-post" aria-label="Latest post">
@@ -19,7 +20,11 @@
   <article class="home-module__item">
     <% if (img = post.frontmatter['image']) %>
       <a class="home-module__cover" href="<%= sanitized_url(post.url) %>">
-        <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>" alt="<%= post.title %>" loading="lazy">
+        <img src="<%= sanitized_url(bundle_asset_url_for(post, img)) %>"
+             alt="<%= post.title %>"
+             loading="<%= _priority ? 'eager' : 'lazy' %>"
+             <% if _priority %>fetchpriority="high"<% end %>
+             decoding="async">
       </a>
     <% end %>
     <div class="home-module__body">

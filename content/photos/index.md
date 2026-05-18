@@ -1,5 +1,6 @@
 ---
 title: Photos
+published: true
 description: Photographs from a lifetime of exploration.
 layout: photos_index
 nav:

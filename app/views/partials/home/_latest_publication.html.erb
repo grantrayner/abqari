@@ -1,15 +1,19 @@
 <!--
   Home module — latest publication. Pulls the most recent entry from
-  the publications collection (manual entries; Folio publications
-  appear here only when they have a corresponding override page in
-  content/publications/<slug>/index.md). Renders cover thumbnail when
-  one is set in frontmatter (`cover:` or `cover_image:`).
+  the publications collection (both manual `content/publications/`
+  pages and externally-sourced publisher entries — `site.collection`
+  returns the merged list).
 
   Toggled by `home.latest_publication: true` in config/site.yml.
   Style via `.home-module*` class hooks in your theme.
+
+  Reads canonical publication frontmatter per docs/publications.md:
+  `cover_url`, `tagline`, `excerpt`. Stale pre-0.3.0 keys (`cover`,
+  `cover_image`, `description`) are not honoured.
 -->
 <%
   pub = site.collection('publications').first
+  _priority = defined?(priority_image) && priority_image
 %>
 <% if pub %>
 <section class="home-module home-module--latest-publication" aria-label="Latest publication">
@@ -18,9 +22,13 @@
     <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('publications')) %>">All <%= collection_index_label('publications') %> &rarr;</a>
   </header>
   <article class="home-module__item">
-    <% if (cover = pub.frontmatter['cover'] || pub.frontmatter['cover_image']) %>
+    <% if (cover = pub.frontmatter['cover_url']) %>
       <a class="home-module__cover" href="<%= sanitized_url(pub.url) %>">
-        <img src="<%= sanitized_url(cover) %>" alt="<%= pub.title %> cover" loading="lazy">
+        <img src="<%= sanitized_url(cover) %>"
+             alt="<%= pub.title %> cover"
+             loading="<%= _priority ? 'eager' : 'lazy' %>"
+             <% if _priority %>fetchpriority="high"<% end %>
+             decoding="async">
       </a>
     <% end %>
     <div class="home-module__body">
@@ -30,7 +38,7 @@
       <% if (tagline = pub.frontmatter['tagline']) %>
         <p class="home-module__tagline"><%= tagline %></p>
       <% end %>
-      <% if (desc = pub.frontmatter['description'].to_s) && !desc.empty? %>
+      <% if (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
         <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
       <% end %>
     </div>

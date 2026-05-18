@@ -89,9 +89,9 @@ mimic existing collections.
 ### `:after_generate` → `(site)`
 
 Fires after the renderer's generator pass (`generate_all` — tag
-pages, paginated shards, visualizations, Folio pages, related-index
-pages). `site.all_pages` is the complete list of everything the
-build will render.
+pages, paginated shards, visualizations, publisher pages,
+related-index pages). `site.all_pages` is the complete list of
+everything the build will render.
 
 Use for: appending custom generated pages, post-processing the
 generated set, computing build-time stats.

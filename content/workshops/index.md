@@ -1,5 +1,6 @@
 ---
 title: Workshops
+published: true
 description: A small example workshops collection. Drop new workshops into `content/workshops/<slug>/index.md`.
 layout: workshops_index
 nav:

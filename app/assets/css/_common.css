@@ -913,26 +913,67 @@ article > header > .lede {
   border-radius: var(--radius-2);
   box-shadow: var(--shadow-soft);
 }
-.toc__heading {
-  margin: 0 0 var(--space-md);
-  font-family: var(--font-heading);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-muted);
+/* `.toc__heading` typography is defined in the shared `__heading`
+   rule. */
+
+/* Native `<details>` collapse. The TOC starts expanded (the `open`
+   attribute on the element) — the toggle is for readers who'd
+   rather hide a long contents list while reading. Click or
+   Enter/Space on the summary; chevron rotates to signal state.
+   No JS, no ARIA polyfilling — browser handles all of it. */
+.toc__details { display: block; }
+.toc__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  cursor: pointer;
+  /* Strip the default disclosure triangle in every browser. The
+     chevron we ship is positioned on the right and rotates with
+     the open state. */
+  list-style: none;
 }
+.toc__summary::-webkit-details-marker { display: none; }
+.toc__summary::marker { content: ''; }
+/* Zero the heading margin inside the summary — the gap between
+   heading and list lives on the list (`margin-top` below) instead,
+   so the gap only renders when the details is open (the list is
+   hidden when closed, taking its margin with it). */
+.toc__summary .toc__heading { margin-bottom: 0; }
+.toc__chevron {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  transition: transform 0.15s ease-out;
+  /* Default (open) — chevron points down. Collapsed — rotated -90°
+     so it points right. `prefers-reduced-motion` disables the
+     transition via the global motion rule. */
+  transform: rotate(0deg);
+}
+.toc__details:not([open]) .toc__chevron { transform: rotate(-90deg); }
+
 .toc__list {
   list-style: none;
-  margin: 0;
+  margin: var(--space-md) 0 0;
   padding: 0;
 }
 .toc__item {
   margin: 0 0 var(--space-xs);
 }
+/* Indent + slight size step per heading level so the hierarchy reads
+   at a glance. h2 (no modifier class beyond `.toc__item`) sits flush;
+   h3 indents one step, h4 indents two. Deeper levels (h5/h6) fall
+   through to the h4 style — almost no TOC realistically needs them,
+   and adding more indent steps starts to look like a directory
+   listing rather than a contents list. */
 .toc__item--h3 {
   padding-left: var(--space-md);
   font-size: 0.9375rem;
+}
+.toc__item--h4,
+.toc__item--h5,
+.toc__item--h6 {
+  padding-left: calc(var(--space-md) * 2);
+  font-size: 0.875rem;
 }
 .toc a {
   color: var(--color-text);
@@ -1133,6 +1174,38 @@ article > header > .lede {
   color: var(--color-code-bg);
 }
 
+/* Decorative initial-tile SVG variant of the cover. Inline SVG
+   already carries its own gradient + text — the cover wrapper just
+   needs the SVG to fill the slot. Generic `.cover-svg` class lets
+   the same SVG render correctly inside any cover container (post
+   list, workshop list, show-view heroes). */
+.cover-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.post-list__cover--svg .cover-svg,
+.workshops-index__cover--svg .cover-svg {
+  aspect-ratio: 4 / 3;
+}
+
+/* Decorative SVG hero on show views. Render as a wide banner with
+   the same shape the photo-hero treatment uses (image-replacement
+   shape), so theme styles that target `.post__hero` / `.workshop__hero`
+   keep working. */
+.post__hero--svg,
+.workshop__hero--svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-2);
+}
+@media (min-width: 768px) {
+  .post__hero--svg,
+  .workshop__hero--svg { aspect-ratio: 16 / 9; }
+}
+
 .post-list__body { min-width: 0; }
 
 .post-list__title {
@@ -1289,10 +1362,43 @@ article > header > .lede {
 .publication__description { margin: 0 0 var(--space-xl); }
 .publication__description p:last-child { margin-bottom: 0; }
 
+/* On bundle / series pages the description sits directly above the
+   markdown body (`page.content`). Let the description's paragraphs
+   carry their natural `<p>` bottom margin so the description-to-
+   content gap matches the paragraph-to-paragraph rhythm in the body
+   — anything larger reads as a spacing bug because the two visually
+   identical blocks of prose are pushed apart for no reason. */
+.bundle__description,
+.series__description { margin: 0; }
+
 .publication__series {
   margin: var(--space-xl) 0;
   font-size: 0.9375rem;
   color: var(--color-muted);
+}
+
+/* Bundle + series show-view header price. Prominent — heading font,
+   bumped size — so the price reads clearly above the buy button on
+   the landing page. Body text colour rather than the link/primary
+   colour so it doesn't read as clickable. */
+.bundle__price,
+.series__price {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--color-text);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+/* Bundle + series taglines use `.lede` for prominence (1.25rem,
+   tightened line-height). The generic `article > header > .lede`
+   rule adds 2xl bottom margin assuming the lede is the LAST item in
+   the header — but here it's followed by price + buttons, so a
+   smaller gap reads better. Same specificity as the generic rule,
+   declared later so it wins. */
+article > header > .bundle__tagline,
+article > header > .series__tagline {
+  margin: 0 0 var(--space-md);
 }
 
 
@@ -1380,15 +1486,8 @@ article > header > .lede {
 .pubs-grouping {
   margin: var(--space-2xl) 0 0;
 }
-.pubs-grouping__heading {
-  margin: 0 0 var(--space-md);
-  font-family: var(--font-heading);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-muted);
-}
+/* `.pubs-grouping__heading` typography is defined in the shared
+   `__heading` rule. */
 
 /* Bundle previews — a stack of 2-3 covers at slight angles, like a
    small deck of books on a desk. Each preview is a single link with
@@ -1755,12 +1854,9 @@ article > header > .lede {
 
 .folio-book-grid { margin: var(--space-2xl) 0; }
 
-.folio-book-grid__heading {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 var(--space-lg);
-}
+/* `.folio-book-grid__heading` typography is defined in the shared
+   `__heading` rule below (small-caps muted, matching every other
+   show-view section heading). */
 
 .folio-book-grid__list {
   display: grid;
@@ -1864,16 +1960,8 @@ article > header > .lede {
    the same vertical rhythm as the other home-page sections. */
 .testimonials { margin: var(--space-2xl) 0; }
 
-/* Same shape as `.folio-book-grid__heading` — both are section
-   headings inside the home page article, sitting alongside markdown
-   <h2>s. Match font-size: 1.5rem (the default h2) so all section
-   titles read at the same level. */
-.testimonials__heading {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 var(--space-lg);
-}
+/* `.testimonials__heading` typography is defined in the shared
+   `__heading` rule below. */
 
 /* Card matches the article's content width — zero out the browser
    default <figure> margin (margin-inline: 40px) so the card extends
@@ -1914,12 +2002,8 @@ article > header > .lede {
  * ============================================================ */
 
 .book-related { margin: var(--space-2xl) 0; }
-.book-related__heading {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 var(--space-lg);
-}
+/* `.book-related__heading` typography is defined in the shared
+   `__heading` rule below. */
 .book-related__item {
   background: var(--color-card-bg);
   border-radius: var(--radius-3);
@@ -1979,15 +2063,9 @@ article > header > .lede {
   border-top: 1px solid var(--color-rule);
 }
 
-.home-module__heading {
-  margin: 0 0 var(--space-md);
-  font-family: var(--font-heading);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-muted);
-}
+/* `.home-module__heading` typography is defined in the shared
+   `__heading` rule. The contextual override that zeros its margin
+   when wrapped in `.home-module__header` lives below. */
 
 /* `.home-module__header` wraps a heading + a "see all" link so they
    sit on one row with the heading on the left and the link aligned
@@ -2201,12 +2279,22 @@ article > header > .lede {
  * ============================================================
  *
  * `.next-item` — single-card section below the post body linking to
- * the chronologically-newer post. Reuses the .post-list card.
+ * the chronologically-newer post (or, with the `--series` modifier,
+ * the next post by series position). Reuses `.post-list` so the
+ * card reads exactly like a row from the posts index — there's only
+ * ever one up-next post, so the full index treatment fits.
  *
  * `.related` — block below each show view (post, photo, publication)
- * listing other items from the same collection ranked by tag/series
- * overlap. `.related__list--full` is the dedicated /<slug>/related/
- * index page variant.
+ * listing items from the same collection ranked by tag/series
+ * overlap. Compact multi-card grid, different shape from the
+ * up-next card by design (the cases are different: one prominent
+ * card vs. several thumbnails). `.related__list--full` is the
+ * dedicated /<slug>/related/ index-page variant.
+ *
+ * The two sections share their heading style (small uppercase muted)
+ * via the consolidated `__heading` rule below — so the show-view
+ * tail reads as a coherent run of sections even though the card
+ * shapes differ.
  */
 
 .next-item {
@@ -2214,42 +2302,36 @@ article > header > .lede {
   padding-top: var(--space-lg);
   border-top: 1px solid var(--color-rule);
 }
-.next-item__heading { margin: 0 0 var(--space-md); font-size: 1.125rem; }
+/* The lone post-list item is also the `:last-child`, so its bottom
+   margin is already 0 from `.post-list__item:last-child`. Zero out
+   the wrapping `.post-list` margin so the card sits flush against
+   the heading. */
 .next-item .post-list { margin: 0; }
-/* `.next-item` reuses the `.post-list` card markup for a single
-   emphasized card. The cover is pinned to 240px on desktop so it
-   matches `.related__cover` (which sits in a `minmax(240px, 1fr)`
-   grid) — same-size thumbnails in both blocks below a post keeps
-   the visual rhythm consistent. Mobile stacks (cover on top, body
-   below) the same way the related grid auto-flows to one column
-   below ~480px. When the next post has no hero, the body falls
-   back to a clean single-column text card — no placeholder needed
-   for a single up-next card. */
-.next-item .post-list__item {
-  padding: 0;
-  border: 0;
-  margin-bottom: 0;
-  grid-template-columns: 1fr;
-  gap: var(--space-md);
-}
-@media (min-width: 480px) {
-  .next-item .post-list__item:has(.post-list__cover) {
-    grid-template-columns: 240px 1fr;
-  }
-}
 
-.related {
-  margin: var(--space-2xl) 0 0;
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--color-rule);
-}
-/* Same typographic treatment as `.home-module__heading` and
-   `.pubs-grouping__heading` — small uppercase muted — so the
-   "Related" section reads consistently with the home modules,
-   the posts-landing Series row, and the publications-landing
-   Bundles / Series headings. Applied across all related sections
-   (posts, photos, publications, workshops). */
-.related__heading {
+/* Section heading — ONE rule that owns the typography for every
+   "small section heading" across the app. Show-view tails ("Related",
+   "Up next", "Next in the series", "Other books in the series"),
+   in-page groupings ("What's included" on bundles, "Books in this
+   series" on series, "Testimonials"), home-page modules, the
+   publications-landing Bundles / Series rows, the TOC, and the
+   book grid all live here.
+
+   Centralised so a change to the section-heading style propagates
+   to every show view at once — and so adding a new section type is
+   one selector addition, not one new copy of the seven declarations.
+
+   The matching contextual override for `.home-module__header`
+   children sits with the rest of the home-module rules above. */
+.toc__heading,
+.pubs-grouping__heading,
+.folio-book-grid__heading,
+.testimonials__heading,
+.book-related__heading,
+.home-module__heading,
+.next-item__heading,
+.related__heading,
+.bundle__contents-heading,
+.series__contents-heading {
   margin: 0 0 var(--space-md);
   font-family: var(--font-heading);
   font-size: 0.875rem;
@@ -2258,6 +2340,14 @@ article > header > .lede {
   letter-spacing: 0.05em;
   color: var(--color-muted);
 }
+
+.related {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+/* `.related__heading` typography is defined in the shared `__heading`
+   rule above. */
 /* Grid track minimum drives the desktop card count. At 240px, the
    typical content max-width (~768px inner) fits 3 cards per row;
    smaller screens reflow to 2 or 1 automatically via auto-fill. */

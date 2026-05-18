@@ -1,5 +1,6 @@
 ---
 title: The Field Guide to Static Sites
+published: true
 tagline: The handbook for everyone shipping a site without a platform.
 excerpt: A practical handbook for self-hosted publishing in 2026.
 cover_url: /publications/the-field-guide/cover.svg

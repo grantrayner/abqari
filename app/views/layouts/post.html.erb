@@ -17,22 +17,24 @@ layout: application
       tags: [foo, bar]
       ---
 
-  Hero rendering is also gated by `collections.posts.show.show_image`
-  in config/site.yml — set it to `false` to suppress the hero across
-  the whole collection without editing each post's frontmatter. The
-  matching toggle on the index card is `collections.posts.index.show_image`;
-  the two are intentionally independent so you can show a hero in the
-  listing but not on the detail page (or vice versa).
+  Hero rendering is gated by `collections.posts.show.cover` in
+  config/site.yml — `photo` (the default) renders the `image:` if
+  present and nothing otherwise; `photo_or_svg` falls back to a
+  decorative initial-tile SVG; `svg` always renders the decorative
+  SVG; `none` suppresses the hero entirely. The matching enum on the
+  index card is `collections.posts.index.cover` — independent of
+  this one, so a listing can use SVG tiles while detail pages render
+  real photos (or vice versa).
+
+  Per-post override: set `cover:` in frontmatter (boolean `false`
+  for none, or one of the enum strings) to override the collection
+  default for a single post.
 
   Tags footer renders only when the post has tags. The "Up next" and
   "Related" partials below the article are also conditional on the
   collection's `next:` and `related:` config; both render nothing
   when not applicable so they degrade silently.
 -->
-<%
-  show_cfg   = (site.collection_config('posts')['show'] || {})
-  show_image = show_cfg.fetch('show_image', true)
-%>
 <article>
 
   <%== render 'partials/draft_banner' %>
@@ -52,13 +54,24 @@ layout: application
         · #<%= sp %> in the <a href="<%= sanitized_url(taxonomy_url('posts_series', sn)) %>"><%= sn %></a> series
       <% end %>
     </p>
-    <%# Hero — emits a <picture> with AVIF/WebP sources when sibling
-        files exist alongside the bundle image (convention: generate
-        `hero.avif` + `hero.webp` next to `hero.jpg`), else a plain
-        <img>. SVG sources skip picture entirely (no format negotiation
-        benefit). See `bundle_picture_tag` in render_context.rb. %>
-    <% if show_image && (hero = page.frontmatter['image']) %>
-      <%== bundle_picture_tag(page, hero, alt: page.title, class_: 'post__hero') %>
+    <%# Hero — `cover_choice_for` returns :photo / :placeholder /
+        :svg / :none based on the cover enum + frontmatter override.
+        For the show page :placeholder maps to "no hero" (a blank
+        flat-tint banner above the body doesn't read as content), so
+        we only render :photo and :svg here. %>
+    <% case cover_choice_for(page, context: :show) %>
+    <% when :photo %>
+      <%# Emits a <picture> with AVIF/WebP sources when sibling files
+          exist alongside the bundle image (convention: generate
+          `hero.avif` + `hero.webp` next to `hero.jpg`), else a plain
+          <img>. SVG sources skip <picture> entirely (no format
+          negotiation benefit). See `bundle_picture_tag` in
+          render_context.rb. %>
+      <%== bundle_picture_tag(page, page.frontmatter['image'], alt: page.title, class_: 'post__hero') %>
+    <% when :svg %>
+      <div class="post__hero post__hero--svg" aria-hidden="true">
+        <%== cover_svg_for(page) %>
+      </div>
     <% end %>
   </header>
 

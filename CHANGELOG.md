@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**Decorative auto-generated cover SVGs.** New `cover:` enum on the
+posts and workshops collections gives text-first authors a polished
+cover slot without sourcing imagery. Four modes:
+
+| Mode | Behaviour |
+|---|---|
+| `photo` (default) | Renders `image:` if set, basic flat-tint placeholder otherwise. The historical behaviour. |
+| `photo_or_svg` | Renders `image:` if set, otherwise a decorative initial-tile SVG (slug-hashed gradient + first letter of the title). |
+| `svg` | Always renders the decorative SVG (ignores `image:`). Uniform tile look across a listing. |
+| `none` | No cover slot at all. Text-only cards. |
+
+Lives in config under `<collection>.index.cover` (listing card) and
+`<collection>.show.cover` (detail-page hero) — independent of each
+other. Frontmatter `cover:` (boolean `false` or one of the enum
+strings) on a single page overrides the collection default.
+
+The SVG generator is deterministic per slug: same post always gets
+the same gradient + initial across builds. Eight muted two-tone
+palettes give adjacent cards distinct tones. Inline SVG (no extra
+HTTP request), `aria-hidden`, scales gracefully via `viewBox`.
+
+See `lib/abqari/render_context/cover_helpers.rb` for the generator
+and the mode-resolution chain.
+
+### Changed
+
+**`show_image` → `cover` enum (hard cutover).** The `show_image: true/false`
+toggle on `posts.index`, `posts.show`, `workshops.index`, and
+`workshops.show` is replaced by the new `cover:` enum above. To
+migrate: replace `show_image: true` with `cover: photo` (current
+behaviour) or pick another mode. `show_image: false` becomes
+`cover: none`.
+
+**Per-collection config: show-view knobs grouped under `show:`.** The
+config shape for per-collection show-page features (TOC, "Up next",
+related grid) moved one level deeper, so every knob that affects
+the show page now lives under `show:` — mirroring `index:` for the
+listing page. Before:
+
+```yaml
+collections:
+  posts:
+    show:
+      show_image: true
+    toc:
+      enabled: true
+    next:
+      enabled: true
+    related:
+      enabled: true
+```
+
+After:
+
+```yaml
+collections:
+  posts:
+    show:
+      show_image: true
+      toc:
+        enabled: true
+      next:
+        enabled: true
+      related:
+        enabled: true
+```
+
+The rule is now uniform: "knobs for the listing page go under
+`index:`; knobs for the show page go under `show:`." Top-level
+keys (`archive`, `pagination`, `feeds`) stay where they are
+because they're separate pages or artifacts, not part of either
+the index or show view.
+
+Hard cutover. Sites with custom config must move `toc:`, `next:`,
+`related:` under `show:` in `config/site.yml` for every collection.
+Read-paths in the engine (`Site#related`, `Site#next_in_collection`,
+`Renderer#generate_related_pages`, the `_toc` / `_related_items`
+partials) updated accordingly.
+
 ## [0.3.1] — 2026-05-16
 
 ### Changed

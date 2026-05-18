@@ -1,5 +1,6 @@
 ---
 title: Olive groves
+published: true
 caption: A working grove on the hills above Latakia, mid-pruning season.
 date: 2026-01-25
 city: Latakia

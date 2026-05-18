@@ -1,5 +1,6 @@
 ---
 title: Old city walls
+published: true
 caption: Late-afternoon light along the eastern wall.
 date: 2026-04-02
 city: Aleppo

@@ -1,5 +1,6 @@
 ---
 title: Coastal walk
+published: true
 caption: The seafront promenade at Latakia, just after the morning storm cleared.
 date: 2026-03-08
 city: Latakia

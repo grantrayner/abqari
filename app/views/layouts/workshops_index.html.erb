@@ -38,7 +38,6 @@ layout: application
 <%
   description = page.frontmatter['description']
   cfg = (site.collection_config('workshops')['index'] || {})
-  show_image       = cfg.fetch('show_image',       true)
   show_description = cfg.fetch('show_description', true)
   show_dates       = cfg.fetch('show_dates',       true)
   show_location    = cfg.fetch('show_location',    true)
@@ -121,12 +120,28 @@ layout: application
           <% fm = w.frontmatter %>
           <li class="workshops-index__item">
             <a href="<%= w.url %>" class="workshops-index__link">
-              <% if show_image && (img = fm['image']) %>
+              <%# Cover slot. `cover_choice_for` returns :photo /
+                  :placeholder / :svg / :none based on the
+                  `workshops.index.cover` enum + frontmatter override. %>
+              <% case cover_choice_for(w, context: :index) %>
+              <% when :photo %>
                 <span class="workshops-index__cover">
-                  <img src="<%= sanitized_url(bundle_asset_url_for(w, img)) %>"
+                  <img src="<%= sanitized_url(bundle_asset_url_for(w, fm['image'])) %>"
                        alt="<%= w.title %>"
                        loading="lazy">
                 </span>
+              <% when :placeholder %>
+                <span class="workshops-index__cover">
+                  <svg class="workshops-index__cover-placeholder" viewBox="0 0 4 3"
+                       preserveAspectRatio="none" aria-hidden="true">
+                    <rect width="4" height="3" fill="currentColor"/>
+                  </svg>
+                </span>
+              <% when :svg %>
+                <span class="workshops-index__cover workshops-index__cover--svg">
+                  <%== cover_svg_for(w) %>
+                </span>
+              <% when :none %>
               <% end %>
               <span class="workshops-index__body">
                 <h3 class="workshops-index__title"><%= w.title %></h3>

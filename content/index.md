@@ -1,5 +1,6 @@
 ---
 title: Hello from Abqari
+published: true
 description: A minimal Ruby static site generator built around four use cases — long-form writing, photo galleries, publications, and workshops.
 layout: home
 nav:

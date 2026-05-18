@@ -51,6 +51,9 @@ def create_post(title)
   File.write(index_path, <<~MD)
     ---
     title: #{title}
+    published: true                # flip to `false` to keep this a draft —
+                                   #   stays out of production builds but
+                                   #   renders in `bin/serve` with a banner.
     date: #{date}
     description:
     tags: []
@@ -90,6 +93,9 @@ def create_page(title)
   File.write(abs_path, <<~MD)
     ---
     title: #{title}
+    published: true                # flip to `false` to keep this a draft —
+                                   #   stays out of production builds but
+                                   #   renders in `bin/serve` with a banner.
     description:
     nav:
       order: 99

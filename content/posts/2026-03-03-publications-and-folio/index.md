@@ -1,5 +1,6 @@
 ---
 title: "Publications and Folio integration"
+published: true
 description: Two ways to ship books on an Abqari site — write manual content files, or connect a Folio storefront for live pricing, ISBNs, and covers.
 date: 2026-03-03
 tags: [publications, folio]
