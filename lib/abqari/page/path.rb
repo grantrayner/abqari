@@ -37,6 +37,14 @@ module Abqari
         # build rather than writing outside `output_dir`.
         if (custom = frontmatter['permalink'])
           cleaned = custom.to_s.sub(%r{\A/}, '')
+          # `permalink: "/"` is the home page — cleaned becomes empty
+          # after stripping the leading slash. That's a legitimate
+          # value (a site setting an explicit home-page permalink for
+          # documentation purposes); short-circuit to the output dir's
+          # `index.html` before the regex check, which `+` won't
+          # match against the empty string.
+          return PathSafe.join_under(site.output_dir, 'index.html') if cleaned.empty?
+
           unless cleaned.match?(PERMALINK_ALLOWED)
             raise PathSafe::Error,
                   "invalid permalink #{custom.inspect} in #{source_path}: " \

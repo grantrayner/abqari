@@ -48,6 +48,16 @@ class PageOutputPathTest < Minitest::Test
     assert_equal File.join(@site.output_dir, '404.html'), page.output_path
   end
 
+  # `permalink: "/"` is the home page — root of the output dir. After
+  # stripping the leading slash the cleaned string is empty, which
+  # the `PERMALINK_ALLOWED` regex (anchored, `+`) won't match against.
+  # The short-circuit above the regex check handles this explicitly
+  # so the home page can be addressed with an explicit permalink.
+  def test_root_permalink_is_home_page
+    page = build_page('permalink' => '/')
+    assert_equal File.join(@site.output_dir, 'index.html'), page.output_path
+  end
+
   def test_dotdot_permalink_is_blocked
     page = build_page('permalink' => '../../etc/passwd')
     assert_raises(Abqari::PathSafe::Error) { page.output_path }
