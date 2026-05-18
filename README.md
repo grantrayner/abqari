@@ -28,7 +28,315 @@ supported for users who want to own all the code.
 
 ## Quickstart
 
-Requires Ruby `~> 3.3`. Two consumption paths:
+Abqari turns plain Markdown files into a fast, dependency-free
+website you can host anywhere — Cloudflare Pages, Netlify, GitHub
+Pages, your own server. This walkthrough takes you from "nothing
+installed" to "site live on my laptop" in about ten minutes; no
+prior Ruby experience required. If you've used Jekyll, Hugo, or
+Eleventy, the shape will be familiar.
+
+### Before you start — open a terminal, pick a projects folder
+
+You'll be typing commands into a **terminal** (also called "command
+line" or "shell"). To open one:
+
+- **macOS**: press ⌘-Space, type `Terminal`, press Return.
+- **Linux**: most desktops have a terminal app; on Ubuntu/GNOME it's
+  Ctrl-Alt-T.
+- **Windows**: open the Ubuntu app you installed via
+  [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) —
+  that's where you'll run all the commands below.
+
+The terminal opens in your home directory (typically `/Users/<you>`
+on macOS or `/home/<you>` on Linux). You'll want a dedicated folder
+for code projects so things stay organised. A common convention is
+`~/apps/` or `~/code/` (the `~` means "your home directory"). Create
+one if you don't already have it:
+
+```bash
+mkdir -p ~/apps
+cd ~/apps
+```
+
+`mkdir -p` creates the folder (the `-p` part is safe to run even if
+it already exists). `cd` "changes directory" — it moves the terminal
+into that folder, so everything that follows happens there.
+
+From now on, every command in this walkthrough goes into the
+terminal exactly as shown. Copy a command, paste it (Cmd-V / Ctrl-V),
+press Return. Wait for it to finish before running the next one.
+
+### Step 1 — Install the prerequisites (one-time, per machine)
+
+Three things need to be on your computer before Abqari can run.
+Most macOS and Linux machines already have at least one of them; the
+commands below are safe to run either way.
+
+**Ruby 3.3 or newer** — the language Abqari is written in.
+
+Check what you have:
+
+```bash
+ruby --version
+```
+
+If the output is `ruby 3.3.x` (or newer), you're done with this part.
+Otherwise:
+
+- **macOS**: install [Homebrew](https://brew.sh) first if you don't
+  have it, then `brew install ruby`. Homebrew prints the exact line
+  to add to your shell config (`~/.zshrc` or `~/.bash_profile`) so
+  your terminal can find the new Ruby — copy-paste that line, then
+  restart your terminal.
+- **Ubuntu / Debian Linux**: `sudo apt install ruby-full`
+- **Alpine Linux**: `apk add ruby ruby-dev build-base`
+- **Windows**: the smoothest path is [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
+  (Windows Subsystem for Linux) — install Ubuntu via WSL, then follow
+  the Ubuntu instructions inside it. Native Windows Ruby via
+  [RubyInstaller](https://rubyinstaller.org/) also works but has
+  rougher edges around libvips and file paths.
+
+**libvips** — a small image-processing library Abqari uses to
+generate responsive image variants (AVIF, WebP, multiple widths).
+
+```bash
+brew install vips                # macOS
+sudo apt install libvips42       # Ubuntu/Debian
+apk add vips                     # Alpine
+```
+
+This step is technically optional — Abqari falls back to plain
+`<img>` tags if libvips is missing — but the optimised pipeline cuts
+image bytes by 60–80%, so install it once and forget about it.
+
+**Git** — for downloading Abqari and (eventually) deploying.
+
+```bash
+git --version
+```
+
+Most modern macOS and Linux installs ship with Git already. If the
+command isn't found: `brew install git` on macOS, `sudo apt install git`
+on Ubuntu/Debian.
+
+### Step 2 — Install Abqari (one-time)
+
+Abqari isn't on RubyGems yet, so you install it from a git checkout
+of the engine repository. From inside your projects folder (the one
+you `cd`'d into above — e.g. `~/apps`):
+
+```bash
+git clone https://github.com/grantrayner/abqari.git
+cd abqari
+gem build abqari.gemspec
+gem install ./abqari-*.gem
+```
+
+After this, `abqari/` lives at `~/apps/abqari/` and the global
+`abqari` command is on your `PATH`.
+
+Test that it worked:
+
+```bash
+abqari version
+```
+
+You should see something like `abqari 0.3.1`. If you get
+`command not found`, see [Troubleshooting](#troubleshooting) below.
+
+### Step 3 — Create your first site
+
+Move back to your projects folder so the new site sits alongside the
+engine, not inside it:
+
+```bash
+cd ~/apps
+abqari new my-site
+```
+
+(Substitute your own folder name and site name. `my-site` is just an
+example — anything URL-safe works.)
+
+This:
+- Creates a new folder called `my-site/`
+- Fills it with everything needed for a working site (`Gemfile`,
+  `config/site.yml`, sample home page, about page, example post,
+  build/serve scripts)
+- Runs `bundle install` automatically to fetch the gems
+
+Takes a few seconds. When it finishes you'll see a "Next:" message.
+
+If you'd prefer a totally clean slate — no example post, no
+explanatory text on the home page, just the empty structure — add
+`--blank`:
+
+```bash
+abqari new my-site --blank
+```
+
+You can also pass your site's name and theme up-front to skip editing
+the config later:
+
+```bash
+abqari new my-site --name "Jane's Notebook" --theme magazine --author "Jane Smith"
+```
+
+The available themes are `minimal`, `magazine`, `notebook`, `sand`,
+`bootstrap`, `custom`, and `none`. You can change the theme later by
+editing one line of `config/site.yml`.
+
+### Step 4 — See your site in the browser
+
+```bash
+cd my-site
+bin/serve
+```
+
+Open <http://localhost:4000> in any browser. You'll see your home
+page, with the example post and the about page linked from the nav.
+
+`bin/serve` watches for file changes — edit anything in `content/`,
+`config/`, or `app/assets/` and the browser auto-reloads. Press
+`Ctrl-C` in the terminal to stop the server when you're done.
+
+### Step 5 — Edit the four files that matter
+
+Open `my-site/` in any text editor (VS Code, Sublime Text, plain
+TextEdit, etc.). Four files account for most of what a new site
+needs to customise:
+
+| File | What it controls |
+|---|---|
+| `config/site.yml` | Site title, description, author, theme, locale. Comments explain every option. |
+| `content/index.md` | Your home page. Plain Markdown. |
+| `content/about.md` | Your about page. |
+| `app/assets/css/site.css` | Custom CSS that loads after the theme. Empty by default — add brand colours, font swaps, etc. |
+
+Save any file and the browser refreshes automatically (as long as
+`bin/serve` is running).
+
+To add a new blog post:
+
+```bash
+bin/new post "My new post title"
+```
+
+This creates `content/posts/<today's date>-my-new-post-title/index.md`
+with the right frontmatter already filled in. Drop images
+(`hero.jpg`, `photo.jpg`, etc.) into the same folder as the post,
+reference them by relative name in the Markdown (`![alt](hero.jpg)`),
+and Abqari's image pipeline takes care of responsive variants.
+
+### Step 6 — Build for production
+
+When you're ready to put the site online:
+
+```bash
+bin/build
+```
+
+This writes the finished HTML to a folder called `_site/`. Upload
+the contents of `_site/` to any static host:
+
+- **Cloudflare Pages / Netlify / Vercel**: point the host at your
+  site's git repository, set the build command to `bin/build`, and
+  the output directory to `_site`. Push to the repo and the host
+  takes care of the rest.
+- **GitHub Pages**: same shape, with a workflow file in
+  `.github/workflows/`.
+- **Your own server**: `rsync -av _site/ user@server:/var/www/site/`
+  or similar.
+
+Pre-built deploy scripts for Cloudflare Pages and Netlify ship as
+`bin/deploy` in your scaffolded site — see the comments inside for
+the env vars they expect.
+
+### Troubleshooting
+
+**`abqari: command not found`** after `gem install`
+The directory where Ruby installs gem executables isn't on your
+shell's `PATH`. Run `gem env home` — it prints the path. Add
+`<that-path>/bin` to your shell config:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+export PATH="$(gem env home)/bin:$PATH"
+```
+
+Then restart your terminal or run `source ~/.zshrc`.
+
+**`Could not locate Gemfile`** when running `bin/serve` or `bin/build`
+You're running the command from outside your site's directory.
+`cd my-site/` first, then re-run.
+
+**`bundle install` fails during `abqari new`**
+Most often this is a Ruby version mismatch — Abqari requires 3.3 or
+newer. Run `ruby --version` to check. If you have multiple Ruby
+versions installed (via rbenv / rvm / asdf), make sure 3.3+ is the
+active one.
+
+**Browser shows the old version after I edit a file**
+`bin/serve`'s live-reload depends on the optional `listen` gem. Run
+`bundle install` from inside the site directory — the scaffolded
+Gemfile already includes `listen` in the `:development` group.
+
+**Images don't appear after I add them**
+Make sure the image file sits in the same folder as the post's
+`index.md` (e.g., `content/posts/<date>-my-post/hero.jpg`) and the
+Markdown references it by relative name only (`![alt](hero.jpg)`,
+not `/posts/.../hero.jpg`).
+
+**Build is very slow on the first run**
+Abqari's image pipeline encodes AVIF/WebP variants for every photo
+on first build — slow once, instant afterwards (cached by mtime).
+See [Images](#images) for the cache details.
+
+**An error mentions "libvips" or "vips"**
+Re-run `brew install vips` (macOS) or `sudo apt install libvips42`
+(Ubuntu/Debian). The build falls back to plain `<img>` without
+libvips, so you can also temporarily disable the pipeline by setting
+`images.optimise: false` in `config/site.yml`.
+
+### What `abqari new` actually creates
+
+For reference — these are the files in a fresh scaffold:
+
+```
+my-site/
+├── Gemfile                 # Ruby dependencies; Bundler reads this
+├── README.md               # Your site's README (overwrite to taste)
+├── .gitignore
+├── config/
+│   └── site.yml            # Site identity, theme, collections, env URLs
+├── content/
+│   ├── index.md            # Home page
+│   ├── about.md            # About page
+│   └── posts/
+│       ├── index.md        # Posts landing
+│       └── welcome/        # Example post (omit with --blank)
+│           └── index.md
+├── app/
+│   └── assets/
+│       └── css/
+│           └── site.css    # Your custom CSS override slot
+├── bin/
+│   ├── build               # Production build
+│   ├── serve               # Dev server with live reload
+│   ├── audit               # Build + check links/SEO/a11y/privacy
+│   └── new                 # Scaffold a new post/page
+├── public/                 # Static passthrough (favicons, robots.txt)
+└── vendor/                 # Auto-populated caches (fonts, publisher data)
+```
+
+Engine code (layouts, themes, helpers, asset pipeline) lives in the
+gem — your site repo stays minimal. To upgrade the engine later,
+edit `Gemfile` and run `bundle update abqari`; see
+[Upgrading](#upgrading).
+
+If you'd rather assemble a site by hand (migrating from another
+generator, or wanting full control over every file in your repo),
+two manual paths follow — both reach the same end state without the
+scaffolder.
 
 ### Path A — Add Abqari to your site as a gem (recommended)
 

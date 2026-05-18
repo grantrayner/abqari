@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Dev server with file-watcher + SSE live reload. Builds the site,
+# starts WEBrick on localhost:4000, watches content/, config/, data/,
+# app/ for changes and incrementally rebuilds.
+
+ENV['ABQARI_ENV']       ||= 'development'
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+require 'bundler/setup'
+require 'abqari'
+
+Abqari::Server.new.start

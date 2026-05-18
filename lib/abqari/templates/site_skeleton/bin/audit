@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Build, then walk _site/ for link/SEO/a11y/privacy/dependency issues.
+# Writes a markdown report to audit/<timestamp>.md. Exit code is 0
+# unless --strict is set, in which case any error-severity finding
+# exits non-zero (suitable for CI).
+
+require 'optparse'
+
+options = { strict: false }
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/audit [--strict]'
+  opts.on('--strict', 'Exit non-zero on any error finding (for CI)') { options[:strict] = true }
+end.parse!(ARGV)
+
+ENV['ABQARI_ENV']       ||= 'production'
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+require 'bundler/setup'
+require 'abqari'
+
+site = Abqari::Site.new
+site.build
+audit = Abqari::Audit.new(site).run
+exit(1) if options[:strict] && audit.error_count.positive?

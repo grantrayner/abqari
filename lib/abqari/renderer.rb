@@ -341,7 +341,18 @@ module Abqari
       Log.warn(slow_page_note(page, elapsed_ms, causes))
       slow_mutex.synchronize { slow_pages << { page: page, ms: elapsed_ms, causes: causes } }
     rescue StandardError, PathSafe::Error => e
-      mutex.synchronize { errors << [page.source_path, e] }
+      # Generated pages (TaxonomyPage, PaginatedShard, PublisherShowPage)
+      # don't have a `source_path` — they synthesise URLs without a
+      # backing markdown file. Fall back to the URL (or class name) so
+      # the error report is still attributable.
+      identifier = if page.respond_to?(:source_path) && page.source_path
+                     page.source_path
+                   elsif page.respond_to?(:url) && page.url
+                     page.url
+                   else
+                     page.class.name
+                   end
+      mutex.synchronize { errors << [identifier, e] }
     end
 
     # Did this page cross the slow threshold? Disabled when the

@@ -1,0 +1,34 @@
+---
+title: <%= title %>
+published: true
+description: <%= description %>
+layout: home
+nav:
+  order: 1
+  label: Home
+---
+
+Welcome to <%= title %>.
+
+This is your home page. Edit `content/index.md` to change what shows
+up here. Markdown, ERB partials (with the right config), the works.
+
+Below the markdown body, Abqari can render optional home modules —
+latest post, photo gallery, featured publication, contact button, and
+more. Toggle them on under `home:` in `config/site.yml`.
+
+## Where to next
+
+- [Read the latest posts](/posts/)
+- [About](/about/)
+
+## Customising
+
+| Where | What |
+|---|---|
+| `config/site.yml` | Site identity, theme, collections, environment URLs |
+| `content/index.md` | This page |
+| `app/assets/css/site.css` | Your custom CSS, loaded after the theme |
+
+When you're ready: edit `config/site.yml`, set the production `url:`,
+flip on the collections and home modules you need.

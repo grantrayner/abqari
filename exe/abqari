@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Global Abqari CLI — single entry point shipped as the gem's executable.
+# After `gem install abqari` (or installing from a git checkout via
+# `gem build && gem install ./abqari-X.Y.Z.gem`), the `abqari` command
+# is available on PATH from anywhere.
+#
+# Subcommands:
+#   abqari new <projectname>   Scaffold a new site directory.
+#   abqari version             Print the engine version.
+#   abqari --help              Show this list.
+#
+# All other operations (build, serve, audit, etc.) run from inside a
+# scaffolded site via the per-site `bin/*` scripts that `abqari new`
+# generates. This matches the Jekyll convention: the global `jekyll`
+# binary bootstraps; per-site scripts do the per-project work.
+
+# Development-checkout escape hatch. When this script runs from a git
+# checkout (the gem isn't installed), `lib/abqari.rb` sits next to the
+# `exe/` directory; auto-add that lib to LOAD_PATH so `require 'abqari'`
+# resolves without `gem install`. Harmless when the gem IS installed —
+# the local require wins on the load path but resolves to identical
+# code. Lets engine developers test `abqari new` without first running
+# `gem build && gem install` after every change.
+dev_lib = File.expand_path('../lib', __dir__)
+$LOAD_PATH.unshift(dev_lib) if File.exist?(File.join(dev_lib, 'abqari.rb'))
+
+require 'abqari'         # for Abqari::VERSION (used by `abqari version`)
+require 'abqari/cli'
+
+exit(Abqari::CLI.run(ARGV) ? 0 : 1)

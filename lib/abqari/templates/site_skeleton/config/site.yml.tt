@@ -1,0 +1,132 @@
+# Abqari site configuration.
+#
+# Top-level keys are shared across environments. Per-environment
+# overrides go under `environments:` and deep-merge over the shared
+# keys based on $ABQARI_ENV (default: development).
+#
+# This starter ships with sensible defaults — edit `title`, `description`,
+# `author`, and `environments.production.url` immediately; the rest can
+# wait until you have a feel for what you want.
+
+# Site identity ──────────────────────────────────────────────────────────
+title: <%= title %>
+description: <%= description %>
+author: <%= author %>
+
+# Locale ─────────────────────────────────────────────────────────────────
+# ISO 639-1 code. Sets <html lang>, RSS <language>, and Preferred-
+# Languages in security.txt. Single-locale only.
+locale: <%= locale %>
+
+# Theme ──────────────────────────────────────────────────────────────────
+# Visual styling. Each theme is one CSS file in themes/<name>/ inside
+# the engine gem. Switch freely — none of the theme files are in this
+# repo (they live in the gem). Built-ins: minimal / magazine / notebook /
+# bootstrap / sand / custom / none.
+theme: <%= theme %>
+
+# Collections ────────────────────────────────────────────────────────────
+# Four collections ship as built-in defaults. Flip enabled to false on
+# any your site doesn't use. Per-collection toggles for index / show /
+# archive / feeds / next / related / toc are scaffolded with sensible
+# defaults; consult the engine's reference config (or
+# docs/publications.md) for the full surface.
+collections:
+  posts:
+    enabled: true
+
+    index:
+      cover: photo                 # photo / photo_or_svg / svg / none
+      show_date: true
+      show_description: true
+      description_truncate: 160
+      show_reading_time: true
+      show_tags: false
+      latest_count: 8
+
+    show:
+      cover: photo                 # hero at the top of the post body
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]             # h2 + h3 in the TOC
+      next:
+        enabled: true              # "Up next" card below the post body
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+        show_image: true
+
+    archive:
+      enabled: false               # turn on + create content/posts-archive.md
+                                   # to enable the long-tail archive page
+
+    feeds:
+      enabled: true                # RSS + JSON Feed at /posts/feed.xml + .json
+
+  photos:
+    enabled: false                 # flip to true to enable photo galleries
+
+  publications:
+    enabled: false                 # flip to true if you ship books / atlases
+
+  workshops:
+    enabled: false                 # flip to true if you run workshops / courses
+
+# Home modules ──────────────────────────────────────────────────────────
+# Optional cards rendered below content/index.md's markdown body.
+# Off by default — your home page renders just the markdown until you
+# flip these on.
+home:
+  latest_post:          false
+  random_post:          false
+  featured_publication: false
+  latest_publication:   false
+  next_workshop:        false
+  latest_photo:         false
+  random_photo:         false
+  photo_gallery:        false      # 'latest' / 'random' / false
+  contact:              false      # needs `contact.email` below
+
+# Navigation ────────────────────────────────────────────────────────────
+# Nav links come from per-page frontmatter — drop a `nav:` block on a
+# page (see `content/index.md`, `content/about.md`) and the page joins
+# the top nav at `nav.order`. To override globally, create `data/nav.yml`
+# with a `links:` list; the engine prefers that over the frontmatter
+# cascade when present. The `nav:` key here is reserved for site-wide
+# nav SETTINGS (e.g. a `brand:` block), NOT a list of links.
+#
+# nav:
+#   brand: My Site                # text shown on the left of the nav
+#                                 # (defaults to site title)
+
+# Footer ────────────────────────────────────────────────────────────────
+footer:
+  signature: "Built with Abqari · <%= year %>"
+
+# Social handles (footer icons + meta tags) — uncomment what applies.
+# social_links:
+#   github:    your-handle
+#   mastodon:  https://mastodon.social/@your-handle
+#   bluesky:   your-handle.bsky.social
+#   x:         your-handle
+#   linkedin:  your-handle
+#   rss:       /posts/feed.xml
+#   mail:      hello@example.com
+
+# Contact button ────────────────────────────────────────────────────────
+# Spam-resistant mailto button. Off by default; populate `email` to opt in.
+# contact:
+#   email: hello@example.com
+
+# Environment overrides ────────────────────────────────────────────────
+# These deep-merge over the shared keys based on $ABQARI_ENV. Set your
+# production URL here so canonical links, sitemap, and OG cards all
+# resolve correctly when deployed.
+environments:
+  development:
+    url: http://localhost:4000
+
+  production:
+    url: https://www.example.com   # ← edit me before deploying

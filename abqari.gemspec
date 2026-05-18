@@ -27,12 +27,14 @@ Gem::Specification.new do |spec|
     'rubygems_mfa_required' => 'true'
   }
 
-  # The gem ships its lib code, the structural app/ (views, icons,
+  # The gem ships its lib code (including the site_skeleton template
+  # tree used by `abqari new`), the structural app/ (views, icons,
   # _common.css and other assets), the bundled themes, and the
   # vendored 3rd-party assets that the engine renders against
   # (heroicons, d3). It deliberately does NOT ship `content/`,
-  # `config/`, `data/`, `vendor/folio/`, or `vendor/fonts/` —
-  # those are site-specific and live in the consuming repo.
+  # `config/`, `data/`, `vendor/folio/`, or `vendor/fonts/` from
+  # the engine repo — those are site-specific and live in the
+  # consuming site.
   spec.files = Dir[
     'lib/**/*',
     'app/views/**/*',
@@ -46,7 +48,14 @@ Gem::Specification.new do |spec|
     'CHANGELOG*'
   ]
 
-  spec.executables = Dir['bin/*'].map { |f| File.basename(f) }
+  # Single global executable. `exe/abqari` is on PATH after `gem
+  # install abqari`; it dispatches to subcommands (currently `new` —
+  # bootstrap a new site — with `version` / `help` as standard
+  # auxiliaries). Per-site commands (build, serve, audit, etc.)
+  # live as `bin/*` scripts inside each scaffolded site, not as
+  # global executables, to avoid name conflicts on PATH.
+  spec.bindir      = 'exe'
+  spec.executables = ['abqari']
 
   spec.add_dependency 'base64',       '~> 0.2'
   spec.add_dependency 'commonmarker', '~> 1.1'

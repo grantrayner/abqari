@@ -1,0 +1,50 @@
+---
+title: Welcome to <%= title %>
+published: true
+date: <%= Time.now.strftime('%Y-%m-%d') %>
+description: A starter post. Edit or delete this once you're up and running.
+tags: [welcome]
+---
+
+This is your first post. Edit it, rename the directory to a real slug,
+or delete it entirely. Posts live in `content/posts/<slug>/index.md`
+with sibling asset files (images, etc.) next to them — Abqari's
+bundle convention lets you reference `hero.jpg` in this post body and
+the image pipeline rewrites it into a responsive `<picture>` block
+on build.
+
+## How to write posts
+
+```bash
+bin/new post "My next post"   # scaffolds content/posts/<date>-my-next-post/index.md
+```
+
+Drop colocated images in the bundle directory and reference them by
+relative path:
+
+```markdown
+![A hero image](hero.jpg)
+```
+
+The image pipeline takes care of AVIF + WebP variants, multiple
+widths, and the correct `<source>` order. The `<img>` keeps its
+`width` and `height` attributes so there's no layout shift.
+
+## Posts you'll see surfaced
+
+On a single post page, the engine renders three optional tail
+sections (toggle each under `posts.show:` in `config/site.yml`):
+
+- **Table of contents** — built from h2/h3 headings when there are
+  three or more
+- **Up next** — single card linking to the next chronological post
+- **Related** — grid of posts sharing tags (or whatever `match_by:`
+  field you point it at)
+
+Each is silent when there's nothing meaningful to show.
+
+## Configuration
+
+Toggle the collections and modules you need in `config/site.yml`.
+The defaults give you `posts` only; flip on `photos`, `publications`,
+or `workshops` when you have content for them.

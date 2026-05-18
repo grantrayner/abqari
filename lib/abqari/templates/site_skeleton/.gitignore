@@ -1,0 +1,15 @@
+_site/
+vendor/fonts/*
+!vendor/fonts/.gitkeep
+vendor/folio/*
+!vendor/folio/.gitkeep
+audit/*.md
+.DS_Store
+*.swp
+*.swo
+*~
+node_modules/
+.bundle/
+.env
+.env.*
+!.env.example
