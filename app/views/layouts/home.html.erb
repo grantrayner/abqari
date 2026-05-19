@@ -60,7 +60,28 @@ layout: application
     latest_post random_post featured_publication latest_publication
     next_workshop latest_photo random_photo photo_gallery contact
   ]
-  priority_modules = module_order.select { |m| home_cfg[m] }.first(3)
+
+  # Per-module enabled check. Each module's config value may be:
+  #   true / false  — simple toggle (the historical shape)
+  #   Hash          — granular config, e.g.
+  #                     featured_publication:
+  #                       enabled: true
+  #                       show_excerpt: true
+  #                       show_price: false
+  #                   The hash is treated as enabled unless
+  #                   `enabled: false` is set explicitly (so a hash
+  #                   that omits the `enabled` key turns the module
+  #                   on by default — matching the simple `true`
+  #                   spelling). Booleans short-circuit; truthy
+  #                   strings (`photo_gallery: 'latest'`) stay
+  #                   enabled.
+  home_enabled = ->(value) do
+    return value             if value == true || value == false
+    return value['enabled'] != false if value.is_a?(Hash)
+    !value.nil? && value != ''
+  end
+
+  priority_modules = module_order.select { |m| home_enabled.call(home_cfg[m]) }.first(3)
 %>
 <article>
   <header>
@@ -75,7 +96,7 @@ layout: application
 <%# Home modules — each is a self-contained section that renders nothing
     when its config flag is false. %>
 <% module_order.each do |m| %>
-  <% next unless home_cfg[m] %>
+  <% next unless home_enabled.call(home_cfg[m]) %>
   <%== render "partials/home/#{m}", priority_image: priority_modules.include?(m) %>
 <% end %>
 

@@ -3,24 +3,70 @@
   collection. Renders nothing when the collection is empty or
   disabled.
 
-  Toggled by `home.latest_photo: true` in config/site.yml.
+  Config (`home.latest_photo` in config/site.yml). Accepts two shapes:
+
+      # Simple — module on with all defaults
+      latest_photo: true
+
+      # Granular — opt-in field controls
+      latest_photo:
+        enabled: true              # `enabled: false` disables; absent = true
+        show_caption: true         # default true   — the descriptive prose
+        show_date:    true         # default true   — capture date
+        show_city:    true         # default true   — city (combined with country)
+        show_country: true         # default true   — country
+        show_camera:  false        # default false  — camera body
+        show_type:    false        # default false  — digital / film / etc.
+        show_series:  false        # default false  — series this photo belongs to
+        show_tags:    false        # default false  — tag pills
+
+  Hero image and photo title are always rendered when present — those
+  are the card's identity. City and country combine into a single
+  "City, Country" entry when both are enabled (or just one of them
+  when only one is on).
+
   Style via `.home-module*` class hooks in your theme.
 -->
 <%
   photo = site.collection('photos').first
   _priority = defined?(priority_image) && priority_image
+
+  mod_cfg      = site.config.dig('home', 'latest_photo')
+  mod_cfg      = {} unless mod_cfg.is_a?(Hash)
+  show_caption = mod_cfg.fetch('show_caption', true)
+  show_date    = mod_cfg.fetch('show_date',    true)
+  show_city    = mod_cfg.fetch('show_city',    true)
+  show_country = mod_cfg.fetch('show_country', true)
+  show_camera  = mod_cfg.fetch('show_camera',  false)
+  show_type    = mod_cfg.fetch('show_type',    false)
+  show_series  = mod_cfg.fetch('show_series',  false)
+  show_tags    = mod_cfg.fetch('show_tags',    false)
 %>
 <% if photo %>
+<%
+  fm    = photo.frontmatter
+  parts = []
+  if show_date && photo.date
+    parts << %(<time datetime="#{photo.date.iso8601}">#{local_time(photo.date)}</time>)
+  end
+  city    = show_city    ? fm['city']    : nil
+  country = show_country ? fm['country'] : nil
+  location = [city, country].compact.reject { |s| s.to_s.strip.empty? }.join(', ')
+  parts << h(location)        unless location.empty?
+  parts << h(fm['camera'])    if show_camera && fm['camera']
+  parts << h(fm['type'])      if show_type   && fm['type']
+  parts << h(fm['series'])    if show_series && fm['series']
+%>
 <section class="home-module home-module--latest-photo" aria-label="Latest photo">
   <header class="home-module__header">
     <h2 class="home-module__heading">Latest photo</h2>
     <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('photos')) %>">All <%= collection_index_label('photos') %> &rarr;</a>
   </header>
   <article class="home-module__item">
-    <% if (img = photo.frontmatter['image']) %>
+    <% if (img = fm['image']) %>
       <a class="home-module__cover" href="<%= sanitized_url(photo.url) %>">
         <img src="<%= sanitized_url(img) %>"
-             alt="<%= photo.frontmatter['caption'] || photo.title %>"
+             alt="<%= fm['caption'] || photo.title %>"
              loading="<%= _priority ? 'eager' : 'lazy' %>"
              <% if _priority %>fetchpriority="high"<% end %>
              decoding="async">
@@ -30,16 +76,18 @@
       <h3 class="home-module__title">
         <a href="<%= sanitized_url(photo.url) %>"><%= photo.title %></a>
       </h3>
-      <% if photo.date %>
-        <p class="home-module__meta">
-          <time datetime="<%= photo.date.iso8601 %>"><%= local_time(photo.date) %></time>
-          <% if photo.frontmatter['country'] %>
-            · <%= photo.frontmatter['country'] %>
+      <% if parts.any? %>
+        <p class="home-module__meta"><%== parts.join(' &middot; ') %></p>
+      <% end %>
+      <% if show_caption && (caption = fm['caption']) %>
+        <p class="home-module__description"><%= truncate(caption.to_s, length: 200) %></p>
+      <% end %>
+      <% if show_tags && Array(fm['tags']).any? %>
+        <p class="home-module__tags">
+          <% Array(fm['tags']).each do |tag| %>
+            <a class="home-module__tag" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
           <% end %>
         </p>
-      <% end %>
-      <% if (caption = photo.frontmatter['caption']) %>
-        <p class="home-module__description"><%= truncate(caption.to_s, length: 200) %></p>
       <% end %>
     </div>
   </article>

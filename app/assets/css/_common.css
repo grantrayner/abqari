@@ -294,6 +294,26 @@ ol, ul {
 }
 ol li, ul li { margin-bottom: var(--space-sm); }
 
+/* GFM task lists — kramdown emits the rendered list as a plain `<ul>`
+   with `<li><input type="checkbox" disabled></li>` for each row. With
+   no class hook on the list or items, the default disc marker shows
+   alongside the checkbox, giving a bullet + circle pair. Detect the
+   pattern with `:has()` and hide the marker (and the corresponding
+   indent) so only the checkbox carries the "this is a list item"
+   signal. `:has()` is supported in all evergreen browsers since
+   late 2023; older browsers fall back to the bullet + checkbox
+   double, which is ugly but readable. */
+ul:has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-left: 0;
+}
+ul > li:has(> input[type="checkbox"]) {
+  list-style: none;
+}
+ul > li > input[type="checkbox"] {
+  margin-right: 0.4em;
+}
+
 blockquote {
   margin: var(--space-lg) 0;
   padding-left: var(--space-md);
@@ -817,6 +837,17 @@ a.card:hover { border-color: var(--color-primary); }
    keep the default body-paragraph margin. */
 article > header > .lede {
   margin: 0 0 var(--space-2xl);
+}
+
+/* `.index-intro` — wraps the markdown body content on every collection
+   index layout (posts, photos, publications, workshops, bundles,
+   series, archives). The wrapper renders only when the page actually
+   has body content, so it never adds gap when an index is widget-only.
+   Sets a uniform bottom gap between the intro prose and the first
+   listing/widget below, so all collection landing pages share the same
+   visual rhythm. */
+.index-intro {
+  margin-bottom: var(--space-2xl);
 }
 
 .back-link { margin: var(--space-lg) 0; }
@@ -2480,6 +2511,23 @@ article > header > .series__tagline {
 .photo-showcase {
   margin: var(--space-xl) 0 var(--space-2xl);
 }
+/* Other photos_index widgets — `<section class="photos-section">` for
+   the "latest photos" row, and `<section class="taxonomy-row">` for
+   the series + countries rows — get a top margin so the vertical
+   rhythm stays consistent regardless of which widget renders first
+   (when the showcase is disabled, latest_photos becomes the first
+   block below the page header; when latest_photos is also off,
+   taxonomy_row is first; and so on).
+   `<section>` has no default margin, so without this rule the gap
+   between the header (or `.index-intro`) and the first widget would
+   collapse to whatever the last header element carries on its own —
+   typically smaller than we want. `.index-intro` carries its own
+   `margin-bottom`, so when body content is present margin-collapse
+   selects the larger of the two and the gap stays even either way. */
+.photos-section,
+.taxonomy-row {
+  margin-top: var(--space-2xl);
+}
 .photo-showcase__link {
   display: block;
 }
@@ -2679,6 +2727,11 @@ article > header > .series__tagline {
   aspect-ratio: 4 / 3;                 /* mobile + no-body fallback */
   overflow: hidden;
   background-color: var(--color-code-bg);
+  align-self: stretch;                 /* explicit — fill the grid row's
+                                          height when side-by-side at
+                                          ≥768px, even before the
+                                          aspect-ratio override below
+                                          drops the 4:3 constraint. */
 }
 .workshops-index__cover img {
   width: 100%;
@@ -2689,16 +2742,41 @@ article > header > .series__tagline {
 @media (min-width: 768px) {
   /* In the side-by-side layout the cover lives in a `1fr 2fr` grid
      cell that stretches to match the body's height (title +
-     description + three meta lines). Without overriding aspect-ratio
-     here, the cover stays pinned to 4:3 of its column width and a
-     gap appears below it when the body is taller. */
+     description + three meta lines).
+
+     Release the 4:3 constraint AND switch the cover to a
+     `position: relative` box whose img is absolutely positioned with
+     `inset: 0`. The absolute-positioning pattern is the bulletproof
+     "fill the parent" idiom — relying on `img { height: 100%; }`
+     against a grid-stretched parent has a known resolution edge case
+     where the img keeps its intrinsic aspect ratio instead of
+     filling the cell, leaving a gap below the photo on cards whose
+     body is taller than the cover's 4:3 natural height (e.g. when
+     the description wraps to two lines). */
   .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover {
     aspect-ratio: auto;
+    position: relative;
+  }
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover > img,
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
     height: 100%;
   }
 }
+/* Flex column with `justify-content: center` so the title / description /
+   meta block sits VERTICALLY CENTRED in the body cell. With the
+   side-by-side grid (cover-left / body-right) the cover stretches to
+   match the row height; centring the body content here keeps the
+   text balanced top + bottom instead of hugging the top edge with
+   surplus space below the price. The body retains symmetric `--space-lg`
+   padding so the centred content has equal breathing room on all
+   sides; nothing more is needed. */
 .workshops-index__body {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: var(--space-lg);
 }
 .workshops-index__title {

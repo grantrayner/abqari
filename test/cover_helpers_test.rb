@@ -4,12 +4,13 @@ require_relative 'test_helper'
 require 'ostruct'
 
 # CoverHelpers — the `cover:` enum resolution and the decorative
-# initial-tile SVG generator. Covers:
+# title-card SVG generator. Covers:
 #
 #   1. Mode resolution chain (frontmatter > collection config > default).
 #   2. `cover_choice_for` → :photo / :placeholder / :svg / :none.
-#   3. `cover_svg_for` markup invariants (escapes title, picks an
-#      initial, embeds a deterministic gradient id).
+#   3. `cover_svg_for` markup invariants (renders the title text —
+#      word-wrapped for long titles, escaped — and embeds a
+#      deterministic gradient id).
 class CoverHelpersTest < Minitest::Test
   def setup
     @site = TestHelpers.built_site
@@ -85,23 +86,38 @@ class CoverHelpersTest < Minitest::Test
 
   # --- SVG generation -------------------------------------------------
 
-  def test_svg_uses_first_alphanumeric_letter_of_title_uppercase
-    page = stub_page(title: '!! my post', slug: 'my-post')
+  def test_svg_renders_short_title_on_a_single_line
+    page = stub_page(title: 'Aleppo', slug: 'aleppo')
     svg  = @ctx.cover_svg_for(page)
-    # The text element contains the initial. (We don't assert the
-    # whole element shape — just that 'M' appears as the text content
-    # of a <text> tag inside the SVG.)
-    assert_match(%r{<text[^>]*>M</text>}, svg)
+    # One <text> element, containing the full title.
+    assert_equal 1, svg.scan(/<text\b/).size, 'short title should be one line'
+    assert_match(%r{<text[^>]*>Aleppo</text>}, svg)
   end
 
-  def test_svg_escapes_title_initial
-    # Defence in depth — if the initial were ever a `<`, `>`, `&`,
-    # `"`, or `'` (it shouldn't, but…), it'd round-trip through h().
-    page = stub_page(title: '<>script', slug: 'x')
+  def test_svg_word_wraps_longer_titles_across_multiple_lines
+    # 20 chars, 3 words → two-line wrap.
+    page = stub_page(title: 'Building with Abqari', slug: 'b-w-a')
     svg  = @ctx.cover_svg_for(page)
-    # '<' is non-alphanumeric → stripped. Next char is '>' → also stripped.
-    # 's' is the initial → uppercased to 'S'.
-    assert_match(%r{<text[^>]*>S</text>}, svg)
+    assert_equal 2, svg.scan(/<text\b/).size, 'medium title should wrap to two lines'
+    # Both words from the original should appear across the two lines.
+    assert_match(/Building/, svg)
+    assert_match(/Abqari/,   svg)
+  end
+
+  def test_svg_wraps_very_long_titles_into_three_lines
+    page = stub_page(title: 'A long workshop title that needs three lines',
+                     slug: 'long-one')
+    svg  = @ctx.cover_svg_for(page)
+    assert_equal 3, svg.scan(/<text\b/).size, 'long title should wrap to three lines'
+  end
+
+  def test_svg_escapes_title_text
+    # `<`, `>`, `&` etc. in the title must round-trip through h() so
+    # they don't break the SVG (or open XSS).
+    page = stub_page(title: 'Tom & Jerry', slug: 't-j')
+    svg  = @ctx.cover_svg_for(page)
+    assert_match(/Tom &amp; Jerry/, svg)
+    refute_match(/Tom & Jerry/, svg, 'raw ampersand must be escaped')
   end
 
   def test_svg_includes_a_linear_gradient_with_unique_id
@@ -125,6 +141,17 @@ class CoverHelpersTest < Minitest::Test
     page = stub_page(title: '', slug: 'empty')
     svg  = @ctx.cover_svg_for(page)
     assert_match(%r{<text[^>]*>\?</text>}, svg)
+  end
+
+  def test_svg_includes_decorative_squares
+    # The hand-authored hero.svg pattern uses two clusters of three
+    # faint white squares (top-left + bottom-right). The generator
+    # should mirror that motif.
+    page = stub_page(title: 'Test', slug: 'test')
+    svg  = @ctx.cover_svg_for(page)
+    rect_count = svg.scan(/<rect\b/).size
+    # 1 background rect + 6 decorative squares.
+    assert_equal 7, rect_count, "expected 7 <rect> elements, got #{rect_count}"
   end
 
   private

@@ -88,7 +88,7 @@ timezone: UTC                 # e.g. America/Los_Angeles, Asia/Singapore
 #               the palette, fonts, components without affecting the
 #               built-in themes.
 #   none      — no theme CSS at all; bring your own in app/assets/
-theme: magazine                # change to one of the names above
+theme: minimal                # change to one of the names above
 
 # Fonts ──────────────────────────────────────────────────────────────────
 # Self-hosted Google Fonts. After adding/changing this block, run
@@ -590,7 +590,7 @@ collections:
       # enum as `posts.index.cover` — see that block for the full
       # vocabulary (photo / photo_or_svg / svg / none). Per-workshop
       # override via frontmatter `cover:`.
-      cover: photo
+      cover: svg
       show_description: true
       show_dates:       true     # show date_from / date_to (or duration fallback)
       show_location:    true
@@ -665,12 +665,65 @@ home:
   # ones you don't want.
   latest_post:        true
   random_post:        true
-  featured_publication: true       # showcase-flagged publication, same
-                                   # design as latest_publication
-  latest_publication: true
-  next_workshop:      true         # soonest upcoming workshop
-  latest_photo:       true
-  random_photo:       true
+
+  # Featured + latest publication cards.
+  #
+  # Cover image, title, and tagline are always rendered (the card's
+  # identity). Excerpt, price, and published_at are field-level
+  # toggles. `enabled: false` on either disables that module.
+  featured_publication:
+    enabled: true                # `enabled: false` disables;
+                                 #   absent = enabled
+    show_excerpt:      true      # default true
+    show_price:        false     # default false
+    show_published_at: false     # default false
+  latest_publication:
+    enabled: true
+    show_excerpt:      true
+    show_price:        true      # surface the price on this card
+    show_published_at: true      # …and the release date
+
+  # Next workshop card — soonest upcoming workshop (or evergreen
+  # workshops with no dates). Cover image and workshop title are
+  # always rendered; the fields below are field-level toggles.
+  next_workshop:
+    enabled: true
+    show_dates:       true     # date_from – date_to (or `duration` fallback)
+    show_description: true     # short summary
+    show_location:    true     # city / country
+    show_format:      false    # In-person / Remote / Hybrid
+    show_price:       false    # canonical `price.formatted`
+    show_tags:        false    # tag pills below the body
+
+  # Latest photo card. Cover image and photo title are always
+  # rendered; city + country combine into a single "City, Country"
+  # meta entry when both are on.
+  latest_photo:
+    enabled: true
+    show_caption: true
+    show_date:    true
+    show_city:    true
+    show_country: true
+    show_camera:  false
+    show_type:    false
+    show_series:  false
+    show_tags:    false
+
+  # Random photo card. Same field surface as `latest_photo`; the
+  # toggles apply uniformly to every card in the swap pool so the
+  # JS-randomised variant looks consistent with the initially
+  # visible one.
+  random_photo:
+    enabled: true
+    show_caption: true
+    show_date:    true
+    show_city:    true
+    show_country: true
+    show_camera:  false
+    show_type:    false
+    show_series:  false
+    show_tags:    false
+
   photo_gallery:      latest       # 'latest' / 'random' / false — single-
                                    # row gallery of four photos
   contact:            true         # needs `contact.email` set (see below)

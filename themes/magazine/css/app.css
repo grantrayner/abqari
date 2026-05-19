@@ -169,11 +169,25 @@ nav[aria-label="Primary"] [aria-current="page"] {
   color: var(--color-primary);
 }
 
-/* Italic metadata (date + reading time below post title). */
-article header p,
-.post-list__meta {
-  font-style: italic;
-}
+/* (Removed) The previous theme italicised `article header p` and
+   `.post-list__meta` to give the post-meta line an editorial feel.
+   Both selectors were too broad:
+     - `article header p` cascades into every `<p>` inside a show-
+       view `<header>`, including `.publication__isbn`,
+       `.publication__pages`, `.publication__published`, and
+       (critically) `.publication__buttons` — which made the buy /
+       add-to-cart button text render in italic alongside the
+       intended metadata. Italic buttons read as decorative and lose
+       the CTA contrast that the workshop "Register" button (which
+       sits outside the header and was never affected) preserves.
+     - `.post-list__meta` and the post-show meta line are functional
+       metadata, not editorial copy; italicising them mirrors the
+       publication header issue and conflicts with the engine-wide
+       convention of plain meta text in `--font-meta`.
+   Taglines (which DO read better in italic) keep their italic
+   styling via dedicated `.publication__tagline` / `.publications-
+   index__tagline` / etc. rules in `_common.css` — those are not
+   affected by removing this broad rule. */
 
 /* Pagination — display-serif uppercase. */
 .pagination {
@@ -199,14 +213,22 @@ blockquote {
   letter-spacing: 0.05em;
 }
 
-/* Italic descriptions in publications index. (The engine already
-   routes `.publications-index__title` through `var(--font-heading)`,
-   so it inherits Playfair Display automatically — no override here.) */
-.publications-index__description { font-style: italic; }
-/* Gallery card titles use the display serif — the engine default leaves
-   the font alone so each theme can decide; magazine opts in for
-   editorial consistency with publication cards. */
+/* (Removed) `.publications-index__description { font-style: italic; }`
+   — the description on a publication card is functional metadata
+   (the long marketing prose), not editorial copy. The tagline above
+   it already renders italic via the engine's
+   `.publications-index__tagline` rule; italicising both made the
+   card visually noisy.
+
+   The publication card's title still uses the display serif via
+   the engine's `.publications-index__title` rule routing through
+   `var(--font-heading)` — no theme override needed. */
+
+/* Gallery card titles use the display serif. The engine default
+   leaves the font alone so each theme can decide; magazine opts in
+   for editorial consistency with publication cards.
+
+   (Removed) `.gallery-index__location { font-style: italic; }` —
+   the photo's location is meta, not editorial; matches the engine-
+   wide convention of plain meta text in `--font-meta`. */
 .gallery-index__title { font-family: var(--font-heading); }
-.gallery-index__location {
-  font-style: italic;
-}

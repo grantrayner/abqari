@@ -4,16 +4,39 @@
   pages and externally-sourced publisher entries — `site.collection`
   returns the merged list).
 
-  Toggled by `home.latest_publication: true` in config/site.yml.
-  Style via `.home-module*` class hooks in your theme.
+  Config (`home.latest_publication` in config/site.yml). Accepts
+  two shapes — pick whichever suits:
+
+      # Simple — module on with all defaults
+      latest_publication: true
+
+      # Granular — opt-in field controls
+      latest_publication:
+        enabled: true             # set false to disable; absent = true
+        show_excerpt: true        # default true; the long marketing prose
+        show_price: false         # default false; canonical price.formatted
+        show_published_at: false  # default false; release / first-published date
+
+  Cover image, title, and tagline are always rendered when present
+  in the publication's frontmatter — those are the card's identity.
 
   Reads canonical publication frontmatter per docs/publications.md:
-  `cover_url`, `tagline`, `excerpt`. Stale pre-0.3.0 keys (`cover`,
-  `cover_image`, `description`) are not honoured.
+  `cover_url`, `tagline`, `excerpt`, `price.formatted`, `published_at`.
+  Stale pre-0.3.0 keys (`cover`, `cover_image`, `description`) are
+  not honoured.
 -->
 <%
   pub = site.collection('publications').first
   _priority = defined?(priority_image) && priority_image
+
+  # Field-visibility resolution: per-module hash > defaults. Defaults
+  # match the historical render shape (excerpt on; price and
+  # published_at off).
+  mod_cfg           = site.config.dig('home', 'latest_publication')
+  mod_cfg           = {} unless mod_cfg.is_a?(Hash)
+  show_excerpt      = mod_cfg.fetch('show_excerpt',      true)
+  show_price        = mod_cfg.fetch('show_price',        false)
+  show_published_at = mod_cfg.fetch('show_published_at', false)
 %>
 <% if pub %>
 <section class="home-module home-module--latest-publication" aria-label="Latest publication">
@@ -38,8 +61,27 @@
       <% if (tagline = pub.frontmatter['tagline']) %>
         <p class="home-module__tagline"><%= tagline %></p>
       <% end %>
-      <% if (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
+      <% if show_excerpt && (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
         <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+      <%# Optional meta line — same shape as `_featured_publication`. %>
+      <%
+        meta_parts = []
+        meta_parts << :published if show_published_at && pub.frontmatter['published_at']
+        meta_parts << :price     if show_price        && pub.frontmatter.dig('price', 'formatted')
+      %>
+      <% if meta_parts.any? %>
+        <p class="home-module__meta">
+          <% meta_parts.each_with_index do |kind, i| %>
+            <% if i.positive? %> &middot; <% end %>
+            <% case kind %>
+            <% when :published %>
+              <time datetime="<%= pub.frontmatter['published_at'] %>"><%= local_time(pub.frontmatter['published_at']) %></time>
+            <% when :price %>
+              <%= pub.frontmatter.dig('price', 'formatted') %>
+            <% end %>
+          <% end %>
+        </p>
       <% end %>
     </div>
   </article>

@@ -1,8 +1,8 @@
 <!--
-  Home module — featured publication. Surfaces the same publication
-  flagged with `showcase: true` in frontmatter — the one shown as the
-  showcase block at the top of /publications/ — but in the smaller
-  home-module card shape (same design as the latest-publication
+  Home module — featured publication. Surfaces the publication flagged
+  with `showcase: true` in frontmatter (the same one that anchors the
+  showcase block at the top of `/publications/`), rendered in the
+  smaller home-module card shape (mirrors the latest-publication
   module). Renders nothing when no publication is flagged.
 
   Note: this module respects the `showcase: true` flag regardless of
@@ -12,13 +12,29 @@
   the same flagged book appears here on the home page. A site can run
   one without the other.
 
-  Toggled by `home.featured_publication: true` in config/site.yml.
-  Style via `.home-module*` class hooks in your theme.
+  Config (`home.featured_publication` in config/site.yml). Accepts
+  two shapes — pick whichever suits:
+
+      # Simple — module on with all defaults
+      featured_publication: true
+
+      # Granular — opt-in field controls
+      featured_publication:
+        enabled: true             # set false to disable; absent = true
+        show_excerpt: true        # default true; the long marketing prose
+        show_price: false         # default false; canonical price.formatted
+        show_published_at: false  # default false; release / first-published date
+
+  Cover image, title, and tagline are always rendered when present
+  in the publication's frontmatter — those are the card's identity.
+  The three configurable fields below the tagline are optional
+  surface decisions; defaults preserve the historical "card with a
+  description, no price, no date" look.
 
   Reads canonical publication frontmatter per docs/publications.md:
-  `cover_url`, `tagline`, `excerpt`. Stale pre-0.3.0 keys (`cover`,
-  `cover_image`, `description`) are not honoured — manual
-  publications must use the canonical names.
+  `cover_url`, `tagline`, `excerpt`, `price.formatted`, `published_at`.
+  Stale pre-0.3.0 keys (`cover`, `cover_image`, `description`) are
+  not honoured — manual publications must use the canonical names.
 -->
 <%
   pub = site.collection('publications').find { |p| p.frontmatter['showcase'] == true }
@@ -26,6 +42,15 @@
   # enabled module) flips this image to eager + high fetch priority
   # so the LCP candidate isn't artificially delayed by lazy-loading.
   _priority = defined?(priority_image) && priority_image
+
+  # Field-visibility resolution: per-module hash > defaults. Defaults
+  # match the historical render shape (excerpt on; price and
+  # published_at off).
+  mod_cfg           = site.config.dig('home', 'featured_publication')
+  mod_cfg           = {} unless mod_cfg.is_a?(Hash)
+  show_excerpt      = mod_cfg.fetch('show_excerpt',      true)
+  show_price        = mod_cfg.fetch('show_price',        false)
+  show_published_at = mod_cfg.fetch('show_published_at', false)
 %>
 <% if pub %>
 <section class="home-module home-module--featured-publication" aria-label="Featured publication">
@@ -50,8 +75,31 @@
       <% if (tagline = pub.frontmatter['tagline']) %>
         <p class="home-module__tagline"><%= tagline %></p>
       <% end %>
-      <% if (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
+      <% if show_excerpt && (desc = pub.frontmatter['excerpt'].to_s) && !desc.empty? %>
         <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+      <%# Optional meta line — published_at and price, both off by
+          default. When both are configured on AND present in the
+          frontmatter, they sit on one bullet-separated line; if
+          only one resolves, the bullet disappears so the line reads
+          cleanly with whichever field made it through. %>
+      <%
+        meta_parts = []
+        meta_parts << :published if show_published_at && pub.frontmatter['published_at']
+        meta_parts << :price     if show_price        && pub.frontmatter.dig('price', 'formatted')
+      %>
+      <% if meta_parts.any? %>
+        <p class="home-module__meta">
+          <% meta_parts.each_with_index do |kind, i| %>
+            <% if i.positive? %> &middot; <% end %>
+            <% case kind %>
+            <% when :published %>
+              <time datetime="<%= pub.frontmatter['published_at'] %>"><%= local_time(pub.frontmatter['published_at']) %></time>
+            <% when :price %>
+              <%= pub.frontmatter.dig('price', 'formatted') %>
+            <% end %>
+          <% end %>
+        </p>
       <% end %>
     </div>
   </article>

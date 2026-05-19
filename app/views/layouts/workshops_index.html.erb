@@ -107,7 +107,9 @@ layout: application
       <p class="lede"><%= description %></p>
     <% end %>
   </header>
-  <%== page.content %>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
 
   <%# Future workshops — full cards. Renders a heading even when the
       list is empty so the section structure stays parallel with past

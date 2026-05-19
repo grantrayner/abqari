@@ -8,9 +8,11 @@ nav:
   label: Home
 ---
 
-This page was rendered from a Markdown file via an ERB layout, then written
-to disk as plain HTML. Have a look around — every section below is a real
-working example of the corresponding feature.
+This is the Abqari demo site, rendered from `content/index.md` via the
+`home` layout and written to disk as plain HTML. Every section below
+is a real working example of the corresponding feature, and the
+configurable home modules at the foot of the page pull live entries
+from the four sample collections.
 
 ## Four pillars
 
@@ -77,6 +79,10 @@ run workshops.
 - Shared `_publication_card` partial — one source of truth for the
   publication-as-card markup used by the publications index, bundle
   show pages, and series show pages
+- Configurable home modules pulling from each collection — toggle
+  per-module in `home:` with simple `true`/`false`, or pass a hash
+  for field-level switches (`show_excerpt`, `show_price`, `show_tags`,
+  `show_dates`, …) so each card surfaces exactly the fields you want
 
 **Styling**
 - Mobile-first responsive CSS with `clamp()` fluid type, safe-area
@@ -86,6 +92,9 @@ run workshops.
   and `none` to bring your own
 - Themes are mostly tokens — palette, fonts, density (`--font-size-body`,
   `--line-height-body`) — driven by CSS variables, not rule overrides
+- Decorative SVG title-card covers (`cover: svg` or `cover: photo_or_svg`)
+  for posts and workshops without an `image:` — slug-hashed gradient
+  with the page title word-wrapped over it, no per-page artwork required
 - Bootstrap-style utility classes: `.lede`, `.small`, `.muted`,
   `.text-center` / `.text-end`, `.shadow-sm` / `.shadow` / `.shadow-lg`,
   `.rounded-*`
@@ -122,3 +131,7 @@ run workshops.
 - Listen-based file watcher, partial CSS reload
 
 See the [README](https://github.com/your-handle/abqari) for the full surface.
+
+*This page lives in `content/index.md` — replace the body with your
+own welcome copy, or delete the markdown entirely and let the home
+modules introduce the site on their own.*

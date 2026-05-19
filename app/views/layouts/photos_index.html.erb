@@ -33,9 +33,12 @@ layout: application
   `permalink: /photos/archive/` (conventionally `content/photos-archive.md`
   with `layout: photos_archive`).
 
-  Page markdown body (any prose under the frontmatter) renders between
-  the modular sections and the archive link, so authors can write a
-  short intro or footer copy without a separate partial.
+  Page markdown body (any prose under the frontmatter) renders directly
+  below the header — same position as `posts_index` and
+  `publications_index` — wrapped in `<div class="index-intro">` so the
+  CSS can give it a uniform bottom gap. The wrapper only renders when
+  body content is present; leave the body empty for a widget-only
+  landing with no extra gap.
 
   Sites that prefer the legacy single-grid view should set
   `layout: gallery_index` in `content/photos/index.md` — the old
@@ -93,6 +96,9 @@ layout: application
       <p class="lede"><%= description %></p>
     <% end %>
   </header>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
 
   <% if showcase_photo %>
     <section class="photo-showcase" aria-label="Featured photo">
@@ -189,8 +195,6 @@ layout: application
                 all_url: countries_cfg['all_url'],
                 cols_class: cols %>
   <% end %>
-
-  <%== page.content %>
 
   <% if archive_on && total_photos.positive? %>
     <p class="photos-index__more">

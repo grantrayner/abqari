@@ -23,7 +23,9 @@ layout: application
     <% end %>
   </header>
 
-  <%== page.content %>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
 
   <ul class="bundles-index">
     <% bundles.each do |b| %>

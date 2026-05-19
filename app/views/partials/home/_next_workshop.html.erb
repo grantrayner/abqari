@@ -10,7 +10,25 @@
   description on the right. The meta line condenses the dl block used
   on the workshops index into a one-row summary.
 
-  Toggled by `home.next_workshop: true` in config/site.yml.
+  Config (`home.next_workshop` in config/site.yml). Accepts two shapes:
+
+      # Simple — module on with all defaults
+      next_workshop: true
+
+      # Granular — opt-in field controls
+      next_workshop:
+        enabled: true              # `enabled: false` disables; absent = true
+        show_dates:       true     # default true   — date_from – date_to
+        show_description: true     # default true   — short summary
+        show_location:    true     # default true   — city / country
+        show_format:      false    # default false  — In-person / Remote / Hybrid
+        show_price:       false    # default false  — canonical `price.formatted`
+        show_tags:        false    # default false  — tag pills
+
+  Cover image and workshop title are always rendered when present —
+  those are the card's identity. The fields above are optional
+  surface decisions.
+
   Style via `.home-module*` class hooks in your theme.
 -->
 <%
@@ -26,24 +44,42 @@
   end
   workshop = upcoming.first
   _priority = defined?(priority_image) && priority_image
+
+  mod_cfg          = site.config.dig('home', 'next_workshop')
+  mod_cfg          = {} unless mod_cfg.is_a?(Hash)
+  show_dates       = mod_cfg.fetch('show_dates',       true)
+  show_description = mod_cfg.fetch('show_description', true)
+  show_location    = mod_cfg.fetch('show_location',    true)
+  show_format      = mod_cfg.fetch('show_format',      false)
+  show_price       = mod_cfg.fetch('show_price',       false)
+  show_tags        = mod_cfg.fetch('show_tags',        false)
 %>
 <% if workshop %>
 <%
-  fm     = workshop.frontmatter
-  df     = fm['date_from']
-  dt     = fm['date_to']
-  parts  = []
-  if df
+  fm    = workshop.frontmatter
+  df    = fm['date_from']
+  dt    = fm['date_to']
+  parts = []
+  if show_dates && df
     date_html = %(<time datetime="#{to_time(df).iso8601}">#{local_time(df)}</time>)
     if dt && dt != df
       date_html += %( &ndash; <time datetime="#{to_time(dt).iso8601}">#{local_time(dt)}</time>)
     end
     parts << date_html
-  elsif fm['duration']
+  elsif show_dates && fm['duration']
     parts << h(fm['duration'])
   end
-  parts << h(fm['location']) if fm['location']
-  parts << h(fm['format'])   if fm['format']
+  parts << h(fm['location']) if show_location && fm['location']
+  parts << h(fm['format'])   if show_format   && fm['format']
+  if show_price && (price = fm['price'])
+    # Workshop frontmatter `price:` is free-form (typically a display
+    # string like "$1,495", per docs/publications.md — the canonical
+    # `{cents, currency, formatted}` shape is publications-only).
+    # Accept either shape so a site can move to the canonical hash
+    # later without re-authoring every workshop.
+    price_str = price.is_a?(Hash) ? price['formatted'].to_s : price.to_s
+    parts << h(price_str) unless price_str.empty?
+  end
 %>
 <section class="home-module home-module--next-workshop" aria-label="Next workshop">
   <header class="home-module__header">
@@ -67,8 +103,15 @@
       <% if parts.any? %>
         <p class="home-module__meta"><%== parts.join(' &middot; ') %></p>
       <% end %>
-      <% if (desc = fm['description'].to_s) && !desc.empty? %>
+      <% if show_description && (desc = fm['description'].to_s) && !desc.empty? %>
         <p class="home-module__description"><%= truncate(desc, length: 200) %></p>
+      <% end %>
+      <% if show_tags && Array(fm['tags']).any? %>
+        <p class="home-module__tags">
+          <% Array(fm['tags']).each do |tag| %>
+            <a class="home-module__tag" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
+          <% end %>
+        </p>
       <% end %>
     </div>
   </article>
