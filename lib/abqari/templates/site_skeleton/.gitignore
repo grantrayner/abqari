@@ -4,6 +4,8 @@ vendor/fonts/*
 !vendor/fonts/.gitkeep
 vendor/folio/*
 !vendor/folio/.gitkeep
+vendor/webmentions/
+vendor/syndication/
 audit/*.md
 .DS_Store
 *.swp

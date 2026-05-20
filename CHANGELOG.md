@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+**IndieWeb foundation (Milestone A).** Three independently-useful
+pieces of native IndieWeb support shipped together:
+
+1. **Microformats2 markup** baked into post, post-list, and about
+   layouts. Class hooks only — `h-entry`, `p-name`, `dt-published`,
+   `e-content`, `p-category`, `u-url`, `p-summary`, `h-feed`,
+   `h-card`. Invisible to humans, structured for IndieWeb parsers
+   and feed readers that grok microformats.
+2. **Webmention receive** via [webmention.io](https://webmention.io).
+   `Indieweb::Fetcher` polls the JF2 API at build time with ETag
+   caching (`vendor/webmentions/mentions.json`). A new
+   `_webmentions` partial renders a "Replies & mentions" section
+   below each post — conversational mentions get full author + body
+   cards; likes / reposts / bookmarks render facepile-style. No
+   JavaScript, no comment backend, no moderation queue. Spam is
+   structurally rare because replies have to be published on real
+   websites first.
+3. **Webmention send** (opt-in via `send_webmentions: true`).
+   `Indieweb::Sender` POSTs notifications to external URLs that
+   recent posts link to. Endpoint discovery follows the spec
+   (HEAD `Link:` header → GET `<link rel="webmention">`). Sent
+   targets are tracked in `vendor/webmentions/sent.yml` so re-builds
+   don't double-send. Only runs for posts within the configurable
+   `send_window_days` (default 30).
+4. **Bridgy Fed link tags** (opt-in via `bridgy_fed: true`). Head
+   emits `rel="me"` and `rel="alternate" type="application/activity+json"`
+   pointing at [fed.brid.gy](https://fed.brid.gy), which speaks
+   ActivityPub on the site's behalf. Mastodon users can then search
+   `@<your-domain>` and follow the site directly; replies on
+   Mastodon flow back as webmentions via Bridgy.
+
+Config under `indieweb:` in `config/site.yml`:
+
+```yaml
+indieweb:
+  enabled: true
+  domain: example.com
+  webmention_io_token: "..."
+  bridgy_fed: false
+  send_webmentions: false
+  send_window_days: 30
+```
+
+Implementation: `lib/abqari/indieweb.rb`, `app/views/partials/_webmentions.html.erb`,
+microformats class additions across `app/views/layouts/{post,about}.html.erb`
+and `app/views/partials/_post_list.html.erb`, default styling in
+`_common.css`. See README → "IndieWeb & federation" for the full guide.
+
+**POSSE — Publish on Own Site, Syndicate Elsewhere (Milestone B).**
+On each build, syndicate recent posts to Mastodon and/or Bluesky. The
+canonical post on your site stays the source of truth; readers on
+each network discover new work in their feed; replies on those
+networks come back as webmentions (via Bridgy Fed) and consolidate
+under the post.
+
+- **Per-network adapters** — `Syndication::Networks::Mastodon` (uses
+  the standard Mastodon API; `write:statuses` OAuth token from
+  Preferences → Development) and `Syndication::Networks::Bluesky`
+  (AT Protocol `createSession` + `createRecord`; app password from
+  Settings → App Passwords — NOT the account password).
+- **Idempotent dispatcher** — `vendor/syndication/sent.yml` records
+  every successful post keyed by `<network>|<canonical_url>`. Sent
+  entries are skipped on subsequent builds; failures are recorded
+  for visibility but retried (transient API outages shouldn't
+  permanently skip a post).
+- **Per-post overrides** — `syndicate: false` in frontmatter excludes
+  a post from POSSE; `syndication_text: "..."` supplies a custom
+  snippet that overrides the auto-formatter.
+- **Per-network formatting** — `Syndication::Formatter` builds
+  `<title> — <description> <url>`, truncating the description to fit
+  each network's character cap (Mastodon 500, Bluesky 300). Bluesky's
+  link facets use UTF-8 byte offsets (the adapter handles this
+  correctly for multi-byte titles).
+- **Window filter** — `window_days` (default 14) excludes historical
+  posts; they predate syndication setup and replaying would look
+  like spam.
+
+Config under `syndication:` in `config/site.yml`:
+
+```yaml
+syndication:
+  enabled: true
+  window_days: 14
+  mastodon:
+    instance: https://mastodon.social
+    access_token: "..."
+    visibility: public
+  bluesky:
+    handle: yourname.bsky.social
+    app_password: "..."
+```
+
+Implementation: `lib/abqari/syndication.rb`. See README → "POSSE" for
+the full guide including the reply-collection flow that connects
+IndieWeb + POSSE end-to-end.
+
 **Content importers (`bin/import`).** New command pulls posts from
 another platform's export into the site's `content/<collection>/`
 tree. Ships with three importers — Substack (`.zip` or unzipped

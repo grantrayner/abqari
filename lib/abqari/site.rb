@@ -125,6 +125,7 @@ module Abqari
       Hooks.run(:after_load_pages, self)
 
       Folio.new(self).fetch                 # publications + bundles, derives series
+      Indieweb::Fetcher.new(self).fetch     # webmentions (received via webmention.io)
       @renderer.generate_all                # tag pages, paginated shards, viz, folio, related
       Hooks.run(:after_generate, self)
 
@@ -139,6 +140,8 @@ module Abqari
       @artifacts.write_deploy_artifacts
       visualizations.write_data
       Search.new(self).run
+      Indieweb::Sender.new(self).send_all   # POST webmentions for new outbound links (opt-in)
+      Syndication::Dispatcher.new(self).run # POSSE: crosspost to Mastodon/Bluesky (opt-in)
 
       Log.info "Built #{all_pages.size} page(s) in #{env}#{incremental ? ' (incremental)' : ''} → _site/"
     ensure
@@ -577,6 +580,24 @@ module Abqari
 
     def data
       @data ||= @loader.load_data
+    end
+
+    # IndieWeb — webmentions received for a given page URL. Returns an
+    # array of mention hashes (newest first) or `[]` when none are
+    # cached for that URL. The mention shape mirrors webmention.io's
+    # JF2 output: `{ 'wm-property' => 'in-reply-to' | 'like-of' | ...,
+    # 'author' => { 'name' => ..., 'url' => ..., 'photo' => ... },
+    # 'content' => { 'text' => ... }, 'published' => '2024-01-15T...',
+    # 'url' => 'https://reply.example.com/post' }`.
+    #
+    # The lookup is path-normalised (trailing slash added) so
+    # `/posts/foo/` matches whether the original mention pointed at
+    # `https://example.com/posts/foo` or `https://example.com/posts/foo/`.
+    def webmentions_for(url)
+      return [] unless data['webmentions'].is_a?(Hash)
+      path = url.to_s
+      path = "#{path}/" unless path.end_with?('/')
+      data['webmentions'][path] || []
     end
 
     # ------------------------------------------------------------------

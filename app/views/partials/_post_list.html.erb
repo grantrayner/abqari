@@ -39,9 +39,12 @@
   show_tags         = cfg.fetch('show_tags',         false)
   truncate_at       = cfg.fetch('description_truncate', 160)
 %>
-<ul class="post-list">
+<ul class="post-list h-feed">
   <% posts.each do |post| %>
-    <li class="post-list__item">
+    <%# `h-entry` on each card lets feed readers and IndieWeb parsers
+        treat the index as a microformats2 feed; `h-feed` on the <ul>
+        marks the surrounding container. Class names are invisible. %>
+    <li class="post-list__item h-entry">
       <%# Cover slot. `cover_choice_for` returns one of :photo /
           :placeholder / :svg / :none — see CoverHelpers for the
           mode resolution (frontmatter > collection config > default).
@@ -68,13 +71,13 @@
       <% end %>
 
       <div class="post-list__body">
-        <h2 class="post-list__title">
-          <% if (pos = post.frontmatter['series_position']) %><span class="series-position">#<%= pos %></span> <% end %><a href="<%= post.url %>"><%= post.title %></a>
+        <h2 class="post-list__title p-name">
+          <% if (pos = post.frontmatter['series_position']) %><span class="series-position">#<%= pos %></span> <% end %><a class="u-url" href="<%= post.url %>"><%= post.title %></a>
         </h2>
 
         <% if show_date && post.date %>
           <p class="post-list__meta">
-            <time datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
+            <time class="dt-published" datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
             <% if show_reading_time && post.respond_to?(:content) && post.content.to_s.length.positive? %>
               · <%= reading_time(post.content) %>
             <% end %>
@@ -82,13 +85,13 @@
         <% end %>
 
         <% if show_description && (desc = post.frontmatter['description'].to_s) && !desc.empty? %>
-          <p class="post-list__description"><%= truncate(desc, length: truncate_at) %></p>
+          <p class="post-list__description p-summary"><%= truncate(desc, length: truncate_at) %></p>
         <% end %>
 
         <% if show_tags && post.tags.any? %>
           <p class="post-list__tags">
             <% post.tags.each do |tag| %>
-              <a class="post-list__tag" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
+              <a class="post-list__tag p-category" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
             <% end %>
           </p>
         <% end %>

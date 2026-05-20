@@ -42,8 +42,11 @@ class SeriesTest < Minitest::Test
   def test_post_series_page_only_contains_posts
     html = TestHelpers.read_output('posts/series/inside-abqari/index.html')
     # Every item link should be a /posts/ URL (or relative within
-    # posts), never /photos/ or /workshops/.
-    links = html.scan(/<a href="(\/[^"]+\/)">/).flatten
+    # posts), never /photos/ or /workshops/. The regex tolerates
+    # optional class attributes before `href=` — post-list cards now
+    # carry `class="u-url"` on their post-link anchors for IndieWeb
+    # microformats2 parsing.
+    links = html.scan(/<a\s[^>]*?href="(\/[^"]+\/)"/).flatten
     item_links = links.reject { |l| l == '/posts/series/inside-abqari/' }
     item_links = item_links.reject { |l| l.start_with?('/tags/', '/country/', '/posts/series/', '/photos/series/', '/publications/series/', '/workshops/series/') }
     # Filter to the link patterns we expect for post-list items

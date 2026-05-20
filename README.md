@@ -1611,6 +1611,110 @@ That's it. The button appears at the bottom of `/about/` on the next build.
 
 The partial honours the same config and renders nothing when `email` is unset, so dropping it into a shared layout is safe.
 
+## IndieWeb & federation
+
+Off by default. When `indieweb.enabled: true`, the build adds:
+
+- **Microformats2 markup** (`h-entry`, `h-card`, `u-url`, `dt-published`, `e-content`, `p-category`, `p-name`, `p-summary`, `h-feed`) baked into the post, post-list, and about layouts. Invisible class attributes — no visual change. Lets other IndieWeb sites and federated tools parse your content cleanly.
+- **Webmention discovery** — `<link rel="webmention">` in `<head>` points incoming notifications at [webmention.io](https://webmention.io) on your behalf. Your site stays static; webmention.io catches replies/likes/reposts from other people's sites.
+- **Webmention rendering** — a "Replies & mentions" section below each post, pulled from webmention.io's cached JF2 feed at build time. Conversational mentions (in-reply-to, mention-of) get the full author + body card; likes / reposts / bookmarks render facepile-style (avatar grid). No JavaScript, no comment backend, no moderation queue — spam is structurally rare because replies have to be published on real websites first.
+- **Webmention send** — opt-in. When `send_webmentions: true`, the build POSTs notifications to external URLs your posts link to so the authors of those posts see you've cited them. Tracked in `vendor/webmentions/sent.yml` so re-builds don't double-send. Only runs against posts published within the last `send_window_days` (default 30).
+- **Bridgy Fed link tags** — opt-in. When `bridgy_fed: true`, the head emits `rel="me"` and `rel="alternate" type="application/activity+json"` tags pointing at [Bridgy Fed](https://fed.brid.gy), which speaks ActivityPub on your behalf. Mastodon users can then search `@<your-domain>` and follow the site directly.
+
+### Setup
+
+1. Visit [webmention.io](https://webmention.io) and sign in with your domain. The login flow uses `rel="me"` verification — make sure `social_links:` in `config/site.yml` carries at least one social profile that links back to your domain.
+2. Copy the API token from your webmention.io account page.
+3. (Optional) Visit [fed.brid.gy](https://fed.brid.gy) and complete its setup (same `rel="me"` pattern).
+4. Add to `config/site.yml`:
+
+```yaml
+indieweb:
+  enabled: true
+  domain: example.com               # bare host, no scheme
+  webmention_io_token: "..."        # from webmention.io account page
+  bridgy_fed: false                 # true once Bridgy Fed setup complete
+  send_webmentions: false           # POST to sites your posts link to
+  send_window_days: 30
+```
+
+### How it works at build time
+
+| Step | What happens |
+|---|---|
+| 1. Fetch | `Indieweb::Fetcher` pulls `https://webmention.io/api/mentions.jf2?domain=…&token=…` with an ETag header. 304 responses reuse the cached `vendor/webmentions/mentions.json`. |
+| 2. Index | Mentions are grouped by target URL (path-normalised so `/posts/foo` and `/posts/foo/` collapse to one key). |
+| 3. Render | Each post layout calls `site.webmentions_for(page.url)`; the `_webmentions` partial renders the matching mentions in a `<section class="webmentions">` below the body. |
+| 4. Send | After render, `Indieweb::Sender` walks posts published within `send_window_days`, extracts outbound external URLs, discovers each target's webmention endpoint (HEAD `Link:` header → GET `<link rel="webmention">`), POSTs a notification, and logs the result. |
+
+### Per-post overrides
+
+- Set `webmentions: false` in a post's frontmatter to suppress the `_webmentions` partial for that post.
+- The send-window means historical posts aren't replayed on every CI run — they were already notified in earlier builds.
+
+### Honest limits
+
+- Webmention adoption is uneven — maybe 10–20% of personal sites support sending them. Growing, but not universal.
+- Bridgy Fed is a third-party service. You don't control the federation hop; outages affect your Fediverse presence.
+- `webmention.io` is also a third-party service. The integration falls back to cached data on outages but a long outage means no new mentions render.
+
+## POSSE — Publish on Own Site, Syndicate Elsewhere
+
+Off by default. When `syndication.enabled: true`, the build POSTs a short summary + canonical URL of each new post to the configured networks (Mastodon, Bluesky). The originating posts on those networks point back at your canonical URL on your site.
+
+```yaml
+# config/site.yml
+syndication:
+  enabled: true
+  window_days: 14                   # only syndicate posts from the last N days
+  mastodon:
+    enabled: true
+    instance: https://mastodon.social
+    access_token: "..."             # write:statuses scope
+    visibility: public              # public | unlisted | private
+  bluesky:
+    enabled: true
+    handle: yourname.bsky.social
+    app_password: "..."             # NOT your account password
+```
+
+### Setup
+
+- **Mastodon.** In your instance UI: Preferences → Development → New Application. Scope: `write:statuses`. Copy the access token.
+- **Bluesky.** In the Bluesky app: Settings → App Passwords → Add. Use the generated app password (never your account password).
+
+### How it works at build time
+
+| Step | What happens |
+|---|---|
+| 1. Filter | `Syndication::Dispatcher` walks posts published within `window_days` (default 14). |
+| 2. Format | `Syndication::Formatter.snippet_for(post, url, limit:)` builds `<title> — <description> <url>` and truncates the description to fit each network's character cap (Mastodon 500, Bluesky 300). |
+| 3. POST | Each configured network adapter (`Networks::Mastodon`, `Networks::Bluesky`) authenticates and posts. The resulting URL on that network is returned. |
+| 4. Log | Every successful syndication is recorded in `vendor/syndication/sent.yml` keyed by `<network>|<canonical_url>`. Re-builds skip any post already marked `status: sent`. Failures are logged but retried on the next build — a transient API outage shouldn't permanently skip a post. |
+
+### Per-post overrides
+
+- `syndicate: false` in a post's frontmatter excludes that post from POSSE entirely.
+- `syndication_text: "..."` supplies a custom snippet, bypassing the auto-formatter (still subject to the per-network length cap).
+
+### Reply collection
+
+When **both** IndieWeb and POSSE are enabled, the flow is:
+
+1. You publish a post; the build syndicates to Mastodon + Bluesky.
+2. A reader replies on Mastodon.
+3. Bridgy Fed translates the AP reply into a webmention sent to webmention.io.
+4. Next build, webmention.io's API returns it.
+5. The post's "Replies & mentions" section now shows the Mastodon reply alongside any direct webmentions from other personal sites.
+
+You wrote once; conversations from three networks consolidate under the canonical post.
+
+### Honest limits
+
+- App tokens expire. Plan for an annual rotation.
+- Each network has its own character limits and content-policy quirks. Long titles can squeeze out the description.
+- Bluesky's link-facet rendering uses UTF-8 **byte** offsets, not character offsets — the adapter handles this, but it's worth knowing if you're debugging odd link placement.
+
 ## Folio integration
 
 Off by default. When `folio:` is configured, Abqari pulls book/bundle data from a [Folio](https://www.foliobooks.app) storefront at build time and auto-generates pages for each entity. The visitor never makes a request to Folio — all data is baked into the static HTML.
@@ -2186,6 +2290,21 @@ For the full list with release dates and rationale, see
 
 **v0.3.x** (current):
 
+- **IndieWeb foundation** — microformats2 (`h-entry`, `h-card`,
+  `p-name`, `dt-published`, `e-content`, `p-category`, `u-url`,
+  `h-feed`, `p-summary`) baked into post / post-list / about
+  layouts. Webmention receive via webmention.io with ETag cache;
+  "Replies & mentions" partial renders below each post (no JS,
+  no comment backend). Webmention send (opt-in) for outbound
+  links. Bridgy Fed link tags (opt-in) for Mastodon following via
+  ActivityPub. See [IndieWeb & federation](#indieweb--federation).
+- **POSSE auto-syndication** — on each build, post a short summary
+  + canonical URL to Mastodon and/or Bluesky. Per-network length
+  limits handled automatically; replies on those networks come
+  back as webmentions (via Bridgy Fed) and consolidate under the
+  canonical post. Per-post `syndicate: false` opt-out;
+  `syndication_text:` custom snippet. Idempotent sent-log.
+  See [POSSE](#posse--publish-on-own-site-syndicate-elsewhere).
 - **Content importers** — `bin/import substack|ghost|jekyll <source>`
   pulls posts from another platform's export into the site's
   collections. Downloads remote images into bundles so the image

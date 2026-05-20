@@ -339,6 +339,8 @@ Cheat sheet for common changes:
 | New env var | add to "Configuration knobs" table in `docs/security.md` |
 | New CLI flag | `bin/<command>` with `OptionParser`; flag wins over env var |
 | New content importer (Substack, Ghost, etc.) | new file under `lib/abqari/importers/`, subclass `Base`, register in `Importers::REGISTRY` |
+| New syndication network (Threads, X, LinkedIn, etc.) | new file under `lib/abqari/syndication.rb`'s `Networks` module, subclass `Networks::Base`, add to `Dispatcher#networks`, add a `LIMITS[name]` entry |
+| New IndieWeb microformat hook | add the class attribute to the relevant layout / partial; verify against indieweb.org/h-entry or h-card; add to `test/indieweb/layouts_test.rb` |
 
 ---
 

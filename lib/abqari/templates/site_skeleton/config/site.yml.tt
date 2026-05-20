@@ -120,6 +120,71 @@ footer:
 # contact:
 #   email: hello@example.com
 
+# IndieWeb / federation ────────────────────────────────────────────────
+# Off by default. Once enabled, the build:
+#   * Adds <link rel="webmention"> so other sites can notify yours.
+#   * Renders received mentions ("Replies & mentions") below each post,
+#     pulled from webmention.io at build time.
+#   * Optionally advertises the site as a Bridgy Fed ActivityPub actor
+#     so Mastodon users can follow `@<domain>` directly.
+#   * Optionally POSTs outbound webmentions to sites your posts link to.
+#
+# Setup (one-time):
+#   1. Sign in at https://webmention.io with your domain (uses rel=me
+#      verification — your social_links above must carry at least one
+#      profile that links back to your domain).
+#   2. Copy the API token from your webmention.io account page.
+#   3. For Bridgy Fed: visit https://fed.brid.gy/, follow its setup
+#      (same rel=me pattern). Then flip `bridgy_fed: true` below.
+#
+# indieweb:
+#   enabled: true
+#   domain: example.com               # bare host, no scheme
+#   webmention_io_token: "..."        # from webmention.io account page
+#   bridgy_fed: false                 # true once Bridgy Fed setup complete
+#   send_webmentions: false           # POST to sites your posts link to
+#   send_window_days: 30              # only send for posts published this
+#                                     #   recently — historical posts have
+#                                     #   already been notified in earlier
+#                                     #   builds; replaying is wasteful
+
+# Syndication (POSSE) ─────────────────────────────────────────────────
+# "Publish on your Own Site, Syndicate Elsewhere" — on each build, the
+# engine POSTs a short summary + canonical URL of each new post to
+# the configured networks. The originating post on your site stays the
+# source of truth; readers on Mastodon/Bluesky discover new work in
+# their feed; replies on those networks come back as webmentions (via
+# Bridgy Fed) and render below the post.
+#
+# Idempotent: every successful crosspost is logged to
+# `vendor/syndication/sent.yml` so re-builds never double-post.
+#
+# Per-post override: set `syndicate: false` in a post's frontmatter to
+# skip syndication for that post; set `syndication_text: "..."` to
+# supply a custom snippet.
+#
+# Setup steps:
+#   * Mastodon — in your instance UI: Preferences → Development →
+#     New Application, scope `write:statuses`. Copy the access token.
+#   * Bluesky  — in the app: Settings → App Passwords → Add. Use the
+#     app password (NOT your account password) below.
+#
+# syndication:
+#   enabled: true
+#   window_days: 14                   # only syndicate posts from the last
+#                                     #   N days — older posts predate
+#                                     #   syndication setup; replaying
+#                                     #   would look like spam
+#   mastodon:
+#     enabled: true
+#     instance: https://mastodon.social
+#     access_token: "..."
+#     visibility: public              # public | unlisted | private
+#   bluesky:
+#     enabled: true
+#     handle: yourname.bsky.social
+#     app_password: "..."             # app password, NOT account password
+
 # Environment overrides ────────────────────────────────────────────────
 # These deep-merge over the shared keys based on $ABQARI_ENV. Set your
 # production URL here so canonical links, sitemap, and OG cards all

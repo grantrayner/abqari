@@ -61,6 +61,7 @@ module Abqari
       icons
       images
       indexable
+      indieweb
       llms
       locale
       manifest
@@ -77,6 +78,7 @@ module Abqari
       share_image
       social
       speculation_rules
+      syndication
       syntax_highlighting
       syntax_theme
       taxonomies

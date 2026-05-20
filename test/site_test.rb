@@ -526,11 +526,13 @@ class LayoutChainingTest < Minitest::Test
     assert_includes html, 'aria-label="Primary"',       'application shell: nav'
     assert_includes html, 'id="main-content"',          'application shell: main'
     # About-specific content from the inner layout
-    assert_includes html, '<h1>About</h1>',             'about content: h1 from page.title'
-    # The header now also emits the lede paragraph from `about.description`
-    # in config when `about.enabled` is true. Lenient on what comes between
-    # the h1 and </header>.
-    assert_match(%r{<header><h1>About</h1>.*?</header>}m, html, 'header markup from inner layout')
+    # The about layout adds an `h-card` `p-name` class to the h1 for
+    # microformats2 parsers (see app/views/layouts/about.html.erb). The
+    # visible text is unchanged; the class attribute is invisible
+    # metadata. Match flexibly so future microformats additions don't
+    # break this assertion.
+    assert_match(%r{<h1[^>]*>About</h1>}, html, 'about content: h1 from page.title')
+    assert_match(%r{<header><h1[^>]*>About</h1>.*?</header>}m, html, 'header markup from inner layout')
   end
 
   def test_yield_content_emits_inner_layout_output_inside_main

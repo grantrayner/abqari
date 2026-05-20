@@ -227,6 +227,17 @@
   <link rel="alternate" type="application/feed+json" href="<%= prefix %>/feed.json" title="<%= title %>">
   <% end %>
 
+  <%# IndieWeb / federation discovery tags. Renders nothing when
+      `indieweb.enabled` is false in config/site.yml. The webmention
+      tag points incoming notifications at webmention.io on our
+      behalf (the site stays static); the Bridgy Fed tags (when
+      `bridgy_fed: true`) advertise an ActivityPub actor so Mastodon
+      users can search `@<domain>` and follow the site directly.
+      See `Abqari::Indieweb::Bridgy.head_links` for the generator. %>
+  <% Abqari::Indieweb::Bridgy.head_links(site).each do |link_tag| %>
+  <%== link_tag %>
+  <% end %>
+
   <%# Favicons + PWA manifest. Run `bin/icons path/to/master.png` to generate
       the full set into public/. Each <link> below is conditionally emitted —
       only present in the rendered HTML when the file actually exists, so the

@@ -933,6 +933,76 @@ article > header > .lede {
 .post__tags-footer a { color: var(--color-muted); text-decoration: none; }
 .post__tags-footer a:hover { color: var(--color-text); }
 
+/* IndieWeb webmentions — receives from webmention.io at build time,
+   renders as a "Replies & mentions" section below the post body.
+   Conversational mentions (in-reply-to, mention-of) get the full
+   author + body card; likes/reposts/bookmarks render facepile-style
+   (avatar grid) because the body text adds nothing the avatar +
+   count doesn't. Class hooks only — themes can override completely
+   via `themes/<name>/css/app.css`. */
+.webmentions {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+.webmentions__heading {
+  font-size: 1.125rem;
+  margin: 0 0 var(--space-md);
+}
+.webmentions__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.webmention {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.webmention__avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.webmention__body { flex: 1; min-width: 0; }
+.webmention__byline {
+  margin: 0 0 var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+.webmention__author { color: var(--color-text); font-weight: 600; text-decoration: none; }
+.webmention__author:hover { text-decoration: underline; }
+.webmention__permalink { color: var(--color-muted); text-decoration: none; margin-left: var(--space-xs); }
+.webmention__permalink:hover { color: var(--color-text); }
+.webmention__text { margin: 0; }
+
+.webmentions__facepile { margin-top: var(--space-lg); }
+.webmentions__facepile-label {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+.webmentions__facepile-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.webmentions__facepile-list img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Table of contents — auto-generated from h2/h3 headings via the
    `_toc` partial. Sits inline above the body when the layout
    renders it. Compact list with indented h3 entries (the `--h3`

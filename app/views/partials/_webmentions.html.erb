@@ -1,0 +1,113 @@
+<!--
+  Webmentions partial — renders received mentions for the current page.
+  Pulled from `site.webmentions_for(page.url)`, populated at build by
+  `Indieweb::Fetcher` from webmention.io's cached JF2 feed.
+
+  Renders nothing when:
+    - The IndieWeb integration is disabled (no cached data exists).
+    - No mentions exist for this page's URL.
+
+  Mention types ("wm-property" in JF2):
+    in-reply-to  → "Replies"  (full content + author)
+    mention-of   → "Mentions" (full content + author)
+    like-of      → "Likes"    (facepile — just author photos)
+    repost-of    → "Reposts"  (facepile)
+    bookmark-of  → "Bookmarks" (facepile)
+
+  Replies + mentions get the full visual treatment because they're
+  conversational; likes/reposts/bookmarks are facepiled because the
+  content (when present) is just "X liked Y" — the signal is the count
+  + avatars, not the body text.
+-->
+<%
+  all = site.webmentions_for(page.url)
+%>
+<% if all.any? %>
+<%
+  by_type = all.group_by { |m| m['wm-property'].to_s }
+  conversational = (by_type['in-reply-to'] || []) + (by_type['mention-of'] || [])
+  likes          = by_type['like-of']     || []
+  reposts        = by_type['repost-of']   || []
+  bookmarks      = by_type['bookmark-of'] || []
+  facepile       = likes + reposts + bookmarks
+%>
+<section class="webmentions" aria-label="Replies and mentions from around the web">
+  <h2 class="webmentions__heading">Replies &amp; mentions</h2>
+
+  <% if conversational.any? %>
+    <ol class="webmentions__list">
+      <% conversational.each do |m| %>
+        <%
+          author    = m['author'] || {}
+          name      = author['name'].to_s
+          author_url = author['url'].to_s
+          photo     = author['photo'].to_s
+          published = m['published'].to_s
+          src       = m['url'] || m['wm-source']
+          text      = (m.dig('content', 'text') || m.dig('content', 'html') || '').to_s
+          kind      = m['wm-property'] == 'in-reply-to' ? 'replied' : 'mentioned'
+        %>
+        <li class="webmention webmention--<%= kind %>">
+          <% if !photo.empty? %>
+            <img class="webmention__avatar" src="<%= photo %>"
+                 alt="" loading="lazy" width="48" height="48">
+          <% end %>
+          <div class="webmention__body">
+            <p class="webmention__byline">
+              <% if !author_url.empty? %>
+                <a class="webmention__author" rel="nofollow ugc" href="<%= author_url %>"><%= name.empty? ? author_url : name %></a>
+              <% else %>
+                <span class="webmention__author"><%= name.empty? ? '(anonymous)' : name %></span>
+              <% end %>
+              <%= kind %>
+              <% if !published.empty? %>
+                <a class="webmention__permalink" rel="nofollow ugc" href="<%= src %>">
+                  <time datetime="<%= published %>"><%= local_time(Time.parse(published)) rescue published %></time>
+                </a>
+              <% end %>
+            </p>
+            <% if !text.empty? %>
+              <p class="webmention__text"><%= truncate(text, length: 320) %></p>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ol>
+  <% end %>
+
+  <% if facepile.any? %>
+    <div class="webmentions__facepile">
+      <% if likes.any? %>
+        <p class="webmentions__facepile-label"><%= pluralize(likes.size, 'like') %></p>
+        <ul class="webmentions__facepile-list">
+          <% likes.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+            <% if !photo.empty? %>
+              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+            <% end %>
+          <% end %>
+        </ul>
+      <% end %>
+      <% if reposts.any? %>
+        <p class="webmentions__facepile-label"><%= pluralize(reposts.size, 'repost') %></p>
+        <ul class="webmentions__facepile-list">
+          <% reposts.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+            <% if !photo.empty? %>
+              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+            <% end %>
+          <% end %>
+        </ul>
+      <% end %>
+      <% if bookmarks.any? %>
+        <p class="webmentions__facepile-label"><%= pluralize(bookmarks.size, 'bookmark') %></p>
+        <ul class="webmentions__facepile-list">
+          <% bookmarks.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+            <% if !photo.empty? %>
+              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+            <% end %>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+<% end %>

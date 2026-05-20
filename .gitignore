@@ -1,5 +1,7 @@
 _site/
 _import_report.md
+vendor/webmentions/
+vendor/syndication/
 .bundle/
 vendor/bundle/
 vendor/folio/

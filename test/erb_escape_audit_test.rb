@@ -98,7 +98,14 @@ class ErbEscapeAuditTest < Minitest::Test
     # composed of `<time datetime="...">local_time(...)</time>` fragments
     # (`local_time` returns a pre-formatted display string, no user
     # markup). Same safety pattern as the `parts.join` entry above.
-    "date_html"
+    "date_html",
+
+    # _head.html.erb: `Abqari::Indieweb::Bridgy.head_links(site)` returns
+    # an array of `<link rel=...>` tags built from controlled site
+    # config (webmention.io endpoint URL + Bridgy Fed domain
+    # interpolation). The values come from `site.config['indieweb']`
+    # which the site author writes themselves — no third-party data.
+    "link_tag"
   ].freeze
 
   def test_no_unaudited_raw_interpolations

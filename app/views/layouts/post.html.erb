@@ -35,16 +35,23 @@ layout: application
   collection's `next:` and `related:` config; both render nothing
   when not applicable so they degrade silently.
 -->
-<article>
+<%# `h-entry` is the IndieWeb microformats2 root class for a post.
+    Combined with `p-name` (title), `dt-published` (date), `e-content`
+    (body), `p-author` / `u-author` (author info), `u-url` (canonical
+    URL), and `p-category` (tags), this lets other IndieWeb sites and
+    feed readers parse the post without needing RSS. No visual impact
+    — pure metadata via class attributes. See indieweb.org/h-entry. %>
+<article class="h-entry">
 
   <%== render 'partials/draft_banner' %>
   <%== render 'partials/future_banner' %>
   <%== render 'partials/back_to_index' %>
 
   <header>
-    <h1><%= page.title %></h1>
+    <h1 class="p-name"><%= page.title %></h1>
+    <a class="u-url" href="<%= sanitized_url(page.url) %>" hidden></a>
     <p class="post__meta">
-      <time datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
+      <time class="dt-published" datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
       · <%= reading_time(page.content) %>
       <%# Series breadcrumb — only when the post carries both `series:`
           and `series_position:` in frontmatter. Position renders as a
@@ -80,14 +87,24 @@ layout: application
       with `min_headings: N`. %>
   <%== render 'partials/toc' %>
 
-  <%== page.content %>
+  <%# `e-content` wraps the post body so microformats2 parsers can
+      lift the rich body content cleanly. The div is structural-only,
+      no visual treatment. %>
+  <div class="e-content">
+    <%== page.content %>
+  </div>
 
   <% if page.tags.any? %>
   <footer class="post__tags-footer">
-    <p>Tagged: <%== page.tags.map { |t| link_to(t, taxonomy_url('tags', t)) }.join(', ') %></p>
+    <p>Tagged: <%== page.tags.map { |t| link_to(t, taxonomy_url('tags', t), class: 'p-category') }.join(', ') %></p>
   </footer>
   <% end %>
 </article>
+
+<%# Webmentions — replies, likes, reposts, bookmarks from around the
+    web. Renders nothing when the IndieWeb integration is off or no
+    mentions exist for this URL. See partials/_webmentions for shape. %>
+<%== render 'partials/webmentions' %>
 
 <%# Testimonials about this post — pulls from data/testimonials.yml
     entries where `collection: posts` matches this page's slug. Same

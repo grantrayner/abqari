@@ -123,6 +123,33 @@ run workshops.
 - Per-environment `robots.txt`, `_redirects` from frontmatter, `security.txt`
 - Plausible analytics: one config line, automatic CSP extension
 
+**Federation and audience** *(all off by default; opt in per feature)*
+- **Microformats2 markup** (`h-entry`, `h-card`, `p-name`,
+  `dt-published`, `e-content`, `p-category`, `u-url`, `h-feed`,
+  `p-summary`) baked into post, post-list, and about layouts.
+  Invisible class hooks — no visual change, full machine-readable
+  identity for IndieWeb tooling.
+- **Webmention receive** via [webmention.io](https://webmention.io) —
+  a "Replies & mentions" section renders below each post with
+  facepile-style likes/reposts/bookmarks and full-card replies. No
+  JavaScript, no comment backend, no moderation queue. Cached
+  build-to-build with ETag.
+- **Webmention send** (opt-in) — POSTs notifications to external
+  URLs your posts link to. Tracked in `vendor/webmentions/sent.yml`
+  so re-builds don't double-send.
+- **Bridgy Fed link tags** (opt-in) — `<link rel="me">` +
+  `application/activity+json` advertisement so Mastodon users can
+  search `@<your-domain>` and follow the site directly via
+  ActivityPub. Bridgy Fed handles the federation hop on its
+  infrastructure; the site stays static.
+- **POSSE auto-syndication** — on each build, post a short summary +
+  canonical URL of every new post to Mastodon and/or Bluesky. The
+  originating post on your site stays the source of truth; replies
+  on those networks come back as webmentions and consolidate under
+  the canonical post. Per-post opt-out via `syndicate: false`;
+  custom snippet via `syndication_text:`. Idempotent — every
+  successful crosspost logged to `vendor/syndication/sent.yml`.
+
 **Quality and shipping**
 - `bin/audit` — links + SEO + a11y + privacy + dependency CVEs in a
   markdown report
