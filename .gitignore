@@ -1,4 +1,5 @@
 _site/
+_import_report.md
 .bundle/
 vendor/bundle/
 vendor/folio/

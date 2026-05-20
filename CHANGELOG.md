@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+**Content importers (`bin/import`).** New command pulls posts from
+another platform's export into the site's `content/<collection>/`
+tree. Ships with three importers — Substack (`.zip` or unzipped
+directory), Ghost (JSON export), Jekyll (site source directory).
+Each imported post lands as a regular Abqari bundle so the result
+is indistinguishable from posts authored fresh.
+
+```bash
+bin/import substack ~/Downloads/substack-export.zip
+bin/import ghost    ~/Downloads/export.json
+bin/import jekyll   ~/old-site/
+```
+
+Behaviour:
+
+- **HTML → Markdown** via `reverse_markdown` (GFM extensions,
+  unknown tags pass through verbatim for manual cleanup).
+- **Platform chrome stripped** before conversion. Each importer
+  ships a default selector list (Substack subscription widgets,
+  Ghost bookmark cards, etc.); extend with `--strip SEL,SEL`.
+- **Remote images downloaded** into each post's bundle directory
+  by default so the build's image pipeline can re-encode them to
+  AVIF + WebP with responsive variants. `--keep-remote` opts out.
+- **`redirect_from:` written** so inbound links to the source-
+  platform URLs keep working (`/p/<slug>/` for Substack,
+  `/<slug>/` for Ghost).
+- **Idempotent** — skip files that already exist by default;
+  `--force` overwrites.
+- **Slug collisions** resolved by numeric suffix (`foo`, `foo-2`,
+  `foo-3`).
+- **`_import_report.md`** written at the site root (gitignored)
+  summarising every post with status + warnings.
+
+Flags: `--into COLLECTION`, `--keep-remote`, `--flat`, `--dry-run`,
+`--force`, `--canonical`, `--strip SEL,SEL`. Adds `reverse_markdown
+~> 2.1` as a runtime dep (lazy-loaded — normal builds never pull it
+into memory). See README → "Importing content" for the full guide.
+Implementation under `lib/abqari/importers/`.
+
 **Decorative auto-generated cover SVGs.** New `cover:` enum on the
 posts and workshops collections gives text-first authors a polished
 cover slot without sourcing imagery. Four modes:
@@ -16,7 +55,7 @@ cover slot without sourcing imagery. Four modes:
 | Mode | Behaviour |
 |---|---|
 | `photo` (default) | Renders `image:` if set, basic flat-tint placeholder otherwise. The historical behaviour. |
-| `photo_or_svg` | Renders `image:` if set, otherwise a decorative initial-tile SVG (slug-hashed gradient + first letter of the title). |
+| `photo_or_svg` | Renders `image:` if set, otherwise a decorative title-card SVG. |
 | `svg` | Always renders the decorative SVG (ignores `image:`). Uniform tile look across a listing. |
 | `none` | No cover slot at all. Text-only cards. |
 
@@ -26,9 +65,14 @@ other. Frontmatter `cover:` (boolean `false` or one of the enum
 strings) on a single page overrides the collection default.
 
 The SVG generator is deterministic per slug: same post always gets
-the same gradient + initial across builds. Eight muted two-tone
-palettes give adjacent cards distinct tones. Inline SVG (no extra
-HTTP request), `aria-hidden`, scales gracefully via `viewBox`.
+the same gradient + layout across builds. Eight muted two-tone
+palettes give adjacent cards distinct tones; the page title is
+word-wrapped to 1–3 lines via a balanced-partition search that
+minimises the longest wrapped line, with font size auto-scaled
+to fit. Two clusters of three faint decorative squares at the
+corners (top-left + bottom-right) echo the hand-authored hero
+pattern. Inline SVG (no extra HTTP request), `aria-hidden`, scales
+gracefully via `viewBox`.
 
 See `lib/abqari/render_context/cover_helpers.rb` for the generator
 and the mode-resolution chain.

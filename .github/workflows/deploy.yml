@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -65,12 +65,18 @@ jobs:
         continue-on-error: true
 
       - name: Upload audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: audit-report
           path: audit/*.md
           retention-days: 30
+          # Audit runs with `continue-on-error: true`, so a hard failure
+          # leaves the audit/ directory empty. Treat that case as silent
+          # rather than a warning — the deploy job still ships the site,
+          # and the missing report is already visible via the audit step's
+          # red ✗ in the workflow summary.
+          if-no-files-found: ignore
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

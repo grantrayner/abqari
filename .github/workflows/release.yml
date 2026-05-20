@@ -30,7 +30,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install libvips
         run: sudo apt-get install -y libvips42
@@ -73,7 +73,7 @@ jobs:
           gem push abqari-*.gem
 
       - name: Upload .gem to release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: gem-${{ steps.tag.outputs.tag }}
           path: abqari-*.gem

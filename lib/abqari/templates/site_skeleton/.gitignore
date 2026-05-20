@@ -1,4 +1,5 @@
 _site/
+_import_report.md
 vendor/fonts/*
 !vendor/fonts/.gitkeep
 vendor/folio/*

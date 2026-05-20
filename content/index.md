@@ -62,6 +62,11 @@ run workshops.
 - Slug aliasing: rename a built-in collection's URL prefix without
   forking the layout (e.g. `posts.slug: stories` puts posts at `/stories/`)
 - Generator: `bin/new`, `bin/new post "Title"`, `bin/new page "Title"`
+- Importers: `bin/import substack|ghost|jekyll <source>` pulls
+  content from another platform's export into the site's
+  collections — downloads images into bundles, writes
+  `redirect_from:` for inbound link preservation, idempotent
+  re-runs
 
 **Templating**
 - ERB layouts and partials — real Ruby, no sandboxed templating

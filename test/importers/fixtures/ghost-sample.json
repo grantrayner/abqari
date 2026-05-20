@@ -1,0 +1,49 @@
+{
+  "db": [{
+    "data": {
+      "posts": [
+        {
+          "id": "p1",
+          "slug": "hello-ghost",
+          "title": "Hello Ghost",
+          "html": "<p>This is a Ghost post.</p><figure class=\"kg-bookmark-card\"><a href=\"https://example.com\">card link</a></figure><p>After the card.</p>",
+          "published_at": "2024-04-15T09:00:00.000Z",
+          "status": "published",
+          "visibility": "public",
+          "feature_image": null,
+          "custom_excerpt": "Short intro line."
+        },
+        {
+          "id": "p2",
+          "slug": "members-only",
+          "title": "Members only",
+          "html": "<p>For members.</p>",
+          "published_at": "2024-05-01T12:00:00.000Z",
+          "status": "published",
+          "visibility": "members",
+          "feature_image": null,
+          "custom_excerpt": null
+        },
+        {
+          "id": "p3",
+          "slug": "draft-post",
+          "title": "Draft post",
+          "html": "<p>Not published.</p>",
+          "published_at": null,
+          "status": "draft",
+          "visibility": "public",
+          "feature_image": null,
+          "custom_excerpt": null
+        }
+      ],
+      "tags": [
+        { "id": "t1", "name": "Ruby", "slug": "ruby" },
+        { "id": "t2", "name": "Static sites", "slug": "static-sites" }
+      ],
+      "posts_tags": [
+        { "post_id": "p1", "tag_id": "t1" },
+        { "post_id": "p1", "tag_id": "t2" }
+      ]
+    }
+  }]
+}

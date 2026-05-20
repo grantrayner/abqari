@@ -489,6 +489,7 @@ internals. For most sites, Path A is cleaner.
 | `bin/new` | Configure site identity, locale, theme; `--clean` to wipe examples. See [Generator](#generator). |
 | `bin/new post "Title"` | Scaffold a new post bundle: `content/posts/<date>-<slug>/index.md`. |
 | `bin/new page "Title"` | Scaffold a top-level page: `content/<slug>.md`. |
+| `bin/import <platform> <source>` | Import content from another platform's export (Substack, Ghost, Jekyll). See [Importing content](#importing-content). |
 | `bin/build` | Render the site to `_site/`. Defaults to `ABQARI_ENV=production`. |
 | `bin/serve` | Build and serve on `:4000`. Defaults to `ABQARI_ENV=development` with file-watch + livereload. |
 | `bin/test` | Run the Minitest suite. See [Testing](#testing). |
@@ -521,6 +522,77 @@ bin/new --name "My Blog" \
 Run it once after `git clone`; after that, edit `config/site.yml` directly. The generator only touches site identity and feature switches — it never modifies templates, layouts, or engine code, since those are yours to customise.
 
 If you skip `bin/new`, the example content stays. Useful for poking around — but commit your own first commit before the example posts get tangled with your real ones.
+
+## Importing content
+
+If you're moving from another platform, `bin/import` pulls content from a platform export into your site's `content/<collection>/` tree. Each imported post lands as a regular Abqari bundle — same layout, same frontmatter conventions, same image pipeline — so the imported posts are indistinguishable from posts you'd write fresh.
+
+```bash
+bin/import substack ~/Downloads/substack-export.zip
+bin/import ghost    ~/Downloads/export.json
+bin/import jekyll   ~/old-site/
+```
+
+After each run, the script writes `_import_report.md` (gitignored) summarising what was imported, skipped, and warned about. Open it in your editor before committing — imports rarely need post-edit tweaks, but the report tells you exactly where to look if they do.
+
+### Supported platforms
+
+| Platform | Source format | Notes |
+|---|---|---|
+| `substack` | `.zip` (or unzipped directory) | Reads `posts.csv` + `posts/<id>.html`. Filters drafts and podcasts; paid-only posts come through with `audience: only_paid` in the frontmatter. Strips subscription widgets, share buttons, polls, and other platform chrome before HTML→Markdown conversion. |
+| `ghost` | `export.json` | Reads the standard Ghost 5.x / 6.x JSON export. Filters drafts; members-only and paid posts come through with `visibility:` set in the frontmatter. Resolves tags via the export's `posts_tags` join table. Strips Ghost-specific bookmark, callout, and product cards. |
+| `jekyll` | Site source directory | Reads `_posts/YYYY-MM-DD-slug.md`. Pure-markdown bodies pass through verbatim; `.html` posts run through HTML→Markdown. Merges `categories:` into `tags:`. Copies colocated assets from `assets/posts/<slug>/` (or `assets/<slug>/`) alongside the new bundle. Warns when Liquid template tags (`{% include %}`, `{% post_url %}`) need manual conversion to ERB. |
+
+### Options
+
+All flags are common across platforms.
+
+| Flag | What it does |
+| --- | --- |
+| `--into COLLECTION` | Destination collection (default: `posts`). Use `--into notes` to import into `content/notes/`, `--into archive` into `content/archive/`, etc. |
+| `--keep-remote` | Leave image URLs as remote references instead of downloading. Faster, but source-platform CDN URLs expire over time — recommended only for testing or dry-runs. |
+| `--flat` | Write flat-file posts (`content/<col>/<slug>.md`) instead of the default bundle layout (`content/<col>/<slug>/index.md`). |
+| `--dry-run` | Process the source but write nothing to disk. The report is also skipped — use this to preview the run. |
+| `--force` | Overwrite existing files. Default is to skip files that already exist on disk, so re-running an import is safe. |
+| `--canonical` | Write a `canonical_url:` frontmatter key pointing back at the source URL. For sites mirroring content rather than migrating off the source — search engines treat the source as the canonical version. |
+| `--strip SEL,SEL` | Comma-separated CSS selectors (`tag` or `tag.class`) to strip from each post body before HTML→Markdown conversion. Use when the per-platform defaults don't catch every chrome block your site's export contains. |
+
+### What you get
+
+For each post, the importer:
+
+1. **Parses the source** — Substack's CSV manifest + per-post HTML files, Ghost's JSON tree, or Jekyll's `_posts/` directory.
+2. **Strips platform chrome** — known divs/widgets/CTAs the source platform inserts (subscribe boxes, share buttons, paywalls). Each importer ships its own selector list; extend with `--strip`.
+3. **Converts HTML → Markdown** via `reverse_markdown` with GitHub-flavoured extensions. Unknown tags pass through verbatim rather than being silently dropped, so a tag the importer doesn't recognise is visible for manual cleanup rather than lost.
+4. **Downloads remote images** into the post's bundle directory (default; opt out with `--keep-remote`). The image pipeline then re-encodes them to AVIF + WebP with responsive variants on the next build, exactly as it does for hand-authored posts. See [Images](#images) for the pipeline details.
+5. **Resolves slug collisions** by appending a numeric suffix — duplicates become `my-post`, `my-post-2`, `my-post-3`.
+6. **Writes a bundle** at `content/<collection>/YYYY-MM-DD-<slug>/index.md` containing:
+   - `title`, `published: true`, `date`, optional `description` / `tags` / `image`
+   - `redirect_from: [/p/<original-slug>/]` (Substack) or `[/<original-slug>/]` (Ghost) so existing inbound links keep working
+   - `canonical_url:` if you passed `--canonical`
+7. **Writes `_import_report.md`** in the site root summarising every post with its bundle path plus any warnings (HTTP failures, Liquid tags needing manual conversion, etc.).
+
+### Image handling
+
+Remote images get downloaded into the post's bundle by default. This is the durable choice: source-platform CDN URLs (`substackcdn.com/image/fetch/...`, Ghost's blob storage, Medium's image proxy) get rotated periodically, and posts that keep remote URLs break six to twenty-four months after migration.
+
+Downloaded images sit alongside `index.md` like any hand-authored bundle asset. Abqari's [image pipeline](#images) picks them up on the next build and emits responsive AVIF + WebP variants, just as it does for bundles you authored from scratch.
+
+If a download fails (404, timeout, oversized file), the URL is left in place and a warning lands in the report. The post still imports — one missing image doesn't sink the run.
+
+### Idempotency
+
+Re-running the importer over the same source is safe. Files that already exist on disk are skipped by default and show up in the report as `skipped`. Use `--force` if you've made source-side edits and want to overwrite the local copies.
+
+If you've made local edits to imported posts and want to pull in only newly-published source posts, leave `--force` off. If you want to start fresh after a botched run, delete the relevant bundle directories first.
+
+### Migration tips
+
+- **Dry-run first.** `--dry-run` shows what the import would produce without writing anything. Useful for sanity-checking platform-specific quirks (paid posts, drafts, slug collisions) before you commit.
+- **Commit the import as one change.** Once you've spot-checked the output, commit the new bundle directories together — the next build will optimise the downloaded images and the diff stays clean.
+- **Read `_import_report.md`.** The report is the single source of truth for "what changed in this import." Glance through it for warnings before you delete it.
+- **Consider `--canonical` for mirroring.** If you're keeping the source site live alongside Abqari (cross-posting from Substack, for example), pass `--canonical` so the imported posts carry `canonical_url:` pointing back. Search engines treat the source as the canonical version.
+- **Custom platforms.** No importer for your source? Each importer is a single file under `lib/abqari/importers/`; the base class handles the writer pipeline (HTML→Markdown, image download, frontmatter, idempotency, report) so a new importer is just "parse this source into `ImportedPost` records." Open an issue or contribute one.
 
 ## Project structure
 
@@ -2114,6 +2186,12 @@ For the full list with release dates and rationale, see
 
 **v0.3.x** (current):
 
+- **Content importers** — `bin/import substack|ghost|jekyll <source>`
+  pulls posts from another platform's export into the site's
+  collections. Downloads remote images into bundles so the image
+  pipeline picks them up; writes `redirect_from:` to preserve
+  inbound links; idempotent (skips existing files by default).
+  See [Importing content](#importing-content).
 - **Canonical publications schema** — frontmatter aligned with the
   Folio v1 API (cover_url, excerpt, tagline, name for bundles +
   series, price as `{cents, currency, formatted}`, in_series, etc.).
@@ -2126,8 +2204,9 @@ For the full list with release dates and rationale, see
   `cover` all live under `<collection>.show:` in `config/site.yml`,
   mirroring `index:` for listing-page knobs.
 - **Cover enum** — `cover: photo | photo_or_svg | svg | none` on
-  posts and workshops. Generates inline decorative initial-tile
-  SVGs for text-first authors who don't supply imagery.
+  posts and workshops. Generates inline decorative title-card SVGs
+  (slug-hashed gradient, word-wrapped page title) for text-first
+  authors who don't supply imagery.
 - **TOC collapse toggle** — native `<details>`/`<summary>`, expanded
   by default. Per-post `toc:` frontmatter override.
 - **Published-field migration** — `published: true` (default) /

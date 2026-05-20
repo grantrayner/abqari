@@ -20,7 +20,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install libvips
         # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
@@ -39,7 +39,7 @@ jobs:
         run: bundle exec bin/test
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: coverage-report
@@ -49,7 +49,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install libvips
         # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
@@ -75,7 +75,7 @@ jobs:
         run: bundle exec bin/audit --strict
 
       - name: Upload audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: audit-report
@@ -85,7 +85,7 @@ jobs:
   bundle-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install libvips
         # Hard runtime dep for the image pipeline. `ubuntu-latest` ships

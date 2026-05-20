@@ -338,6 +338,7 @@ Cheat sheet for common changes:
 | New config key | add to `SiteConfig::KNOWN_KEYS`; read via `site.config['key']` |
 | New env var | add to "Configuration knobs" table in `docs/security.md` |
 | New CLI flag | `bin/<command>` with `OptionParser`; flag wins over env var |
+| New content importer (Substack, Ghost, etc.) | new file under `lib/abqari/importers/`, subclass `Base`, register in `Importers::REGISTRY` |
 
 ---
 
