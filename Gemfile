@@ -16,7 +16,7 @@ gem 'webrick', '~> 1.8'
 
 group :development do
   gem 'listen', '~> 3.8'    # FS events for the dev-server watcher (optional)
-  gem 'minitest', '~> 5.0'
+  gem 'minitest', '~> 6.0'
   # ostruct + rexml: used by the test suite (struct stubs in many tests;
   # XML validation in sitemap_feed_escape_test). Both moved out of Ruby's
   # default gem set on different schedules; pin so CI passes under
