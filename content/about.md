@@ -1,30 +1,66 @@
 ---
 title: About
 published: true
-description: A few words about this site, the people behind it, or what you'll find here.
+description: A Ruby static site generator for working authors — posts, photos, publications, workshops, and the IndieWeb out of the box.
 layout: about
 nav:
-  order: 99             # high number so About stays last even when
-                        # other collections get added
+  order: 99
 ---
 
-This is placeholder copy — edit `content/about.md` to make it yours.
-The lede above the body comes from this file's frontmatter
-`description:`, which is also used for SEO meta and social previews.
+Abqari is a static site generator for Ruby. It's built around the four
+content types working authors actually publish — long-form **writing**
+(posts), **photos** and image-led notes, **publications** (books and
+other catalogue items), and **workshops** or other services that need
+structured metadata. Each is a first-class collection with its own
+layout, frontmatter shape, and configuration surface.
 
-## Subscribe
+This site is itself built with Abqari. Every section is a working
+example of the corresponding feature; the
+[source for this site](https://github.com/grantrayner/abqari) is the
+same code you'd use to build your own.
 
-New posts are published via RSS and JSON Feed. Paste either URL into your
-feed reader (NetNewsWire, Feedly, Inoreader, …):
+## What ships in the box
 
-- [RSS feed](/feed.xml)
-- [JSON Feed](/feed.json)
+- **Four built-in collections** — posts, photos, publications, workshops — plus your own under `collections:`.
+- **Themes as tokens, not rules.** Five hand-tuned themes (`minimal`, `magazine`, `notebook`, `sand`, `bootstrap`), `custom` for starter customisation, `none` for bring-your-own. Palette + density via CSS variables.
+- **Image pipeline.** libvips-backed AVIF + WebP variants with CLS-safe responsive `<picture>` rewriting.
+- **Folio storefront integration** for sites that sell books — manual frontmatter and auto-fetched data coexist in the same collection.
+- **Content importers** — `bin/import substack | ghost | jekyll <source>` brings posts from another platform's export into your `content/` tree.
+- **IndieWeb-native** — microformats2, webmention send/receive via webmention.io, Bridgy Fed for ActivityPub following.
+- **POSSE syndication** to Mastodon and Bluesky on each build, with idempotent retry-on-failure tracking.
+- **`bin/audit`** for links, SEO, a11y, privacy, and CVE checks in one markdown report.
+- **Static search via Pagefind**, JSON Feed, sitemap with image extension, JSON-LD Article schema, Open Graph + Twitter cards, per-environment robots.
 
-You can also paste any page on this site into a feed reader — auto-discovery
-is enabled, so the reader finds the feed without you copying the URL directly.
+See the [README](https://github.com/grantrayner/abqari#readme) for the
+full surface — or browse the [posts](/posts/) for hands-on examples of
+each feature.
 
-## Contact
+## Design principles
 
-A spam-resistant contact button appears below this paragraph once you set
-`contact.email` in `config/site.yml`. Until then this section is empty —
-nothing leaks to the page.
+- **Author-trusted content.** The engine assumes the operator wrote
+  the content. No sandboxed templating; no untrusted markdown gate.
+- **Sensible defaults.** Sites work out of the box. Configuration is
+  for opting *out* of behaviour, not opting *in*.
+- **Real Ruby in layouts.** ERB partials run real Ruby via Erubi's
+  auto-escape. No new templating language to learn.
+- **Small surface, large reach.** Three runtime gem deps:
+  `commonmarker`, `erubi`, `ruby-vips`. Plus standard library.
+- **One file at a time.** Every config knob has an inline comment
+  explaining what it does and what changes if you flip it. `bin/audit`
+  surfaces what's drifting.
+
+## Project status
+
+Abqari is on `v0.3.x` — the engine is stable enough to run this
+site and several others. It's distributed via git source today; a
+RubyGems release is on the near-term roadmap. See the
+[CHANGELOG](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md)
+for every shipped feature with dates and rationale.
+
+## Source &amp; contributing
+
+- **Repository:** [github.com/grantrayner/abqari](https://github.com/grantrayner/abqari)
+- **README:** setup, project structure, full feature surface
+- **CHANGELOG:** every shipped change, dated, with rationale
+- **CONTRIBUTING:** how to file issues and submit changes
+- **License:** MIT

@@ -8,7 +8,7 @@
 # every page header. Edit them now, or run `bin/new --name "My Blog"
 # --description "..."` to set them via the CLI.
 title: Abqari
-description: A static site generator for Ruby
+description: A Ruby static site generator for working authors — posts, photos, publications, workshops, and the IndieWeb out of the box.
 author: Grant Rayner
 
 # Locale ─────────────────────────────────────────────────────────────────
@@ -999,9 +999,11 @@ search: false                 # set to true once pagefind is installed
 # To put the button somewhere other than About — e.g. in the footer —
 # render the partial from any layout: <%%= render 'partials/contact_button' %>
 contact:
-  email: hello@example.com    # demo address — the engine's fixture site
-                              # showcases the contact module on the home page;
-                              # replace with your own when forking
+  # The project site keeps GitHub as the canonical contact surface
+  # (issues / discussions / PRs). Leave `email:` commented out unless
+  # you want a JavaScript-reassembled mailto button — see the
+  # spam-resistance commentary above.
+  # email: hello@example.com
   label: Contact              # button text
   subject:                    # optional — pre-fills the mail client's subject line
 
@@ -1051,13 +1053,16 @@ contact:
 # The fixture site below enables a sampler so the engine demo shows
 # every shipped icon in the footer. Replace with your own when forking.
 social:
-  github: https://github.com/your-handle
-  mastodon: https://mastodon.social/@your-handle
-  bluesky: https://bsky.app/profile/your-handle.bsky.social
-  x: https://x.com/your-handle
-  linkedin: https://linkedin.com/in/your-handle
+  github: https://github.com/grantrayner/abqari
+  # Fill in (or remove) the platforms you publish on. Each entry maps
+  # to a footer icon; setting `rel="me"` also unlocks `webmention.io`
+  # and Bridgy Fed verification when `indieweb.enabled: true`.
+  # mastodon: https://mastodon.social/@your-handle
+  # bluesky:  https://bsky.app/profile/your-handle.bsky.social
+  # x:        https://x.com/your-handle
+  # linkedin: https://linkedin.com/in/your-handle
   rss: /feed.xml
-  mail: mailto:hello@example.com
+  # mail: mailto:you@example.com
 
 # Nav ────────────────────────────────────────────────────────────────────
 # The primary nav at the top of every page. Layout is
@@ -1165,5 +1170,9 @@ environments:
     indexable: false        # robots.txt disallows everything
 
   production:
-    url: https://example.com
+    # This is the project's own website. Forking the engine and want to
+    # deploy your own site instead? Edit this URL to your own domain
+    # before pushing to production, OR run `bin/new --name "..."` from
+    # a fresh clone to reset all the site-identity values to your own.
+    url: https://www.abqari.dev
     indexable: true

@@ -1,29 +1,29 @@
-# Deploy an Abqari site to Cloudflare Pages on every push to main.
+# Deploy to Cloudflare Pages on every push to main.
 #
-# Setup (one-time):
+# OPT IN — this workflow is GATED. Until you enable it, it runs as a
+# no-op even on push. To enable:
+#
 #   1. Create a Cloudflare Pages project (Direct Upload, no Git integration).
 #   2. Generate an API token with the "Cloudflare Pages: Edit" scope:
 #      https://dash.cloudflare.com/profile/api-tokens
-#   3. In your GitHub repo: Settings → Secrets and variables → Actions → New
-#      repository secret. Add:
-#        CLOUDFLARE_API_TOKEN     — the token from step 2
-#        CLOUDFLARE_ACCOUNT_ID    — from any Cloudflare dashboard URL
-#   4. Edit `project-name` below to match your Pages project's name.
+#   3. GitHub repo → Settings → Secrets and variables → Actions:
+#      - Secrets (tab): add `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+#      - Variables (tab): add `ENABLE_CLOUDFLARE = true`
+#                          add `CLOUDFLARE_PROJECT_NAME = your-project-name`
+#
+# Three deploy options ship in this repo — Cloudflare Pages (this file),
+# Render (`deploy-render.yml`), and GitHub Pages (`deploy-github-pages.yml`).
+# Each one is independently gated on its own `ENABLE_*` repo variable so
+# you can enable multiple, none, or any subset.
 #
 # What this does:
-#   - Installs Ruby and Pagefind (only used if `search: true` in site.yml)
-#   - Caches `bundle install` between runs
+#   - Installs Ruby + libvips, restores bundle cache
+#   - Installs Pagefind (used only if `search: true` in site.yml)
 #   - Builds the site in production mode
-#   - Runs the audit and uploads the report as an artifact (won't fail the deploy)
+#   - Runs the audit, uploads report as artifact (audit failures don't block deploy)
 #   - Deploys _site/ to Cloudflare Pages via Wrangler
-#
-# Other hosts:
-#   - Netlify:        replace the deploy step with `nwtgck/actions-netlify`
-#   - Render:         link the GitHub repo directly in the Render dashboard;
-#                     this workflow becomes optional
-#   - GitHub Pages:   replace deploy with `actions/deploy-pages`
 
-name: Deploy
+name: Deploy → Cloudflare Pages
 
 on:
   push:
@@ -36,10 +36,16 @@ permissions:
 
 jobs:
   build-and-deploy:
+    if: vars.ENABLE_CLOUDFLARE == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install libvips
+        # The image pipeline expects libvips. Pre-installing avoids a
+        # slow fallback to shell-out (`vips` / `magick`) at build time.
+        run: sudo apt-get update && sudo apt-get install -y libvips42
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -71,11 +77,6 @@ jobs:
           name: audit-report
           path: audit/*.md
           retention-days: 30
-          # Audit runs with `continue-on-error: true`, so a hard failure
-          # leaves the audit/ directory empty. Treat that case as silent
-          # rather than a warning — the deploy job still ships the site,
-          # and the missing report is already visible via the audit step's
-          # red ✗ in the workflow summary.
           if-no-files-found: ignore
 
       - name: Deploy to Cloudflare Pages
@@ -83,4 +84,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy _site --project-name=your-project-name
+          command: pages deploy _site --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME }}

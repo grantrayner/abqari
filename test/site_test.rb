@@ -93,7 +93,7 @@ class SiteBuildTest < Minitest::Test
 
   def test_canonical_link_in_head
     html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
-    assert_match(%r{<link rel="canonical" href="https://example\.com/posts/hello-from-the-blog/">}, html)
+    assert_match(%r{<link rel="canonical" href="https://www\.abqari\.dev/posts/hello-from-the-blog/">}, html)
   end
 
   def test_post_emits_jsonld_article
@@ -112,7 +112,7 @@ class SiteBuildTest < Minitest::Test
 
   def test_sitemap_includes_post_url
     sitemap = TestHelpers.read_output('sitemap.xml')
-    assert_includes sitemap, 'https://example.com/posts/hello-from-the-blog/'
+    assert_includes sitemap, 'https://www.abqari.dev/posts/hello-from-the-blog/'
   end
 
   def test_sitemap_declares_image_extension_namespace
@@ -122,13 +122,13 @@ class SiteBuildTest < Minitest::Test
 
   def test_sitemap_emits_image_entry_for_post_with_bundle_image
     sitemap = TestHelpers.read_output('sitemap.xml')
-    assert_includes sitemap, '<image:loc>https://example.com/posts/building-with-abqari/hero.svg</image:loc>'
+    assert_includes sitemap, '<image:loc>https://www.abqari.dev/posts/building-with-abqari/hero.svg</image:loc>'
   end
 
   def test_sitemap_omits_image_entry_for_post_without_bundle_images
     sitemap = TestHelpers.read_output('sitemap.xml')
     # The writing-in-markdown post has no images; its <url> block should not contain <image:image>.
-    block = sitemap[%r{<url>\s*<loc>https://example\.com/posts/writing-in-markdown/</loc>.*?</url>}m]
+    block = sitemap[%r{<url>\s*<loc>https://www\.abqari\.dev/posts/writing-in-markdown/</loc>.*?</url>}m]
     refute_nil block
     refute_includes block, '<image:image>'
   end

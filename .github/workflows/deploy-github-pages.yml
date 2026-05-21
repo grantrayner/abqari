@@ -1,0 +1,100 @@
+# Deploy to GitHub Pages on every push to main.
+#
+# OPT IN — this workflow is GATED. Until you enable it, it runs as a
+# no-op even on push. To enable:
+#
+#   1. GitHub repo → Settings → Pages → Source: "GitHub Actions"
+#      (NOT "Deploy from a branch"). This grants the workflow the
+#      `pages` and `id-token` permissions it needs to publish.
+#   2. GitHub repo → Settings → Secrets and variables → Actions →
+#      Variables (tab): add `ENABLE_GITHUB_PAGES = true`
+#
+# Unlike Cloudflare and Render, no secrets are required — GitHub
+# Pages auth is handled by the runner via OIDC. The free tier covers
+# unlimited public projects; private projects need a paid plan.
+#
+# Custom domain: add a `CNAME` file with your domain to the repo root
+# (committed) and set the domain in Settings → Pages → Custom domain.
+# GitHub serves HTTPS via Let's Encrypt automatically.
+#
+# Three deploy options ship in this repo. Each is independently gated
+# on its own `ENABLE_*` repo variable; enable any subset.
+
+name: Deploy → GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Concurrency: only one Pages deploy can run at a time. Newer pushes
+# cancel older still-running ones so the live site reflects the most
+# recent main.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: vars.ENABLE_GITHUB_PAGES == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y libvips42
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install Pagefind (optional — for static search)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build site
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/build
+
+      - name: Run audit
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/audit
+        continue-on-error: true
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: audit-report
+          path: audit/*.md
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: vars.ENABLE_GITHUB_PAGES == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

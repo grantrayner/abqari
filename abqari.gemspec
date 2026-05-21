@@ -46,6 +46,12 @@ Gem::Specification.new do |spec|
     'README*',
     'LICENSE*',
     'CHANGELOG*'
+  ] + Dir[
+    # The skeleton ships a `.github/workflows/` tree (the deploy
+    # workflows for Cloudflare / Render / GitHub Pages). `Dir.glob`
+    # excludes dotfiles by default, so the lib/**/* entry above
+    # silently drops them. The explicit dotglob below picks them up.
+    'lib/abqari/templates/site_skeleton/.github/**/*'
   ]
 
   # Single global executable. `exe/abqari` is on PATH after `gem
@@ -59,6 +65,10 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'base64',          '~> 0.2'
   spec.add_dependency 'commonmarker',    '~> 1.1'
+  # csv: used by `Abqari::Importers::Substack` to read the export's
+  # posts.csv manifest. Moved out of Ruby's default gem set in 3.4 —
+  # pinned explicitly so the gem still works under Bundler's frozen mode.
+  spec.add_dependency 'csv',             '~> 3.3'
   spec.add_dependency 'erubi',           '~> 1.13'
   # reverse_markdown: lazy-loaded by the content importers (bin/import).
   # Normal builds never pull it into memory; the gem is small pure Ruby.

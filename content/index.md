@@ -8,11 +8,16 @@ nav:
   label: Home
 ---
 
-This is the Abqari demo site, rendered from `content/index.md` via the
-`home` layout and written to disk as plain HTML. Every section below
-is a real working example of the corresponding feature, and the
+This is the Abqari project site, rendered from `content/index.md` via
+the `home` layout and written to disk as plain HTML. Every section
+below is a real working example of the corresponding feature, and the
 configurable home modules at the foot of the page pull live entries
 from the four sample collections.
+
+The source is open on
+[GitHub](https://github.com/grantrayner/abqari) — including the
+content of this very page. Clone it, run `bin/new`, and you have
+the same engine to build your own.
 
 ## Four pillars
 
@@ -162,8 +167,9 @@ run workshops.
 - Incremental rebuilds in dev (only changed pages re-render)
 - Listen-based file watcher, partial CSS reload
 
-See the [README](https://github.com/your-handle/abqari) for the full surface.
+See the [README](https://github.com/grantrayner/abqari#readme) for the full surface.
 
-*This page lives in `content/index.md` — replace the body with your
-own welcome copy, or delete the markdown entirely and let the home
-modules introduce the site on their own.*
+*This page lives in `content/index.md` in the source repository.
+Forks: replace the body with your own welcome copy, or delete the
+markdown entirely and let the home modules introduce the site on
+their own.*

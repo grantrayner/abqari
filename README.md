@@ -606,7 +606,9 @@ gem.
 ```
 my-site/
 ├── .github/workflows/
-│   └── deploy.yml                      Cloudflare Pages deploy via GitHub Actions
+│   ├── deploy-cloudflare.yml           Cloudflare Pages deploy (gated by ENABLE_CLOUDFLARE)
+│   ├── deploy-render.yml               Render deploy via deploy hook (gated by ENABLE_RENDER)
+│   └── deploy-github-pages.yml         GitHub Pages deploy (gated by ENABLE_GITHUB_PAGES)
 ├── Gemfile, Gemfile.lock               Declares the abqari gem dependency
 ├── bin/
 │   ├── build                           Thin wrapper: requires 'abqari', builds
@@ -652,7 +654,7 @@ every file in this list:
 
 ```
 abqari/
-├── .github/workflows/deploy.yml
+├── .github/workflows/deploy-*.yml      Three host-specific deploy workflows (Cloudflare, Render, Pages)
 ├── abqari.gemspec                      Gem manifest (lib/, app/, themes/, etc.)
 ├── app/
 │   ├── assets/css/_common.css          Structural CSS (layout, components)
@@ -1529,27 +1531,46 @@ Abqari generates a stub HTML page at `/old-tutorial/` with a `<meta refresh>` an
 
 Abqari produces a plain `_site/` directory of static files — deploy it anywhere that serves static HTML.
 
-A starter GitHub Actions workflow ships at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). It builds with Ruby + Bundler caching, optionally installs Pagefind for search, runs the audit (uploaded as an artifact), and deploys to Cloudflare Pages on every push to `main`.
+Three GitHub Actions workflows ship in `.github/workflows/`, one per first-class host. Each is **gated by an `ENABLE_*` repository variable** so they're inert until you opt in. You can enable one, any combination, or none.
 
-**One-time Cloudflare Pages setup:**
+| Host | Workflow file | Gate variable | Required secrets |
+| --- | --- | --- | --- |
+| **Cloudflare Pages** | [`deploy-cloudflare.yml`](.github/workflows/deploy-cloudflare.yml) | `ENABLE_CLOUDFLARE = true` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_PROJECT_NAME` variable) |
+| **Render** | [`deploy-render.yml`](.github/workflows/deploy-render.yml) | `ENABLE_RENDER = true` | `RENDER_DEPLOY_HOOK_URL` |
+| **GitHub Pages** | [`deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml) | `ENABLE_GITHUB_PAGES = true` | None (uses OIDC) |
 
-1. Create a Pages project (use **Direct Upload**, not Git integration — the GitHub Action handles deploy).
-2. Generate an API token with the **Cloudflare Pages: Edit** scope.
-3. Add two secrets to your GitHub repo (Settings → Secrets and variables → Actions):
-   - `CLOUDFLARE_API_TOKEN`
-   - `CLOUDFLARE_ACCOUNT_ID`
-4. Edit `your-project-name` in the workflow file to match your Pages project.
+Gate variables live in **Settings → Secrets and variables → Actions → Variables**. Secrets live in the **Secrets** tab on the same page.
 
-Push to `main` and the site deploys.
+### Step-by-step setup
 
-**Other hosts:**
+**See [`docs/deploying.md`](docs/deploying.md) for the full walkthrough**, including:
+
+- Per-host one-time setup with exact button labels and field values
+- Whether to use Render's dashboard auto-deploy or the Actions-driven path
+- Cloudflare API token creation (the part where most people get stuck)
+- DNS configuration: CNAME for `www`, apex domain options, propagation verification
+- Custom domain setup on each host
+- A verification checklist for after the first deploy
+- Troubleshooting reference for the common failure modes
+
+### Quick start (Render dashboard, no workflow needed)
+
+If you just want a site live quickly, the simplest path is Render's dashboard. No GitHub secrets, no workflow files:
+
+1. Sign in at [dashboard.render.com](https://dashboard.render.com), click **New +** → **Static Site**, connect your repo.
+2. Build command: `sudo apt-get update && sudo apt-get install -y libvips42 && bundle install && bundle exec bin/build`
+3. Publish directory: `_site`. Environment variable: `ABQARI_ENV=production`.
+4. Click **Create Static Site**. Wait ~3-5 minutes for the first build.
+
+The site is live at `<name>.onrender.com`. Add a custom domain via **Settings → Custom Domains** — Render gives you a CNAME target to add at your registrar.
+
+For everything else (Cloudflare Pages, GitHub Pages, Actions-gated Render, DNS, troubleshooting), see [`docs/deploying.md`](docs/deploying.md).
+
+### Other hosts
 
 | Host | Approach |
 | --- | --- |
-| **Cloudflare Pages** | Use the shipped workflow above (recommended for free tier + unmetered bandwidth) |
-| **Netlify** | Replace the deploy step with [`nwtgck/actions-netlify`](https://github.com/nwtgck/actions-netlify) |
-| **Render** | Connect the GitHub repo directly in Render — no Action needed; build command `bundle exec bin/build`, publish dir `_site` |
-| **GitHub Pages** | Replace the deploy step with `actions/deploy-pages@v4` |
+| **Netlify** | Add a Netlify deploy step using [`nwtgck/actions-netlify`](https://github.com/nwtgck/actions-netlify); same shape as the Cloudflare workflow |
 | **S3 + CloudFront** | `aws s3 sync _site s3://your-bucket/ --delete` after build |
 | **Anywhere static** | Upload `_site/` via FTP/rsync/SCP/whatever |
 
