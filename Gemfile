@@ -9,7 +9,7 @@ gem 'commonmarker', '~> 1.1'
 # frozen-mode CI runs don't fail with a require error.
 gem 'csv', '~> 3.3'
 gem 'erubi', '~> 1.13'    # auto-escape ERB engine — see docs/security.md §3
-gem 'reverse_markdown', '~> 2.1' # HTML→Markdown for `bin/import` (lazy-loaded; no cost on normal builds)
+gem 'reverse_markdown', '~> 3.0' # HTML→Markdown for `bin/import` (lazy-loaded; no cost on normal builds)
 gem 'rouge', '~> 4.0'
 gem 'ruby-vips', '~> 2.2' # native libvips bindings for the image pipeline
 gem 'webrick', '~> 1.8'

@@ -72,7 +72,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'erubi',           '~> 1.13'
   # reverse_markdown: lazy-loaded by the content importers (bin/import).
   # Normal builds never pull it into memory; the gem is small pure Ruby.
-  spec.add_dependency 'reverse_markdown', '~> 2.1'
+  spec.add_dependency 'reverse_markdown', '>= 2.1', '< 4.0'
   spec.add_dependency 'rouge',           '~> 4.0'
   # ruby-vips: native libvips bindings for the image pipeline. The gem
   # is small pure-FFI Ruby; the install footprint is the libvips C
