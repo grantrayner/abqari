@@ -13,6 +13,14 @@
 
 name: Release
 
+# Third-party actions are SHA-pinned (not `@v5`-style floating tags).
+# Floating tags on a workflow that holds `contents: write` and the
+# RubyGems API key is a supply-chain hazard: an attacker who
+# compromises any major-tag action can publish abqari on our behalf.
+# Dependabot's `github-actions` ecosystem (.github/dependabot.yml)
+# keeps these pins up to date — bumping them is a reviewable PR
+# rather than a silent upstream release.
+
 on:
   push:
     tags:
@@ -30,7 +38,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Install libvips with AVIF support
         # libheif1 + plugin packages are required for AVIF encoding —
@@ -42,8 +50,13 @@ jobs:
                                    libheif-plugin-libde265 \
                                    libheif-plugin-dav1d
 
+      - name: Install Pagefind (for site audit step)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           bundler-cache: true
 
@@ -67,8 +80,23 @@ jobs:
             exit 1
           fi
 
+      # Mirror the PR-gate (`bin/check`): every check that gates a
+      # PR also gates a release. Skipping the audit + dep-CVE check
+      # at release time would let a regression that bypassed CI
+      # (e.g. a [skip ci] merge) ship to RubyGems.
       - name: Run full test suite
         run: bundle exec bin/test
+
+      - name: Run site audit (strict)
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/audit --strict
+
+      - name: Install bundler-audit
+        run: gem install bundler-audit
+
+      - name: Run bundle-audit (CVE check)
+        run: bundle-audit check --update
 
       - name: Build gem
         run: gem build abqari.gemspec
@@ -80,7 +108,7 @@ jobs:
           gem push abqari-*.gem
 
       - name: Upload .gem to release artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: gem-${{ steps.tag.outputs.tag }}
           path: abqari-*.gem

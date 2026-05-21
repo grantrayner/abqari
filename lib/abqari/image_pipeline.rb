@@ -292,6 +292,19 @@ module Abqari
       end
     end
 
+    # The libvips C-library version, used as a cache-key component
+    # so a libvips upgrade invalidates variants automatically. Falls
+    # back to 'none' when ruby-vips isn't loaded (shell backend or
+    # passthrough) — in that case `backend.name` already varies
+    # between `shell-vips` / `shell-magick`, so the version
+    # component is supplementary.
+    def vips_version_tag
+      return 'none' unless defined?(::Vips) && ::Vips.respond_to?(:version_string)
+      ::Vips.version_string
+    rescue StandardError
+      'none'
+    end
+
     # ----------------------------------------------------------------
     # Backend detection
     # ----------------------------------------------------------------
@@ -504,9 +517,19 @@ module Abqari
         return @variants_cache[cache_key] if @variants_cache[cache_key]
       end
 
+      # Backend identity is part of the cache key so a switch from
+      # `vips-native` → `shell-magick` (or a libvips upgrade that
+      # changes a codec) invalidates old variants. Without this, the
+      # content-addressed filename stays stable while the bytes
+      # inside change, and CDN-cached old variants never get evicted.
+      # `Vips.version_string` is the underlying libvips C-library
+      # version (e.g. "8.18.2"); a codec upgrade in libvips ships as
+      # a new version string, so the hash flips automatically.
       ext = format == 'original' ? File.extname(source_path).delete('.') : format
+      backend_name = backend ? backend.name : 'passthrough'
       hash = Digest::SHA1.hexdigest(
-        "#{source_path}:#{width}:#{format}:#{quality_for(format)}:#{File.mtime(source_path).to_i}"
+        "#{source_path}:#{width}:#{format}:#{quality_for(format)}:" \
+        "#{File.mtime(source_path).to_i}:#{backend_name}:#{vips_version_tag}"
       )[0, HASH_LENGTH]
 
       basename = File.basename(source_path, File.extname(source_path))
@@ -514,8 +537,36 @@ module Abqari
       FileUtils.mkdir_p(target_dir)
       out_path = File.join(target_dir, out_filename)
 
+      # Write a fresh variant to a sibling `.tmp` and rename into
+      # place. Under parallel render two workers can both miss the
+      # in-memory cache, both see `File.exist?(out_path)` return
+      # false, and both attempt to write to the SAME output path
+      # — a slow-disk race can produce a torn/corrupt file. With
+      # the tmp-and-rename pattern, the loser's rename either
+      # silently wins (overwriting a complete file with another
+      # complete file) or the file already exists and we skip the
+      # write entirely. Either way, no reader sees a half-written
+      # variant.
       unless File.exist?(out_path)
-        backend.thumbnail(source_path, out_path, width, format, quality_for(format))
+        # tmp filename keeps the original extension at the end so
+        # libvips' `write_to_file` (which infers format from the
+        # extension) doesn't reject "foo.avif.123.tmp" as unknown.
+        # The `pid + thread.object_id` prefix is load-bearing: two
+        # workers can both pass the cache_mutex check and both reach
+        # this branch for the same `out_filename`. Without unique
+        # tmp paths per thread, one would truncate the other's
+        # in-progress write, and the rename-after-rename would hit
+        # ENOENT on the loser.
+        tmp_path = File.join(
+          target_dir,
+          ".#{Process.pid}.#{Thread.current.object_id}.#{out_filename}"
+        )
+        begin
+          backend.thumbnail(source_path, tmp_path, width, format, quality_for(format))
+          File.rename(tmp_path, out_path)
+        ensure
+          File.unlink(tmp_path) if File.exist?(tmp_path)
+        end
       end
 
       url = "#{url_prefix}#{out_filename}"

@@ -24,10 +24,18 @@ module Abqari
     # window.
     SSE_HEARTBEAT = 30
 
-    def initialize(site, port: DEFAULT_PORT, bind: nil)
+    def initialize(site, port: DEFAULT_PORT, bind: nil, logger: nil)
       @site = site
       @port = port
       @bind = bind || ENV['ABQARI_BIND'] || DEFAULT_BIND
+      # WEBrick's internal logger. Defaults to nil → WEBrick uses its
+      # own stderr logger, which is what operators want in production.
+      # Tests can pass a silent `WEBrick::Log.new(File::NULL)` so
+      # ECONNRESET noise from socket-close races in `server_sse_test`
+      # doesn't pollute the test output (the rescue at the SSE
+      # endpoint already swallows the error functionally; this just
+      # silences the access-log side effect).
+      @logger = logger
       @version = Time.now.to_f
       @scope = 'all'
       @mutex = Mutex.new
@@ -41,13 +49,15 @@ module Abqari
     def start
       start_watcher
 
-      server = WEBrick::HTTPServer.new(
+      server_opts = {
         BindAddress: @bind,
         Port: @port,
         DocumentRoot: @site.output_dir,
         AccessLog: [],
         DirectoryIndex: ['index.html']
-      )
+      }
+      server_opts[:Logger] = @logger if @logger
+      server = WEBrick::HTTPServer.new(server_opts)
 
       server.mount_proc('/__reload__', &method(:handle_reload_endpoint))
 
@@ -318,9 +328,21 @@ module Abqari
     # restarting; if the same error fires `MAX_RESTARTS` times in
     # `RESTART_WINDOW` seconds give up (an unrecoverable bug should
     # surface, not spin forever).
-    WATCHER_RESTART_BACKOFF = 1
-    MAX_RESTARTS            = 5
-    RESTART_WINDOW          = 60
+    #
+    # `WATCHER_RESTART_BACKOFF` can be overridden via the
+    # `ABQARI_WATCHER_RESTART_BACKOFF` env var — primarily for tests,
+    # so `server_supervise_test` doesn't have to wait 5+ seconds for
+    # the give-up branch to fire. Production callers shouldn't set
+    # this; the 1s default exists to avoid hot-restarting on a tight
+    # loop when the underlying error is unrecoverable.
+    DEFAULT_WATCHER_RESTART_BACKOFF = 1.0
+    MAX_RESTARTS                    = 5
+    RESTART_WINDOW                  = 60
+
+    def watcher_restart_backoff
+      return DEFAULT_WATCHER_RESTART_BACKOFF unless ENV['ABQARI_WATCHER_RESTART_BACKOFF']
+      ENV['ABQARI_WATCHER_RESTART_BACKOFF'].to_f
+    end
 
     def supervise(kind)
       Thread.new do
@@ -341,8 +363,9 @@ module Abqari
               break
             end
 
-            Log.warn "#{kind} watcher restarting in #{WATCHER_RESTART_BACKOFF}s…"
-            sleep WATCHER_RESTART_BACKOFF
+            backoff = watcher_restart_backoff
+            Log.warn "#{kind} watcher restarting in #{backoff}s…"
+            sleep backoff
           end
         end
       end

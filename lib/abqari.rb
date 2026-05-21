@@ -5,7 +5,7 @@ require 'time'
 
 module Abqari
   ROOT = File.expand_path('..', __dir__)
-  VERSION = '0.3.1'
+  VERSION = '0.4.0'
 
   # Classes the engine accepts from any YAML input — site config,
   # data files, frontmatter, Folio cache, audit whitelists. Date +
@@ -15,6 +15,39 @@ module Abqari
   # touches the engine. Keep this set minimal — adding a class here
   # is the security-sensitive equivalent of widening a sandbox.
   YAML_PERMITTED_CLASSES = [Date, Time].freeze
+
+  # Marker file written by `Site#build` at the end of a successful
+  # build. Deployers (`bin/deploy`, CI pipelines that rsync `_site/`)
+  # refuse to ship without it; the test harness uses it as the
+  # fixture-intact sentinel. Single source of truth so the three
+  # readers stay in lockstep.
+  BUILD_OK_SENTINEL = '.abqari-build-ok'
+
+  # Atomic file write: write to a sibling tempfile, fsync, then
+  # rename into place. POSIX guarantees the rename is atomic on the
+  # same filesystem, so a reader either sees the previous full
+  # contents or the new full contents — never a half-written buffer.
+  #
+  # Used for state files we re-read on subsequent builds: the
+  # POSSE sent log, the webmention sender log, the webmention
+  # cache, the etag pointer. Without atomicity, a SIGINT or
+  # runner timeout mid-write leaves a truncated YAML / JSON file
+  # and the next build either crashes on parse or — worse for the
+  # POSSE case — treats every prior send as un-sent and re-posts
+  # everything to Mastodon + Bluesky.
+  def self.atomic_write(path, content)
+    dir  = File.dirname(path)
+    base = File.basename(path)
+    tmp  = File.join(dir, ".#{base}.#{Process.pid}.tmp")
+    File.open(tmp, 'w') do |f|
+      f.write(content)
+      f.flush
+      f.fsync rescue nil
+    end
+    File.rename(tmp, path)
+  ensure
+    File.unlink(tmp) if tmp && File.exist?(tmp) rescue nil
+  end
 
   # Jekyll-style YAML frontmatter — opening `---`, body, closing
   # `---`, then everything after.

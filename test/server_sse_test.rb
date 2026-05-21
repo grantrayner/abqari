@@ -12,7 +12,14 @@ require 'socket'
 class ServerSseTest < Minitest::Test
   def setup
     @site = TestHelpers.built_site
-    @server = Abqari::Server.new(@site, port: pick_unused_port, bind: '127.0.0.1')
+    # Silence WEBrick's internal logger. The SSE endpoint rescues
+    # `Errno::ECONNRESET` at the handler level, but WEBrick's request
+    # loop logs the SAME error from `io_fillbuf` when the test's
+    # `socket.close` lands while WEBrick's read is still parked.
+    # That's cosmetic — the tests pass either way — but the stderr
+    # noise drowns out genuine errors in CI output.
+    silent_log = WEBrick::Log.new(File::NULL)
+    @server = Abqari::Server.new(@site, port: pick_unused_port, bind: '127.0.0.1', logger: silent_log)
     @server_thread = Thread.new { @server.start }
 
     # Wait for the server to start listening — poll the port until it

@@ -86,6 +86,19 @@ unless system($PROGRAM_NAME.sub(/deploy\z/, 'build'), out: $stdout, err: $stderr
   abort 'Build failed; not deploying.'
 end
 
+# Defence-in-depth: the build script propagates non-zero exit on
+# render failure (Ruby's default on an unhandled exception), so the
+# `system(...)` check above SHOULD be sufficient. The sentinel below
+# closes the gap when bin/deploy is invoked from a pipeline that
+# `set +e`s the build, or when something else (a rogue rm, an
+# interrupted external rsync) has touched _site/ between the build
+# and now. `_site/.abqari-build-ok` is written by `Site#build` on
+# its success path only; if it's missing, we refuse to ship.
+sentinel = File.join(site.output_dir, Abqari::BUILD_OK_SENTINEL)
+unless File.exist?(sentinel)
+  abort "Missing #{sentinel} — build did not complete successfully. Not deploying."
+end
+
 case target
 when 'cloudflare' then deploy_to_cloudflare(target_config, site.output_dir)
 when 'netlify'    then deploy_to_netlify(target_config, site.output_dir)

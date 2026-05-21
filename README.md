@@ -12,9 +12,10 @@ optional overrides), while the engine — layouts, themes, helpers, asset
 pipeline — lives in the dependency. Forking the engine is also
 supported for users who want to own all the code.
 
-> **Status:** v0.1.0 with active `[Unreleased]` work — see
-> [CHANGELOG.md](CHANGELOG.md). Distributed via Bundler (path or git
-> source). RubyGems publish deferred until the API stabilises further.
+> **Status:** v0.4.0 — see [CHANGELOG.md](CHANGELOG.md). Distributed
+> via RubyGems (`gem install abqari`) and as a Bundler path/git
+> source. The API is still pre-1.0; minor bumps may carry breaking
+> changes documented in the CHANGELOG.
 
 ## Design principles
 
@@ -141,7 +142,7 @@ Test that it worked:
 abqari version
 ```
 
-You should see something like `abqari 0.3.1`. If you get
+You should see something like `abqari 0.4.0`. If you get
 `command not found`, see [Troubleshooting](#troubleshooting) below.
 
 ### Step 3 — Create your first site

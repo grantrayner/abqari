@@ -172,4 +172,36 @@ class SyndicationNetworksTest < Minitest::Test
       net.post(text: text, url: url)
     end
   end
+
+  # When `syndication_text:` mentions the URL twice (e.g. "Read
+  # more at #{url} — see #{url}"), the facet should span the LAST
+  # occurrence — the trailing canonical URL the formatter appends.
+  # The first-match form (`index`) facets the leading mention and
+  # orphans the canonical, which Bluesky's client renders as a
+  # half-linked dangling URL.
+  def test_bluesky_link_facet_picks_last_url_occurrence_when_duplicated
+    net = Bluesky.new(site_with({ 'syndication' => { 'bluesky' => {
+      'handle' => 'h.bsky.social', 'app_password' => 'pw' } } }))
+
+    url  = 'https://example.com/p/'
+    text = "Read at #{url} — #{url}"
+
+    responder = ->(req) {
+      if req.path.include?('createSession')
+        [200, JSON.dump('did' => 'did:plc:x', 'accessJwt' => 'j')]
+      else
+        body  = JSON.parse(req.body)
+        facet = body['record']['facets'].first
+        bytes = text.b
+        assert_equal bytes.rindex(url.b), facet['index']['byteStart'],
+                     'facet should span the rightmost (canonical) URL occurrence'
+        assert_equal bytes.rindex(url.b) + url.bytesize, facet['index']['byteEnd']
+        [200, JSON.dump('uri' => 'at://did:plc:x/app.bsky.feed.post/r1', 'cid' => 'c')]
+      end
+    }
+
+    with_stubbed_http(responder) do |_|
+      net.post(text: text, url: url)
+    end
+  end
 end

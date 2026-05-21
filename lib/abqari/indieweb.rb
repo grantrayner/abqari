@@ -122,10 +122,18 @@ module Abqari
         cached = File.exist?(cache_path) ? safe_parse(File.read(cache_path)) : nil
         etag   = File.exist?(etag_path)  ? File.read(etag_path).strip       : nil
 
+        # Token in the `Authorization` header rather than the query
+        # string. Query strings end up in upstream proxy access logs,
+        # web-server panels, and outbound HTTP monitoring — bearer-style
+        # secrets shouldn't ride there. The webmention.io API accepts
+        # the token in either place; pick the form that doesn't leak.
         uri = URI("#{API_BASE}?domain=#{URI.encode_www_form_component(@cfg['domain'])}" \
-                  "&token=#{URI.encode_www_form_component(@cfg['webmention_io_token'])}" \
                   "&per-page=#{PAGE_SIZE}")
-        headers = { 'Accept' => 'application/json', 'User-Agent' => USER_AGENT }
+        headers = {
+          'Accept'        => 'application/json',
+          'User-Agent'    => USER_AGENT,
+          'Authorization' => "Bearer #{@cfg['webmention_io_token']}"
+        }
         headers['If-None-Match'] = etag if etag
 
         begin
@@ -138,8 +146,8 @@ module Abqari
         case res.code.to_i
         when 200
           parsed = safe_parse(res.body) || {}
-          File.write(cache_path, JSON.pretty_generate(parsed))
-          File.write(etag_path, res['etag'].to_s) if res['etag']
+          Abqari.atomic_write(cache_path, JSON.pretty_generate(parsed))
+          Abqari.atomic_write(etag_path, res['etag'].to_s) if res['etag']
           cached_children(parsed)
         when 304
           cached_children(cached)
@@ -238,7 +246,14 @@ module Abqari
 
           outbound_targets_for(post).each do |target|
             key = "#{source_url}|#{target}"
-            next if log['sent'].key?(key)
+            # Skip only when previously SENT successfully. Prior
+            # `'no-endpoint'` (transient DNS / 5xx) and `'failed'`
+            # (target up but POST rejected) entries are recorded for
+            # visibility but get retried on the next build — a single
+            # bad build must not permanently exclude a (source, target)
+            # pair. Same retry policy as the syndication Dispatcher.
+            prev = log['sent'][key]
+            next if prev && prev['status'] == 'sent'
 
             endpoint = discover_endpoint(target)
             unless endpoint
@@ -270,7 +285,7 @@ module Abqari
       end
 
       def save_log(log)
-        File.write(log_path, YAML.dump(log))
+        Abqari.atomic_write(log_path, YAML.dump(log))
       end
 
       def log_dirty?(log)
@@ -296,11 +311,13 @@ module Abqari
         env_url || @site.config['url']
       end
 
-      # Extract distinct off-site http(s) URLs from a post's rendered body.
-      # We use the raw markdown body because the rendered HTML isn't
-      # available at this stage of the build (sending happens after
-      # render in `Site#build`). Reading frontmatter-ignored markdown
-      # body is fine — author-controlled `[text](url)` and bare URLs.
+      # Extract distinct off-site http(s) URLs from a post's body.
+      # Reads `post.content` (the markdown rendered to HTML — sending
+      # runs after render in `Site#build`, so this is populated).
+      # Author-controlled markdown source means `[text](url)` and
+      # bare URLs are the only shapes we need to handle; the bare-URL
+      # regex below catches both forms once Commonmarker has emitted
+      # them as anchor `href`s or as plain text.
       def outbound_targets_for(post)
         body = post.respond_to?(:content) ? post.content.to_s : ''
         return [] if body.empty?
@@ -362,36 +379,32 @@ module Abqari
       end
 
       def http_request(uri, method, max_bytes: 64 * 1024)
-        if method == :head
-          # HttpSafe is GET-only; we use Net::HTTP directly for the HEAD
-          # probe and don't read a body either way.
-          Net::HTTP.start(uri.host, uri.port,
-                          use_ssl: uri.scheme == 'https',
-                          open_timeout: 5, read_timeout: 5) do |http|
-            req = Net::HTTP::Head.new(uri.request_uri, 'User-Agent' => USER_AGENT)
-            http.request(req)
-          end
-        else
-          HttpSafe.get(uri, headers: { 'User-Agent' => USER_AGENT },
-                            max_bytes: max_bytes,
-                            open_timeout: 5, read_timeout: 10)
-        end
+        # Route every method (GET/HEAD) through HttpSafe so the
+        # streaming + body-size cap + timeouts apply uniformly.
+        # Discovery probes target arbitrary external hosts found in
+        # post bodies — a hostile or compromised target could
+        # otherwise stream gigabytes into the build's memory.
+        HttpSafe.request(method, uri,
+                         headers: { 'User-Agent' => USER_AGENT },
+                         max_bytes: max_bytes,
+                         open_timeout: 5,
+                         read_timeout: method == :head ? 5 : 10)
       rescue StandardError
         nil
       end
 
       def post_notification(endpoint, source, target)
-        uri = URI(endpoint)
-        Net::HTTP.start(uri.host, uri.port,
-                        use_ssl: uri.scheme == 'https',
-                        open_timeout: 5, read_timeout: 10) do |http|
-          req = Net::HTTP::Post.new(uri.request_uri,
-                                    'Content-Type' => 'application/x-www-form-urlencoded',
-                                    'User-Agent'   => USER_AGENT)
-          req.body = URI.encode_www_form(source: source, target: target)
-          res = http.request(req)
-          res.code.to_i.between?(200, 299)
-        end
+        body = URI.encode_www_form(source: source, target: target)
+        res = HttpSafe.request(:post, endpoint,
+                               headers: {
+                                 'Content-Type' => 'application/x-www-form-urlencoded',
+                                 'User-Agent'   => USER_AGENT
+                               },
+                               body: body,
+                               max_bytes: 64 * 1024,
+                               open_timeout: 5,
+                               read_timeout: 10)
+        res.code.to_i.between?(200, 299)
       rescue StandardError => e
         Log.warn "Webmention POST failed (#{endpoint}): #{e.class}: #{e.message}"
         false

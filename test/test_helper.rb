@@ -93,13 +93,18 @@ ENV['ABQARI_OUTPUT_DIR'] = File.join(Dir.tmpdir, 'abqari-test-site')
 ENV['ABQARI_ALLOW_EXTERNAL_OUTPUT'] = 'true'
 
 module TestHelpers
-  # Build the canonical fixture site once per test run. Subsequent calls reuse it.
+  # Build the canonical fixture site once per test run. The
+  # `Abqari::BUILD_OK_SENTINEL` file is written by `Site#build`
+  # only on a fully successful build — if it's absent, either the
+  # fixture has never been built or a sibling test trampled
+  # `_site/`. Either way, rebuild. The sentinel guarantees that
+  # when it's present, `@pages` is populated and every artifact
+  # is on disk, so no additional integrity checks are needed.
   def self.built_site
-    @built_site ||= begin
-      site = Abqari::Site.new
-      site.build
-      site
-    end
+    @built_site ||= Abqari::Site.new
+    sentinel = File.join(@built_site.output_dir, Abqari::BUILD_OK_SENTINEL)
+    @built_site.build unless File.exist?(sentinel)
+    @built_site
   end
 
   def self.read_output(relative_path)
@@ -110,6 +115,16 @@ module TestHelpers
     File.exist?(File.join(built_site.output_dir, relative_path))
   end
 end
+
+# Eagerly warm the shared fixture before any test setup runs.
+# `Site#site_root` memoises `ENV['ABQARI_SITE_ROOT']` on first
+# read; if the first test to call `TestHelpers.built_site` happens
+# to have mutated that env var in its `setup` (e.g. EnvOverrideTest,
+# LayoutDepsMtimeTest), the fixture Site gets anchored to a tmpdir
+# that lacks the engine's `app/assets/`. By touching `built_site`
+# at suite-load time we lock in the canonical site_root before any
+# test gets a chance to interfere.
+TestHelpers.built_site
 
 Minitest.after_run do
   FileUtils.rm_rf(ENV['ABQARI_OUTPUT_DIR']) if ENV['ABQARI_OUTPUT_DIR']&.start_with?(Dir.tmpdir)

@@ -48,8 +48,30 @@ module Abqari
             max_bytes: DEFAULT_MAX_BYTES,
             open_timeout: DEFAULT_OPEN_TIMEOUT,
             read_timeout: DEFAULT_READ_TIMEOUT)
+      request(:get, uri,
+              headers: headers,
+              max_bytes: max_bytes,
+              open_timeout: open_timeout,
+              read_timeout: read_timeout)
+    end
+
+    # General-purpose bounded request — same streaming + cap +
+    # timeouts as `get`, parameterised by HTTP method and optional
+    # body. Used by the POSSE adapters (Mastodon/Bluesky POST) and
+    # the webmention sender (POST + HEAD) so a misbehaving upstream
+    # can't stream gigabytes into the build process's memory.
+    #
+    # Supported methods: :get, :head, :post. POSTs take a `body:`
+    # (string already-encoded — form or JSON) and a Content-Type in
+    # `headers:`.
+    def request(method, uri,
+                headers: {},
+                body: nil,
+                max_bytes: DEFAULT_MAX_BYTES,
+                open_timeout: DEFAULT_OPEN_TIMEOUT,
+                read_timeout: DEFAULT_READ_TIMEOUT)
       uri = URI(uri) unless uri.is_a?(URI)
-      req = Net::HTTP::Get.new(uri.request_uri)
+      req = build_request(method, uri, body)
       headers.each { |k, v| req[k] = v.to_s }
 
       Net::HTTP.start(uri.host, uri.port,
@@ -57,9 +79,22 @@ module Abqari
                       open_timeout: open_timeout,
                       read_timeout: read_timeout) do |http|
         http.request(req) do |res|
-          body = read_capped_body(res, max_bytes, uri)
-          return Response.new(res.code, res.message, flatten_headers(res), body)
+          response_body = method == :head ? '' : read_capped_body(res, max_bytes, uri)
+          return Response.new(res.code, res.message, flatten_headers(res), response_body)
         end
+      end
+    end
+
+    def build_request(method, uri, body)
+      case method
+      when :get  then Net::HTTP::Get.new(uri.request_uri)
+      when :head then Net::HTTP::Head.new(uri.request_uri)
+      when :post
+        req = Net::HTTP::Post.new(uri.request_uri)
+        req.body = body if body
+        req
+      else
+        raise ArgumentError, "unsupported HTTP method: #{method.inspect}"
       end
     end
 

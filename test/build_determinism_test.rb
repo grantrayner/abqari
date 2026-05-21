@@ -14,18 +14,28 @@ require 'digest'
 # `Dir.glob(...).each` somewhere that affects output bytes.
 class BuildDeterminismTest < Minitest::Test
   def test_two_consecutive_builds_produce_identical_output
-    site1 = Abqari::Site.new
-    site1.build
-    snapshot1 = hash_output(site1.output_dir)
+    # Isolate output_dir so the back-to-back `reset_output + build`
+    # cycles don't race with sibling tests that read from the shared
+    # `TestHelpers.built_site` fixture under random test ordering.
+    original_out = ENV['ABQARI_OUTPUT_DIR']
+    Dir.mktmpdir('abqari-determinism') do |dir|
+      ENV['ABQARI_OUTPUT_DIR'] = File.join(dir, '_site')
 
-    site2 = Abqari::Site.new
-    site2.build
-    snapshot2 = hash_output(site2.output_dir)
+      site1 = Abqari::Site.new
+      site1.build
+      snapshot1 = hash_output(site1.output_dir)
 
-    diffs = snapshot1.to_a - snapshot2.to_a
-    extras = snapshot2.to_a - snapshot1.to_a
-    refute (diffs.any? || extras.any?),
-           "build is non-deterministic.\nFiles in build-1 but not build-2:\n  #{diffs.first(5).inspect}\nFiles in build-2 but not build-1:\n  #{extras.first(5).inspect}"
+      site2 = Abqari::Site.new
+      site2.build
+      snapshot2 = hash_output(site2.output_dir)
+
+      diffs = snapshot1.to_a - snapshot2.to_a
+      extras = snapshot2.to_a - snapshot1.to_a
+      refute (diffs.any? || extras.any?),
+             "build is non-deterministic.\nFiles in build-1 but not build-2:\n  #{diffs.first(5).inspect}\nFiles in build-2 but not build-1:\n  #{extras.first(5).inspect}"
+    end
+  ensure
+    ENV['ABQARI_OUTPUT_DIR'] = original_out
   end
 
   private

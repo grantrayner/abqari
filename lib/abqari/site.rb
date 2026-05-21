@@ -86,6 +86,11 @@ module Abqari
       @config = SiteConfig.with_defaults(raw)
       @pages           = []
       @generated_pages = []
+      # Per-build memo registry. All `||=` caches on Site route
+      # through `memo(key) { … }` so a rebuild only has to clear one
+      # hash; adding a new memo can never go out of sync with the
+      # rebuild-reset code. See `reset_state_for_rebuild!`.
+      @memos     = {}
       @renderer  = Renderer.new(self)
       @artifacts = ArtifactWriter.new(self)
 
@@ -143,6 +148,19 @@ module Abqari
       Indieweb::Sender.new(self).send_all   # POST webmentions for new outbound links (opt-in)
       Syndication::Dispatcher.new(self).run # POSSE: crosspost to Mastodon/Bluesky (opt-in)
 
+      # Build-complete sentinel (`Abqari::BUILD_OK_SENTINEL`). Written
+      # ONLY on the success path — if any step above raises, this line
+      # never runs and the file stays absent. Deployers (bin/deploy,
+      # CI pipelines that rsync/scp _site/) check for it before
+      # publishing so a half-built _site/ from a crashed build can't
+      # accidentally ship over a working site. Includes the build
+      # timestamp + the gem version so a stale sentinel (older than
+      # the source files under content/) is detectable.
+      File.write(
+        File.join(output_dir, Abqari::BUILD_OK_SENTINEL),
+        "version: #{Abqari::VERSION}\nbuilt_at: #{Time.now.utc.iso8601}\n"
+      )
+
       Log.info "Built #{all_pages.size} page(s) in #{env}#{incremental ? ' (incremental)' : ''} → _site/"
     ensure
       Hooks.run(:after_build, self) if defined?(@incremental)
@@ -165,9 +183,9 @@ module Abqari
     # honest without requiring careful generator-ordering.
     def add_generated_page(page)
       @generated_pages << page
-      @collection_cache = nil
-      @collection_url_index_cache = nil
-      @posts_cache = nil if page.respond_to?(:post?) && page.post?
+      @memos.delete(:collection_cache)
+      @memos.delete(:collection_url_index_cache)
+      @memos.delete(:posts) if page.respond_to?(:post?) && page.post?
     end
 
     # ------------------------------------------------------------------
@@ -313,8 +331,8 @@ module Abqari
     # O(N) work × number of partial calls. Reset on `reset_state_for_rebuild!`.
     def collection(name)
       canonical = resolve_collection_name(name)
-      @collection_cache ||= {}
-      @collection_cache[canonical] ||= begin
+      cache = memo(:collection_cache) { {} }
+      cache[canonical] ||= begin
         # Manual content pages (Page objects) AND generated pages that
         # opt in by exposing `#collection` returning the canonical
         # name. PublisherShowPage is the primary example —
@@ -347,8 +365,8 @@ module Abqari
     # the total cost across a build is O(pages) instead of O(pages²).
     def collection_url_index(name)
       canonical = resolve_collection_name(name)
-      @collection_url_index_cache ||= {}
-      @collection_url_index_cache[canonical] ||= begin
+      cache = memo(:collection_url_index_cache) { {} }
+      cache[canonical] ||= begin
         index = {}
         collection(canonical).each_with_index { |page, i| index[page.url] = i }
         index
@@ -527,9 +545,11 @@ module Abqari
     # entirely) sort to the end as Time.at(0). Memoised — same shape
     # as `posts`, called from every taxonomy partial.
     def taxonomy_pages
-      @taxonomy_pages_cache ||= @pages.select(&:collection)
-                                     .sort_by { |p| p.date || Time.at(0) }
-                                     .reverse
+      memo(:taxonomy_pages) do
+        @pages.select(&:collection)
+              .sort_by { |p| p.date || Time.at(0) }
+              .reverse
+      end
     end
 
     # ------------------------------------------------------------------
@@ -545,11 +565,11 @@ module Abqari
     # latest-post module, and several JSON-LD partials. Recomputing
     # on each call is O(N); cache once per build.
     def posts
-      @posts_cache ||= @pages.select(&:post?).sort_by(&:date).reverse
+      memo(:posts) { @pages.select(&:post?).sort_by(&:date).reverse }
     end
 
     def posts_by_tag
-      @posts_by_tag_cache ||= begin
+      memo(:posts_by_tag) do
         result = Hash.new { |h, k| h[k] = [] }
         posts.each do |post|
           post.tags.each { |tag| result[tag] << post }
@@ -563,23 +583,23 @@ module Abqari
     # ------------------------------------------------------------------
 
     def assets
-      @assets ||= AssetPipeline.new(self)
+      memo(:assets) { AssetPipeline.new(self) }
     end
 
     def images
-      @images ||= ImagePipeline.new(self)
+      memo(:images) { ImagePipeline.new(self) }
     end
 
     def visualizations
-      @visualizations ||= Visualizations.new(self)
+      memo(:visualizations) { Visualizations.new(self) }
     end
 
     def folio
-      @folio ||= Folio.new(self)
+      memo(:folio) { Folio.new(self) }
     end
 
     def data
-      @data ||= @loader.load_data
+      memo(:data) { @loader.load_data }
     end
 
     # IndieWeb — webmentions received for a given page URL. Returns an
@@ -703,20 +723,26 @@ module Abqari
     end
 
     # Reset between (re)builds so the dev-server's incremental rebuild
-    # picks up generator + template changes correctly. Includes the
-    # partition-view caches (posts, posts_by_tag, taxonomy_pages,
-    # collection) so a content edit isn't masked by a stale memo.
+    # picks up generator + template changes correctly. Clearing the
+    # `@memos` hash drops every memoised value at once — partition
+    # views (posts, posts_by_tag, taxonomy_pages, collection),
+    # pipelines (assets, images, visualizations), Folio, loaded
+    # data. Adding a new `memo(...)` accessor anywhere on Site is
+    # automatically picked up here; the old per-field nil-list could
+    # silently go out of sync.
     def reset_state_for_rebuild!
-      @generated_pages           = []
-      @assets                    = nil
-      @images                    = nil
-      @data                      = nil
-      @posts_cache               = nil
-      @posts_by_tag_cache        = nil
-      @taxonomy_pages_cache      = nil
-      @collection_cache          = nil
-      @collection_url_index_cache = nil
+      @generated_pages = []
+      @memos.clear
       @renderer.clear_template_cache
+    end
+
+    # Memoise the result of `block` under `key` for the lifetime of
+    # this Site instance (or until `reset_state_for_rebuild!` runs).
+    # Every cache on Site routes through here so there's a single
+    # source of truth for what gets cleared between rebuilds.
+    def memo(key)
+      return @memos[key] if @memos.key?(key)
+      @memos[key] = yield
     end
 
     def folio_enabled?

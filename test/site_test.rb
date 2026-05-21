@@ -683,16 +683,28 @@ class TimezoneTest < Minitest::Test
   end
 
   def test_tz_is_restored_after_build
-    original = ENV['TZ']
-    ENV['TZ'] = 'America/New_York'
+    # Build into an isolated output dir so we don't wipe the fixture
+    # that `TestHelpers.built_site` produced for the rest of the
+    # suite. Under Minitest's random ordering, this test can run
+    # before tests that `read_output(...)` from the fixture; without
+    # isolation, `reset_output` here clears those files and every
+    # downstream `read_output` call raises ENOENT.
+    original_tz  = ENV['TZ']
+    original_out = ENV['ABQARI_OUTPUT_DIR']
 
-    site = Abqari::Site.new
-    site.build
+    Dir.mktmpdir('abqari-tz-restored') do |dir|
+      ENV['ABQARI_OUTPUT_DIR'] = File.join(dir, '_site')
+      ENV['TZ']                = 'America/New_York'
 
-    assert_equal 'America/New_York', ENV['TZ'],
-                 'Site#build should restore ENV[TZ] to its pre-build value via ensure'
+      site = Abqari::Site.new
+      site.build
+
+      assert_equal 'America/New_York', ENV['TZ'],
+                   'Site#build should restore ENV[TZ] to its pre-build value via ensure'
+    end
   ensure
-    ENV['TZ'] = original
+    ENV['TZ']                = original_tz
+    ENV['ABQARI_OUTPUT_DIR'] = original_out
   end
 
   def test_tz_is_restored_even_when_build_raises

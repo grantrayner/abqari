@@ -19,6 +19,16 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The gemspec declares `required_ruby_version: '>= 3.3'`. The
+    # matrix tests against the floor (3.3 — anyone on the oldest
+    # supported release) and the latest stable Ruby so regressions
+    # against either end are caught at PR time. Add new minors as
+    # they reach stable; drop a row when bumping the floor in the
+    # gemspec.
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.3', '3.4']
     steps:
       - uses: actions/checkout@v5
 
@@ -39,9 +49,10 @@ jobs:
                                    libheif-plugin-libde265 \
                                    libheif-plugin-dav1d
 
-      - name: Set up Ruby
+      - name: Set up Ruby ${{ matrix.ruby }}
         uses: ruby/setup-ruby@v1
         with:
+          ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
 
       - name: Run test suite with coverage
@@ -50,8 +61,11 @@ jobs:
         run: bundle exec bin/test
 
       - name: Upload coverage report
+        # Only upload from one Ruby version — uploading from every
+        # matrix entry produces duplicate artifacts under the same
+        # name, which the upload-artifact action rejects.
+        if: always() && matrix.ruby == '3.3'
         uses: actions/upload-artifact@v5
-        if: always()
         with:
           name: coverage-report
           path: coverage/

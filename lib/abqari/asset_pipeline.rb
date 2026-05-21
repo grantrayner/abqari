@@ -67,6 +67,15 @@ module Abqari
         next if File.directory?(entry)
         next if File.basename(entry).start_with?('.')
         next if entry.include?(File.join('assets', 'images') + File::SEPARATOR)
+        # Symlink containment — same invariant `BundleAssets`,
+        # `ImagePipeline`, and `SiteLoader` enforce. A theme or
+        # `app/assets/` file that symlinks outside `site_root` (e.g.
+        # `app/assets/css/main.css` → `/etc/passwd`) is skipped with
+        # a warning rather than copied into `_site/`. Trust model
+        # still treats `app/assets/` as author-controlled, but
+        # consistency across walkers keeps future contributors from
+        # assuming any one of them is sufficient on its own.
+        next if @site.external_symlink?(entry)
 
         logical = entry.sub("#{src}/", '')
         fingerprinted = fingerprint(entry, logical)

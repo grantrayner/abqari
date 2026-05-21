@@ -50,6 +50,12 @@ module Abqari
   module Syndication
     USER_AGENT = "abqari-syndication/#{Abqari::VERSION}"
 
+    # Per-response body cap for Mastodon / Bluesky API calls. API
+    # responses for a single status are <10 KB; 2 MB is far above the
+    # worst case and exists so a misbehaving instance can't OOM the
+    # build by streaming an unbounded body.
+    MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
     # Hard caps per network. Mastodon allows configurable instance max
     # (default 500) — we use the conservative default so the same
     # snippet posts cleanly to any instance. Bluesky enforces 300.
@@ -164,7 +170,7 @@ module Abqari
       end
 
       def save_log(log)
-        File.write(log_path, YAML.dump(log))
+        Abqari.atomic_write(log_path, YAML.dump(log))
       end
 
       def log_dirty?(log)
@@ -263,24 +269,22 @@ module Abqari
 
         protected
 
+        # Bounded HTTP via HttpSafe — same streaming + size cap + timeouts
+        # as our build-time GETs. Without the cap, a misbehaving
+        # Mastodon instance or Bluesky PDS could stream gigabytes into
+        # the build process's memory.
         def http_json(uri, method:, headers: {}, body: nil)
-          uri = URI(uri) unless uri.is_a?(URI)
-          req = case method
-                when :post then Net::HTTP::Post.new(uri.request_uri)
-                when :get  then Net::HTTP::Get.new(uri.request_uri)
-                else raise ArgumentError, "unsupported method: #{method}"
-                end
-          headers.each { |k, v| req[k] = v }
-          req['User-Agent'] = USER_AGENT
-          req.body = body if body
-
-          Net::HTTP.start(uri.host, uri.port,
-                          use_ssl: uri.scheme == 'https',
-                          open_timeout: 5, read_timeout: 15) do |http|
-            res = http.request(req)
-            return [res.code.to_i, parse_json(res.body)]
-          end
+          merged = headers.merge('User-Agent' => USER_AGENT)
+          res = HttpSafe.request(method, uri,
+                                 headers: merged,
+                                 body: body,
+                                 max_bytes: MAX_RESPONSE_BYTES,
+                                 read_timeout: 15)
+          [res.code.to_i, parse_json(res.body)]
         rescue StandardError => e
+          # `uri` is the request target only — credentials live in the
+          # `Authorization` header (Mastodon) or POST body (Bluesky
+          # createSession), never in the URI, so logging the URI is safe.
           Log.warn "#{name} request failed (#{uri}): #{e.class}: #{e.message}"
           [nil, nil]
         end
@@ -412,10 +416,19 @@ module Abqari
         # streams). Find the URL in the text and emit a `link` facet
         # spanning its byte range so the post displays it as a clickable
         # link rather than a plain string of characters.
+        #
+        # `rindex` (not `index`) — the formatter appends the canonical
+        # URL at the END of the snippet ("<title> — <desc> <url>"), so
+        # the last occurrence is the authoritative one. A custom
+        # `syndication_text:` that mentions the URL twice would
+        # otherwise facet the first appearance and orphan the second.
+        # Operators occasionally write `"More on #{url} — read at #{url}"`
+        # patterns; picking the trailing occurrence keeps the link
+        # facet aligned with how the snippet was constructed.
         def link_facets(text, url)
           bytes = text.b
           target = url.b
-          start = bytes.index(target)
+          start = bytes.rindex(target)
           return [] unless start
           finish = start + target.bytesize
           [{
