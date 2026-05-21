@@ -1,0 +1,53 @@
+# Dependabot configuration.
+#
+# Controls how/when Dependabot opens version-update PRs. (Security-
+# update PRs run independently of this file — they fire whenever a
+# CVE is disclosed for one of your deps, regardless of cadence.)
+#
+# Cadence is weekly + grouped: one PR per ecosystem per week with all
+# eligible bumps, instead of a separate PR per dep per day. For a
+# small Ruby site with a handful of deps and Actions, this keeps the
+# inbox sane without missing meaningful updates.
+#
+# Edit the timezone/day below to match your working week.
+
+version: 2
+updates:
+  # ----- Ruby gems --------------------------------------------------
+  - package-ecosystem: bundler
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per week with all eligible gem bumps. Easier to review
+      # together than separate PRs per gem; one CI run instead of N.
+      ruby-deps:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Major bumps on the engine + runtime-critical gems gated behind
+      # manual upgrade — these change behaviour, not just API surface.
+      # Edit the list to fit the gems you actually depend on.
+      - dependency-name: "abqari"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "commonmarker"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ruby-vips"
+        update-types: ["version-update:semver-major"]
+
+  # ----- GitHub Actions --------------------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - "*"
