@@ -1558,7 +1558,7 @@ Gate variables live in **Settings → Secrets and variables → Actions → Vari
 If you just want a site live quickly, the simplest path is Render's dashboard. No GitHub secrets, no workflow files:
 
 1. Sign in at [dashboard.render.com](https://dashboard.render.com), click **New +** → **Static Site**, connect your repo.
-2. Build command: `sudo apt-get update && sudo apt-get install -y libvips42 && bundle install && bundle exec bin/build`
+2. Build command: `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d && bundle install && bundle exec bin/build`
 3. Publish directory: `_site`. Environment variable: `ABQARI_ENV=production`.
 4. Click **Create Static Site**. Wait ~3-5 minutes for the first build.
 

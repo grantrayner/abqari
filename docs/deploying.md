@@ -44,7 +44,7 @@ directly, rebuilds on every push to `main`.
    | Name | Anything memorable — appears in the Render URL (`<name>.onrender.com`) |
    | Branch | `main` |
    | Root Directory | _Leave blank_ |
-   | Build Command | `sudo apt-get update && sudo apt-get install -y libvips42 && bundle install && bundle exec bin/build` |
+   | Build Command | `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d && bundle install && bundle exec bin/build` |
    | Publish Directory | `_site` |
 
 5. Click **Advanced** → **Add Environment Variable**:
@@ -324,7 +324,7 @@ After deploying, walk through this checklist:
 You're missing libvips on the build environment.
 
 - **Render**: ensure your build command starts with
-  `sudo apt-get update && sudo apt-get install -y libvips42 &&`
+  `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d &&`
 - **Cloudflare Pages / GitHub Pages**: the shipped workflows
   include the apt step automatically. If you've edited the
   workflow, make sure you didn't remove it.
@@ -333,6 +333,34 @@ You can also drop the image pipeline entirely — see
 [`README.md → Images`](../README.md#images) for the `optimise: false`
 config option. The build then runs without libvips and ships original
 images.
+
+### Build fails: `Vips::Error: heifsave: Unsupported compression`
+
+libvips is installed but the libheif AV1 encoder plugin isn't, so the
+pipeline can't write AVIF variants. On Ubuntu 24.04 (the base image
+behind `ubuntu-latest` runners and most modern Render environments),
+`libvips42` no longer pulls HEIF support in by default — it's split
+into per-codec plugin packages.
+
+The fix is to install them alongside `libvips42`:
+
+```bash
+sudo apt-get install -y libvips42 libheif1 \
+                         libheif-plugin-aomenc \
+                         libheif-plugin-libde265 \
+                         libheif-plugin-dav1d
+```
+
+The shipped workflow files (`deploy-cloudflare.yml`,
+`deploy-render.yml`, `deploy-github-pages.yml`) already do this. If
+you're using Render's dashboard auto-deploy, update your build
+command to include the plugin packages.
+
+If you can't install the plugins for some reason, the image pipeline
+will now degrade gracefully — it probes each format at startup, logs
+a one-line warning for unsupported formats, and emits a `<picture>`
+with the remaining formats only. Sites still ship, just without AVIF
+variants.
 
 ### Build succeeds but custom domain shows "Site not found"
 

@@ -22,11 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install libvips
-        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
-        # with libvips preinstalled but the apt step is cheap insurance
-        # against image-name-pinning changes.
-        run: sudo apt-get install -y libvips42
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -51,11 +62,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install libvips
-        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
-        # with libvips preinstalled but the apt step is cheap insurance
-        # against image-name-pinning changes.
-        run: sudo apt-get install -y libvips42
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -87,11 +109,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install libvips
-        # Hard runtime dep for the image pipeline. `ubuntu-latest` ships
-        # with libvips preinstalled but the apt step is cheap insurance
-        # against image-name-pinning changes.
-        run: sudo apt-get install -y libvips42
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

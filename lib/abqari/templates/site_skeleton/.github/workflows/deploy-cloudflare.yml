@@ -42,10 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install libvips
-        # The image pipeline expects libvips. Pre-installing avoids a
-        # slow fallback to shell-out (`vips` / `magick`) at build time.
-        run: sudo apt-get update && sudo apt-get install -y libvips42
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 (the
+        # `ubuntu-latest` runner) the apt package `libvips42` doesn't
+        # include HEIF/AVIF — that's split into libheif1 + per-codec
+        # plugins. Without them, the pipeline raises "Unsupported
+        # compression" the first time it tries to emit an AVIF variant.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

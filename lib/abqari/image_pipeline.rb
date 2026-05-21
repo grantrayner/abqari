@@ -2,6 +2,7 @@
 
 require 'digest'
 require 'fileutils'
+require 'set'
 require 'shellwords'
 
 begin
@@ -82,6 +83,7 @@ module Abqari
       @registry = {}
       @registry_mutex = Mutex.new
       @url_to_bundle_dir = nil
+      @config['formats'] = prune_unsupported_formats(@config['formats'])
     end
 
     def enabled?
@@ -212,6 +214,82 @@ module Abqari
 
     def quality_for(format)
       @config['quality'][format.to_s] || @config['quality']['original'] || 80
+    end
+
+    # ----------------------------------------------------------------
+    # Format capability pre-flight
+    # ----------------------------------------------------------------
+
+    # Probe each configured output format once per process. Drop the
+    # ones the host environment can't actually write — typically AVIF
+    # on stripped-down libvips builds that lack the libheif AV1 encoder
+    # plugin (the `Vips::Error: heifsave: Unsupported compression`
+    # symptom on Ubuntu 24.04 without `libheif-plugin-aomenc`).
+    #
+    # Without this guard, the pipeline raises mid-build for every
+    # image, the rendered site is corrupted, and the build fails. With
+    # it, we emit a one-line warning, drop the format from the formats
+    # list, and the pipeline produces a `<picture>` element with the
+    # remaining formats — site still ships, just without AVIF variants.
+    #
+    # Memoised at the class level so the actual probe runs at most
+    # once per process even when many ImagePipeline instances are
+    # created (e.g. across the test suite). The probe is cheap, but
+    # cold-start codec init for HEIF/AVIF can take a second or two —
+    # repeating it per-test would be slow.
+    def prune_unsupported_formats(formats)
+      return formats unless defined?(::Vips)
+      formats.select do |fmt|
+        if format_writable?(fmt)
+          true
+        else
+          warn_unsupported_format(fmt)
+          false
+        end
+      end
+    end
+
+    def format_writable?(format)
+      return true if format == 'original'
+      capability = ImagePipeline.format_capabilities[format.to_s]
+      return capability unless capability.nil?
+      ImagePipeline.format_capabilities[format.to_s] = probe_format(format)
+    end
+
+    # The actual probe — a tiny in-memory write. Run at most once per
+    # format per process via the class-level memo above.
+    def probe_format(format)
+      probe = ::Vips::Image.black(2, 2)
+      probe.write_to_buffer(".#{format}")
+      true
+    rescue ::Vips::Error
+      false
+    rescue StandardError
+      # Any non-Vips failure (load error, FFI weirdness): bias toward
+      # "yes, try it" — the real write will surface a clearer error
+      # than swallowing the probe failure here.
+      true
+    end
+
+    def warn_unsupported_format(format)
+      return if ImagePipeline.warned_formats.include?(format.to_s)
+      ImagePipeline.warned_formats << format.to_s
+      Log.warn "Image pipeline: #{format.upcase} unsupported by this libvips " \
+               "build (likely missing codec plugin) — skipping #{format.upcase} variants. " \
+               "On Ubuntu 24.04 install `libheif1 libheif-plugin-aomenc` to enable AVIF."
+    end
+
+    # Class-level caches for probe results + already-warned formats.
+    # Survives across ImagePipeline instances within a single Ruby
+    # process.
+    class << self
+      def format_capabilities
+        @format_capabilities ||= {}
+      end
+
+      def warned_formats
+        @warned_formats ||= Set.new
+      end
     end
 
     # ----------------------------------------------------------------

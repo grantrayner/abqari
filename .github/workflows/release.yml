@@ -32,8 +32,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install libvips
-        run: sudo apt-get install -y libvips42
+      - name: Install libvips with AVIF support
+        # libheif1 + plugin packages are required for AVIF encoding —
+        # libvips42 alone doesn't include them on Ubuntu 24.04.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
