@@ -1,0 +1,85 @@
+<%#
+  Newsletter subscription form. Provider-agnostic — works with any
+  service that accepts an HTML form POST (Cogent Notes, Mailchimp,
+  Buttondown, ConvertKit / Kit, TinyLetter, Substack, etc.).
+
+  Configure once in config/site.yml under `newsletter:`. The form
+  renders ONLY when `newsletter.action` is set; without it the
+  partial emits nothing, so it's safe to drop into any layout.
+
+  Schema:
+      newsletter:
+        action: https://www.cogentnotes.app/s/MWAsQKqFXcs   # required — POST target
+        email_field: email                                   # default 'email'
+                                                             #   Mailchimp: EMAIL
+                                                             #   ConvertKit: email_address
+        title: Subscribe to the newsletter                   # default
+        description: Short standfirst (optional)
+        button: Subscribe                                    # default
+        hidden_fields:                                       # optional — extra inputs
+          - { name: tags,   value: blog }                    #   e.g. Buttondown tags
+          - { name: b_abc1, value: '' }                      #   e.g. Mailchimp honeypot
+        script: https://www.cogentnotes.app/js/subscribe.js  # optional, loaded `defer`
+        attribution:                                         # optional — omit for none
+          text: Cogent Notes
+          url: https://www.cogentnotes.app
+          prefix: Powered by                                 # default
+
+  Per-call overrides (any layout or markdown body with erb: true):
+      <%%= render 'partials/newsletter_subscribe' %>
+      <%%= render 'partials/newsletter_subscribe',
+                title: 'Get notified when new books drop',
+                description: 'One short email a month.',
+                button: 'Notify me' %>
+
+  Common placements: bottom of posts_index, end of about page,
+  end of a publications index, sidebar slot, dedicated
+  /subscribe/ page.
+
+  Note on indentation: this partial can be rendered from a markdown
+  body (erb: true), where commonmarker treats indented lines as code
+  blocks. We keep all output HTML at column 0 and use `-%>` on
+  control tags to suppress whitespace-only output.
+%>
+<%
+  cfg = site.config['newsletter']
+-%>
+<% if cfg.is_a?(Hash) && (action_url = cfg['action']) -%>
+<%
+  form_title       = defined?(title)       && title       ? title       : (cfg['title']       || 'Subscribe to the newsletter')
+  form_description = defined?(description) && description ? description : cfg['description']
+  form_button      = defined?(button)      && button      ? button      : (cfg['button']      || 'Subscribe')
+  email_field      = cfg['email_field'] || 'email'
+  hidden_fields    = Array(cfg['hidden_fields'])
+  attribution      = cfg['attribution']
+  script_url       = cfg['script']
+-%>
+<aside class="newsletter-subscribe">
+<h2 class="newsletter-subscribe__title"><%= form_title %></h2>
+<% if form_description && !form_description.to_s.empty? -%>
+<p class="newsletter-subscribe__description"><%= form_description %></p>
+<% end -%>
+<form action="<%= action_url %>" method="post" class="newsletter-subscribe__form">
+<label for="newsletter-email" class="visually-hidden">Your email</label>
+<input type="email" id="newsletter-email" name="<%= email_field %>" placeholder="you@example.com" required class="newsletter-subscribe__input">
+<% hidden_fields.each do |field| -%>
+<input type="hidden" name="<%= field['name'] %>" value="<%= field['value'] %>">
+<% end -%>
+<button type="submit" class="btn btn-primary newsletter-subscribe__button"><%= form_button %></button>
+</form>
+<% if attribution.is_a?(Hash) && attribution['text'] -%>
+<% prefix = attribution['prefix'] || 'Powered by' -%>
+<p class="newsletter-subscribe__attribution">
+<%= prefix %>
+<% if attribution['url'] -%>
+<a href="<%= sanitized_url(attribution['url']) %>" target="_blank" rel="noopener noreferrer"><%= attribution['text'] %></a>
+<% else -%>
+<%= attribution['text'] %>
+<% end -%>
+</p>
+<% end -%>
+<% if script_url && (safe_script = sanitized_url(script_url)) -%>
+<script src="<%= safe_script %>" defer></script>
+<% end -%>
+</aside>
+<% end -%>

@@ -1,0 +1,89 @@
+---
+layout: application
+---
+<!--
+  Publications archive — the canonical full grid of every publication
+  in the `publications` collection, paginated. Pairs with
+  `publications_index.html.erb`: when
+  `collections.publications.archive.enabled: true`, the front page is
+  a curated landing (showcase + latest N + bundles + series), and
+  this page holds the full list.
+
+  After the canonical-schema migration (docs/publications.md),
+  `site.collection('publications')` returns BOTH manual content
+  pages AND Folio-sourced entries — the paginator slices the merged
+  list automatically. Folio-only publications appear here without
+  needing a manual override page.
+
+  Wire it up by creating `content/publications-archive.md` (NOT
+  inside `content/publications/` — that would make the page a
+  publication itself) with:
+
+      ---
+      title: Publications archive
+      description: Every book on the site, newest first.
+      layout: publications_archive
+      permalink: /publications/archive/
+      paginate: true
+      paginate_collection: publications
+      ---
+
+  `paginate: true` reads the page count from
+  `collections.publications.pagination.per_page` in config/site.yml.
+  `paginate_collection: publications` is **required** — without it
+  the paginator falls back to the default `'posts'` collection.
+-->
+<%
+  cfg       = (site.collection_config('publications') || {})
+  index_cfg = cfg['index'] || {}
+  description      = page.frontmatter['description']
+  show_description = index_cfg.fetch('show_description', true)
+  show_price       = index_cfg.fetch('show_price',       true)
+  show_isbn        = index_cfg.fetch('show_isbn',        false)
+  show_pages       = index_cfg.fetch('show_pages',       false)
+  show_published   = index_cfg.fetch('show_published',   false)
+  truncate_at      = index_cfg.fetch('description_truncate', 200)
+
+  # URL prefix for individual publication pages — honors `slug:` aliasing.
+  pubs_prefix = cfg['slug'].to_s.empty? ?
+    cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{cfg['slug']}/"
+  pubs_prefix = '/publications/' if pubs_prefix.empty?
+
+  # Paginator carries this page's slice of the collection;
+  # fall back to the full collection if pagination is disabled.
+  pubs = page.paginator&.posts || site.collection('publications')
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Publications archive' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
+
+  <% if pubs.any? %>
+    <ul class="publications-index">
+      <% pubs.each_with_index do |pub_page, idx| %>
+        <%# `publication_card_data(slug)` returns the normalised hash
+            the `_publication_card` partial expects — reads canonical
+            frontmatter fields directly. %>
+        <%== render 'partials/publication_card',
+                   pub: publication_card_data(pub_page.slug),
+                   idx: idx,
+                   pubs_prefix: pubs_prefix,
+                   heading_level: 2,
+                   show_description: show_description,
+                   show_price: show_price,
+                   show_isbn: show_isbn,
+                   show_pages: show_pages,
+                   show_published: show_published,
+                   truncate_at: truncate_at %>
+      <% end %>
+    </ul>
+    <%== render 'partials/pagination', paginator: page.paginator %>
+  <% end %>
+</article>

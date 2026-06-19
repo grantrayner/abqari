@@ -1,0 +1,46 @@
+---
+layout: application
+---
+<%
+  description = page.frontmatter['description']
+
+  # URL prefix honours `bundles.slug:` aliasing.
+  cfg = site.collection_config('bundles')
+  prefix = cfg['slug'].to_s.empty? ?
+    cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{cfg['slug']}/"
+  prefix = '/bundles/' if prefix.empty?
+
+  # Merged collection — manual content + any externally-sourced
+  # entries — minus the index page itself.
+  bundles = site.collection('bundles').reject { |b| b.url == page.url }
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Bundles' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
+
+  <ul class="bundles-index">
+    <% bundles.each do |b| %>
+      <% fm = b.frontmatter %>
+      <li>
+        <a href="<%= prefix %><%= b.slug %>/">
+          <span class="bundles-index__name"><%= b.title %></span>
+          <% if (price = fm.dig('price', 'formatted')) %>
+            <span class="bundles-index__price"><%= price %></span>
+          <% end %>
+          <% if (count = Array(fm['publications']).size) > 0 %>
+            <span class="bundles-index__count"><%= pluralize(count, 'book') %></span>
+          <% end %>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</article>

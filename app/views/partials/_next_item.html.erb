@@ -1,0 +1,38 @@
+<!--
+  Renders a single "Up next" card below a show view, linking to the
+  chronologically-newer post in the same collection. "Next" means
+  strictly newer — at the newest post the section is suppressed
+  rather than falling back to an older neighbour (which would
+  contradict the label).
+
+  Reuses the `_post_list` index card so the single "Up next" entry
+  reads like a regular index row — cover-left, title / date /
+  description on the right at desktop, stacked on mobile. There's
+  only ever one up-next post, so the full index treatment fits;
+  the related grid below uses a different (compact, multi-card)
+  shape for its many-card case.
+
+  Heading style matches `.related__heading` (small uppercase muted)
+  so the show-view tail still reads as a coherent run of sections —
+  it's the card body that differs.
+
+  Usage:
+      <%%= render 'partials/next_item' %>
+
+  Config (per collection in config/site.yml):
+
+      collections:
+        posts:
+          next:
+            enabled: true       # set false to suppress the section
+
+  Renders nothing when the source is the newest in its collection,
+  there's no next page, or `next.enabled` is false.
+-->
+<% next_post = site.next_in_collection(page) %>
+<% if next_post %>
+<section class="next-item" aria-labelledby="next-item-heading">
+  <h2 id="next-item-heading" class="next-item__heading">Up next</h2>
+  <%== render 'partials/post_list', posts: [next_post] %>
+</section>
+<% end %>

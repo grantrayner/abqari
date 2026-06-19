@@ -1,0 +1,145 @@
+/* Minimal — system fonts, max-width prose, light/dark via
+   `prefers-color-scheme`. The default theme that ships with Abqari.
+   Inherits all structural CSS from `_common.css` (layout, components,
+   page structure). This file just sets:
+
+     1. Theme tokens (palette + fonts) for both light and dark
+     2. Light/dark mode overrides
+     3. Minimal-specific aesthetic refinements
+*/
+
+
+/* ==========================================================================
+   Theme tokens — overrides _common.css defaults.
+
+   Light is declared in `:root`. Dark redeclares only the values that
+   differ from light, in two contexts:
+
+     1. `@media (prefers-color-scheme: dark) :root:not([data-theme="light"])`
+        — system-pref dark, unless the user explicitly toggled to light.
+     2. `[data-theme="dark"]` — explicit user toggle to dark.
+
+   No `[data-theme="light"]` block — `:root` already holds light, and
+   the `:not()` guard lets the explicit light setting fall through.
+   ========================================================================== */
+
+:root {
+  /* Base palette — minimal's signature is "near-white page with a
+     hint of grey, clear web-blue accents". The bg is a perceptible
+     light grey so cards (`--color-card-bg: #fff`) sit as subtly
+     brighter rectangles against it. */
+  --color-text:    #1a1a1a;
+  --color-bg:      #f5f5f5;            /* very light grey, just visibly off-white */
+  --color-muted:   #6b6b6b;
+  --color-link:    #0066cc;            /* clear web-blue — links + primary */
+  --color-rule:    rgba(127, 127, 127, 0.2);
+  --color-card-bg: #fff;
+  --color-code-bg: rgba(127, 127, 127, 0.08);
+
+  /* Component palette */
+  --color-primary:        #0066cc;
+  --color-on-primary:     #fff;
+  --color-secondary:      #6b6b6b;
+  --color-on-secondary:   #fff;
+  --color-success:        #198754;
+  --color-on-success:     #fff;
+  --color-danger:         #dc3545;
+  --color-on-danger:      #fff;
+  --color-warning:        #ffc107;
+  --color-on-warning:     #1a1a1a;
+  --color-info:           #0dcaf0;
+  --color-on-info:        #1a1a1a;
+  --color-light:          #f8f9fa;
+  --color-on-light:       #1a1a1a;
+  --color-dark:           #1a1a1a;
+  --color-on-dark:        #f8f9fa;
+
+  /* Typography — system fonts, no web-font dependency. Body is sans,
+     so `--font-sans` (buttons / nav / footer) just follows. */
+  --font-body:    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-body);
+  --font-meta:    var(--font-body);
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans:    var(--font-body);
+
+  /* Tag chip — pill-shaped with a subtle code-bg fill. The engine's
+     default is a plain inline link with no chrome; setting these
+     three tokens opts into the chip style without re-declaring the
+     `.post-list__tag` rule. */
+  --tag-padding:  0.125rem 0.5rem;
+  --tag-bg:       var(--color-code-bg);
+  --tag-radius:   var(--radius-pill);
+}
+
+/* Dark deltas — only values that differ from `:root`. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-text:    #ececec;
+    --color-bg:      #111;
+    --color-muted:   #9a9a9a;
+    --color-link:    #6cb;
+    --color-rule:    rgba(255, 255, 255, 0.15);
+    --color-card-bg: #1c1c1c;
+    --color-code-bg: rgba(255, 255, 255, 0.08);
+
+    --color-primary:        #6cb;
+    --color-on-primary:     #111;
+    --color-secondary:      #9a9a9a;
+    --color-on-secondary:   #111;
+    --color-success:        #4caf7a;
+    --color-on-success:     #111;
+    --color-danger:         #f06b75;
+    --color-on-danger:      #111;
+    --color-on-warning:     #111;
+    --color-info:           #6cb;
+    --color-on-info:        #111;
+    --color-light:          #1c1c1c;
+    --color-on-light:       #ececec;
+    --color-dark:           #ececec;
+    --color-on-dark:        #111;
+  }
+}
+
+[data-theme="dark"] {
+  --color-text:    #ececec;
+  --color-bg:      #111;
+  --color-muted:   #9a9a9a;
+  --color-link:    #6cb;
+  --color-rule:    rgba(255, 255, 255, 0.15);
+  --color-card-bg: #1c1c1c;
+  --color-code-bg: rgba(255, 255, 255, 0.08);
+
+  --color-primary:        #6cb;
+  --color-on-primary:     #111;
+  --color-secondary:      #9a9a9a;
+  --color-on-secondary:   #111;
+  --color-success:        #4caf7a;
+  --color-on-success:     #111;
+  --color-danger:         #f06b75;
+  --color-on-danger:      #111;
+  --color-on-warning:     #111;
+  --color-info:           #6cb;
+  --color-on-info:        #111;
+  --color-light:          #1c1c1c;
+  --color-on-light:       #ececec;
+  --color-dark:           #ececec;
+  --color-on-dark:        #111;
+}
+
+
+/* ==========================================================================
+   Theme-specific aesthetic refinements
+   ========================================================================== */
+
+/* Minimal's anchors are slightly tighter underline-offset for a
+   denser reading feel. */
+a { text-underline-offset: 2px; }
+
+/* Article header tightening — minimal puts the date/meta under h1
+   without spacing, classic newsprint feel. */
+article header h1 { margin-bottom: 0.25rem; }
+article header p {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  margin-top: 0;
+}

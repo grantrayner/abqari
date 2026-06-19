@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Run the Abqari test suite. Uses Minitest from Ruby stdlib — no extra gems.
+# Each *_test.rb file under test/ requires test_helper.rb which loads
+# minitest/autorun; tests fire automatically at exit.
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+$LOAD_PATH.unshift(File.expand_path('../test', __dir__))
+
+Dir[File.expand_path('../test/**/*_test.rb', __dir__)].sort.each { |file| require file }

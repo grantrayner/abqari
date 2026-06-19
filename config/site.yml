@@ -1,0 +1,1233 @@
+# Abqari site configuration.
+# Top-level keys are shared across environments. Per-environment overrides
+# go under `environments:` and deep-merge over the shared keys based on
+# $ABQARI_ENV (default: development).
+
+# Site identity ──────────────────────────────────────────────────────────
+# REQUIRED — these appear in <title>, RSS, social-share previews, and
+# every page header. Edit them now, or run `bin/new --name "My Blog"
+# --description "..."` to set them via the CLI.
+title: Abqari
+description: A Ruby static site generator for working authors — posts, photos, publications, workshops, and the IndieWeb out of the box.
+author: Grant Rayner
+
+# Locale ─────────────────────────────────────────────────────────────────
+# ISO 639-1 code (en, es, fr, de, ja, …). Wires up <html lang>, the RSS
+# <language> element, and Preferred-Languages in security.txt.
+# Single-locale only — Abqari is not a multilingual generator.
+locale: en                    # change to your site's primary language
+# og_locale: en_US            # optional override for `og:locale` — uses
+                              # `<lang>_<region>` format (Facebook prefers it).
+                              # Falls back to `locale` when unset.
+
+# Social cards — Twitter / X identity ─────────────────────────────────────
+# When set, the head emits `twitter:site` and `twitter:creator` meta
+# tags so shares display the right account credit. Both optional;
+# per-post `twitter_creator:` frontmatter overrides the site default.
+# twitter:
+#   site:    "@yourhandle"
+#   creator: "@yourhandle"
+
+# Default share image — used as `og:image` / `twitter:image` for pages
+# without their own hero (e.g. the home page, tag pages). Resolution
+# order per page is: frontmatter `share_image:` → frontmatter `image:`
+# or `cover:` → this site-wide default. Either a site-relative path
+# (`/assets/share.png`) or a full URL.
+# share_image: /assets/share-default.png
+
+# Speculation Rules — modern browsers prerender `/posts/*` links
+# the user is about to click, making navigations near-instant.
+# Strict-CSP friendly (typed JSON only, no inline script). Set
+# enabled: false to skip the script tag entirely.
+speculation_rules:
+  enabled: true               # set false to opt out
+  eagerness: moderate         # 'conservative' / 'moderate' / 'eager'
+
+# llms.txt — opt-in machine-readable summary at /llms.txt (no
+# `.well-known/` prefix in the current draft spec). Lets AI / LLM
+# tools discover a curated index of your content. Off by default;
+# the engine also blocks AI training crawlers via robots.txt
+# (see `block_ai_scraping` below) — flip this on when you want
+# the inverse policy (welcome LLM readers, give them a roadmap).
+llms:
+  enabled: true               # engine fixture turns this on to showcase
+                              # — set false on your own site if you'd
+                              # rather not emit the file
+  description:                # optional — defaults to site.description
+
+# Auto-generated OG share images. When enabled, the build emits a
+# themed SVG card at `<page-url>og.svg` for every content page
+# without an explicit `image:` / `share_image:` / `cover:` hero.
+# The card uses the site's `manifest.theme_color` for its gradient,
+# so the result feels on-brand without per-post artwork. Pages
+# with their own hero image are skipped (their hero IS the share
+# image). Set `og_image: false` in a page's frontmatter to skip
+# generation for that specific page.
+og_images:
+  auto: true                  # engine fixture turns this on to showcase
+
+# Timezone ───────────────────────────────────────────────────────────────
+# IANA timezone name. Used for interpreting naked dates in front matter —
+# `date: 2026-06-15` means "midnight in this zone" no matter where the
+# build runs (your laptop, GitHub Actions, etc.), so future-dated posts
+# publish at the same wall-clock moment everywhere. Dates with an explicit
+# offset (`2026-06-15T08:00:00+08:00`) keep their offset.
+timezone: UTC                 # e.g. America/Los_Angeles, Asia/Singapore
+
+# Theme ──────────────────────────────────────────────────────────────────
+# Visual styling. Each theme is a small CSS file in themes/<name>/.
+#   minimal   — system fonts, clean prose, light/dark via prefers-color-scheme
+#   magazine  — serif headings, drop caps, warm cream palette
+#   notebook  — monospace accents, dense typography, docs-style
+#   bootstrap — Bootstrap 5.3.8 vendored (~232KB), full utility framework
+#   sand      — warm earth-toned palette for prose-led sites; Merriweather
+#               typography, brand-red accents, hand-rolled CSS, no framework
+#   custom    — your-edit-this starter (copy of `minimal` with prominent
+#               customisation guidance in themes/custom/css/app.css).
+#               Recommended when you want a distinctive look — change
+#               the palette, fonts, components without affecting the
+#               built-in themes.
+#   none      — no theme CSS at all; bring your own in app/assets/
+theme: minimal                # change to one of the names above
+
+# Fonts ──────────────────────────────────────────────────────────────────
+# Self-hosted Google Fonts. After adding/changing this block, run
+# `bin/fetch-fonts` once to download woff2 files into vendor/fonts/.
+# Fonts are then served from /assets/fonts/ at build time. Privacy-friendly
+# (no requests to fonts.googleapis.com from the user's browser).
+#
+# fonts:
+#   - family: Inter
+#     weights: [400, 600]
+#     style: normal
+#   - family: Source Serif 4
+#     weights: [400]
+#     style: italic
+
+# The notebook theme is set up to use JetBrains Mono (mono accents,
+# headings) + Inter (body). The pair below downloads both so the
+# fixture site demonstrates the theme's full visual character. If you
+# switch theme, you can leave or remove this block without effect —
+# unused fonts just sit in vendor/fonts/.
+fonts:
+  - family: Inter
+    weights: [400, 600]
+    style: normal
+  - family: JetBrains Mono
+    weights: [400, 600]
+    style: normal
+
+# Font preload — explicit paths to `<link rel="preload">` in the head.
+# Cuts 100-300ms of LCP delay on cold loads when set correctly. Find
+# the right paths by inspecting `vendor/fonts/fonts.css` after a
+# `bin/fetch-fonts` — preload the latin subset of the regular-weight
+# body font (the most-used file). Leaving this list empty is fine;
+# the fonts still load from the stylesheet, just slower on first paint.
+#
+# fonts_preload:
+#   - /assets/fonts/inter-400-latin.woff2
+#   - /assets/fonts/inter-600-latin.woff2
+
+# Images — optional build-time optimisation. When `optimise: true`,
+# Abqari shells out to vips (or magick as a fallback) to generate
+# WebP + AVIF variants alongside the original. AVIF is listed first
+# in the <picture> source order because it compresses 20-50% smaller
+# than WebP at equivalent quality and has universal support as of
+# 2026. Both formats fall through to the original on any browser
+# that can't decode them. Requires `vips` or `imagemagick` on PATH.
+#
+# images:
+#   optimise: true
+#   formats: [avif, webp]
+#   widths: [400, 800, 1200]
+#   quality: 80
+
+# Collections ────────────────────────────────────────────────────────────
+# Each collection is a content type with its own source directory, URL
+# pattern, and default layout. Three ship by default: `posts` (prose
+# blog posts), `photos` (image-centric posts, perfect for a gallery),
+# and `publications` (books, essays — a manually-maintained alternative
+# to the Folio integration).
+#
+# Toggle `enabled: false` on any collection you don't want — its source
+# directory is left alone on disk, but no pages render, no taxonomy
+# entries get generated, and the collection's index page disappears
+# from nav. Flip back to `enabled: true` to restore. This is the right
+# answer for "I'm rebuilding photos and don't want them visible yet"
+# or "I don't ship books, just blog and photos".
+#
+# Add your own collections — workshops, projects, recipes, anything —
+# by extending this block. Set `bundle: false` for flat single-file
+# collections (no colocated assets directory).
+#
+# Slug aliasing — rename a built-in collection without writing a
+# custom block. Set `slug:` on `posts`, `photos`, or `publications`
+# and the source dir, permalink, layout, and feed URL all derive
+# from it (`stories` → /stories/, content/stories/, story.html.erb,
+# /stories/feed.xml). The collection is still internally named
+# `posts` (so `site.posts` works), but accessible by the slug too
+# (`site.collection('stories')`):
+#
+#   collections:
+#     posts:
+#       slug: stories            # this site calls them stories
+#       enabled: true
+#
+# Explicit `source:`, `permalink:`, `layout:` in the same block win
+# over the slug-derived defaults. Layout name singularizes the slug
+# (stories → story, books → book); set `layout:` explicitly if your
+# slug doesn't singularize cleanly.
+collections:
+  posts:
+    enabled: true
+    # `slug:` is the URL-prefix alias for a built-in collection. The
+    # on-disk source dir stays `content/posts/` and the layout is
+    # still `post.html.erb` — only the public URL prefix changes.
+    # The full slug-aliasing reference is in the doc block above
+    # this `collections:` map.
+    #
+    # We alias to `/guides/` because this site treats the posts
+    # collection as the canonical engine-documentation feed —
+    # quickstart, templating, themes, collections, audit, deploy,
+    # etc. The companion `cookbook` collection (below) is a second
+    # posts-style collection for shorter, more recipe-style entries.
+    slug: guides
+    # Slug-derived layout would be `guide` (singularized) but no
+    # `guide.html.erb` exists — pin to the canonical post layout.
+    layout: post
+
+    # Per-collection pagination. Applies to pages that paginate the
+    # `posts` collection with `paginate: true` — primarily the
+    # `/posts/archive/` page. Pages that set an explicit integer
+    # (e.g. `paginate: 25`) always win over this default.
+    pagination:
+      per_page: 10
+
+    # `index:` controls per-card display in the listing page at
+    # `/posts/` (or `/<slug>/` if slug-aliased). The h1 title and
+    # visible lede on the listing page both come from
+    # `content/posts/index.md`'s frontmatter — they're content, not
+    # config. Per-card toggles below.
+    index:
+      # Cover slot on each card. Enum, four values:
+      #   photo         — `image:` if set, basic flat-tint placeholder
+      #                   otherwise (the historical default)
+      #   photo_or_svg  — `image:` if set, decorative initial-tile SVG
+      #                   otherwise. Good for text-first authors who
+      #                   want a polished card without sourcing imagery.
+      #   svg           — always render the decorative initial-tile SVG
+      #                   (ignore `image:`). Uniform tile look across
+      #                   the entire listing.
+      #   none          — no cover slot at all (text-only cards).
+      # Per-post override via frontmatter `cover:` (boolean `false`
+      # for none, or one of the enum strings).
+      cover: photo
+      show_date: true
+      show_description: true
+      description_truncate: 160     # characters, before the ellipsis
+      show_reading_time: true
+      show_tags: false              # tags appear on the post page itself; off here
+      latest_count: 8               # when archive is enabled (below), this
+                                    # is the number of full-detail cards
+                                    # shown on /posts/. Ignored when archive
+                                    # is off (pagination handles list size).
+      # Post-series previews — a row of stacked-image tiles, one per
+      # series, showing how many posts each series contains. Each tile
+      # fans out the hero images from posts in that series (same
+      # visual as the publications index's series block). Drives off
+      # the `posts_series` taxonomy.
+      #
+      # The row renders nothing when no post has `series:` set in its
+      # frontmatter — toggle `enabled: false` to hide it even when
+      # there's content. `limit` caps how many series tiles show
+      # (nil = all). `all_url` is the optional "View all →" link
+      # target — leave unset to omit the link.
+      series:
+        enabled: true
+        limit:                      # e.g. 6 — leave unset to show all
+        all_url:                    # e.g. /posts/series/
+    # Archive — a separate page at `/posts/archive/` (or `/<slug>/archive/`)
+    # listing every post in a compact title + date row. When enabled,
+    # `/posts/` shows only the latest `index.latest_count` posts with
+    # full cards, then a "View all N posts →" link to the archive. The
+    # archive replaces pagination on the front index (the front index
+    # becomes a curated highlight rather than the canonical full list).
+    #
+    # **On by default** as of this engine version — most sites want it.
+    # Set `enabled: false` to fall back to the classic paginated index.
+    #
+    # Setup when enabled (the engine fixture has this wired):
+    #   1. Create `content/posts-archive.md` (NOT inside `content/posts/` —
+    #      that would make the archive page itself a post) with
+    #      `layout: posts_archive` and explicit `permalink: /posts/archive/`.
+    #   2. Set `paginate: false` in `content/posts/index.md` since the
+    #      front index is finite when the archive is on — otherwise the
+    #      paginator generates duplicate `/posts/page/2/` pages.
+    archive:
+      enabled: true
+    # `show:` controls the single-post detail page (`post.html.erb`).
+    # Independent of `index:` — flip `show_image` here off to suppress
+    # the hero on the post page itself while still showing covers in
+    # the listing, or vice versa.
+    #
+    # All knobs that affect the show page live here — the hero, the
+    # TOC, the "Up next" card, the related grid. (Mirrors `index:`,
+    # which collects every listing-page knob.) Separate top-level
+    # keys like `archive:`, `pagination:`, and `feeds:` stay outside
+    # `show:` because they're separate pages or artifacts, not part
+    # of the show view.
+    show:
+      # Hero slot at the top of the post body. Same four-value enum
+      # as `index.cover`. See the comment block on `index.cover` for
+      # the full vocabulary; the two are intentionally independent so
+      # a listing can use SVG tiles while detail pages render real
+      # photos (or vice versa).
+      cover: photo
+
+      # Auto-generated table of contents at the top of each post body,
+      # built from body headings.
+      #
+      #   enabled:      set false to suppress globally; override per-
+      #                 post with `toc: true` / `toc: false` in
+      #                 frontmatter (explicit frontmatter always wins).
+      #
+      #   min_headings: quality floor. Renders nothing on posts with
+      #                 fewer than N qualifying headings (default 3 —
+      #                 short posts don't need one).
+      #
+      #   levels:       which heading levels to include in the TOC.
+      #                 h2 + h3 by default; set [2] for "h2 only"
+      #                 (top-section overview), [2, 3, 4] when posts
+      #                 use h4 subheadings worth navigating. h1 is
+      #                 always excluded (it's the page title, set by
+      #                 the layout, not the body markdown).
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]
+
+      # "Up next" — a single card below the post body linking to the
+      # chronologically-newer post (falling back to older if at the
+      # newest). Sits ABOVE the related block when both are enabled.
+      next:
+        enabled: true
+
+      # Related-posts block at the bottom of each post. Items are
+      # ranked by overlap on `match_by`; pages with zero overlap are
+      # excluded (the section just won't render). Set enabled: false
+      # to turn off.
+      #
+      # `show_image: true` keeps the grid visually consistent when
+      # some posts have heroes and others don't — items without
+      # `image:` render a tinted placeholder tile in place of the
+      # cover. Set false for text-only cards.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags              # field name OR list of names
+        show_image: true            # render cover (or placeholder) on every card
+    # RSS + JSON Feed for the posts collection. Defaults to
+    # `/feed.xml` + `/feed.json` (root paths, for back-compat with
+    # subscribers). With `slug: stories` the feed lives at
+    # `/stories/feed.xml` + `/stories/feed.json` instead. Set false
+    # to suppress — useful when you've moved to a managed newsletter.
+    feeds:
+      enabled: true
+
+  photos:
+    enabled: true
+    # source/permalink/layout default to content/photos, /photos/:slug/,
+    # photo from DEFAULT_COLLECTIONS — set them explicitly only to
+    # override. Set `slug:` to alias the URL prefix (e.g. slug: images
+    # → /images/). The on-disk source dir stays canonical.
+
+    # Per-collection pagination. Applies to pages that paginate the
+    # `photos` collection with `paginate: true` — primarily the
+    # `/photos/archive/` page. 12 fits a 3- or 4-column gallery
+    # neatly across three rows.
+    pagination:
+      per_page: 12
+
+    # Photo card toggles. Country/city are on by default; camera and
+    # caption are off because they're noise on most galleries. Turn on
+    # the ones that matter for your work.
+    #
+    # `cols:` pins the desktop grid size on /photos/, /country/<x>/,
+    # and /series/<x>/. Accepts 2, 3, 4, or `auto`. Use `auto` (the
+    # default) for the responsive reflow, which packs in as many
+    # ~220px-wide cells as the container allows. Desktop-only —
+    # below 768px the setting has no effect and the grid reflows
+    # responsively for tablets and phones either way.
+    index:
+      show_location: true           # city + country
+      show_date: true
+      show_camera: false
+      show_caption: false
+      caption_truncate: 100
+      cols: auto                    # 2 / 3 / 4 to pin desktop count, or auto
+      # Feature one photo at the top of /photos/ — full-width, rendered
+      # like the photo show view (no card chrome). Opt-in per photo
+      # via `showcase: true` in that photo's frontmatter — the
+      # showcased photo is automatically removed from the grid below
+      # so it doesn't appear twice. First match wins when multiple
+      # photos are flagged (single-slot feature, not a carousel).
+      display_showcase: true
+      # `photos_index` layout is a modular landing — the sections below
+      # each toggle independently. The legacy `gallery_index` layout is
+      # still available for sites that want the old single-grid view;
+      # see `content/photos/index.md`'s `layout:` line.
+      #
+      # Latest photos — row of recent photos directly under the
+      # showcase, same visual as the home page's photo gallery module.
+      # Excludes the showcase photo so it never appears twice.
+      latest:
+        enabled: true
+        count: 3
+      # Series row — one tile per series, sorted by photo count desc.
+      # Each tile links to /series/<slug>/. `limit` caps the row (nil
+      # shows all). `all_url` is the destination for the optional
+      # "View all →" link; leave unset to omit the link when you
+      # don't have an umbrella `/series/` page.
+      series:
+        enabled: true
+        limit: 3
+        all_url:                    # e.g. /series/
+      # Countries row — same shape as `series`, keyed on country.
+      countries:
+        enabled: true
+        limit: 3
+        all_url:                    # e.g. /country/
+    # Archive mode — same pattern as `posts.archive`. When enabled, the
+    # photos_index page becomes a curated landing (showcase + latest +
+    # series + countries), and the full paginated grid lives at the
+    # page configured with `permalink: /photos/archive/`. Set
+    # `enabled: false` to revert to a paginated grid on /photos/ itself.
+    #
+    # Setup when enabled (the engine fixture has this wired):
+    #   1. Create `content/photos-archive.md` with
+    #      `layout: photos_archive`, `permalink: /photos/archive/`,
+    #      `paginate: 12`, AND `paginate_collection: photos`. The last
+    #      key is required — without it the paginator falls back to
+    #      the default `'posts'` collection and the page silently
+    #      shows posts instead.
+    #   2. Leave `paginate:` unset on `content/photos/index.md` since
+    #      the landing is finite.
+    archive:
+      enabled: true
+
+    # `show:` collects every knob that affects the single-photo detail
+    # page (`photo.html.erb`). Same convention as `posts.show:` and
+    # `publications.show:`.
+    show:
+      # Related photos at the bottom of each photo page. `match_by`
+      # is a priority list — series matches weight more than country,
+      # country more than tag. Set enabled: false to turn off.
+      related:
+        enabled: true
+        limit: 3
+        match_by: [series, country, tags]
+
+    # RSS + JSON Feed for the photos collection. Off by default — flip
+    # on when you want photo subscribers. Renders to /photos/feed.xml
+    # and /photos/feed.json.
+    feeds:
+      enabled: false
+
+  publications:
+    enabled: true
+    # source/permalink/layout default to content/publications,
+    # /publications/:slug/, publication from DEFAULT_COLLECTIONS. Set
+    # `slug: books` to alias the URL prefix to /books/ — the source
+    # dir stays canonical. When using slug aliasing, override `layout:`
+    # back to `publication` (the canonical name) if you want to keep
+    # using the engine's publication.html.erb instead of slug-deriving
+    # to `book.html.erb`.
+
+    # Per-collection pagination. Applies when a publications-list
+    # page uses `paginate: true`. 12 fits a 4-up cover grid across
+    # three rows.
+    pagination:
+      per_page: 12
+
+    # `index:` controls per-card display in /publications/. The h1
+    # title and visible lede on the listing page both come from
+    # `content/publications/index.md`'s frontmatter — they're content,
+    # not config. Per-card toggles below.
+    index:
+      show_description: true        # per-card description
+      description_truncate: 200
+      show_price: true
+      show_isbn: false
+      show_pages: false
+      show_published: false
+      # Feature one publication at the top of /publications/ with a
+      # larger cover, tagline, and price card. Opt-in per book via
+      # `showcase: true` in that publication's frontmatter — the
+      # showcased book is automatically removed from the list below
+      # so it doesn't appear twice. First match wins when multiple
+      # books are flagged (single-slot feature, not a carousel).
+      display_showcase: true
+      # When `archive.enabled: true` (below), the front
+      # /publications/ page shows only the latest N books with full
+      # cards, then a "View all N publications →" link to the
+      # archive. Bundles + series rows still render below the link.
+      latest_count: 8
+    # Archive — separate page at `/publications/archive/` listing
+    # every publication. Pairs with the landing in `latest_count` mode:
+    # the front index becomes a curated highlight, this page becomes
+    # the canonical full list (paginated via
+    # `collections.publications.pagination.per_page`).
+    #
+    # **On by default** — most sites want a tidy landing + a full
+    # archive page. Set `enabled: false` to fall back to a single
+    # all-books grid on /publications/ with no archive link.
+    #
+    # Folio caveat: the archive paginates manually-defined Publications
+    # only. Folio-only books appear on the landing's merged list but
+    # NOT in the paginated archive. Add a thin override page in
+    # `content/publications/<slug>/index.md` for each Folio book you
+    # want listed in the archive.
+    #
+    # Setup when enabled (the engine fixture has this wired):
+    #   1. Create `content/publications-archive.md` with
+    #      `layout: publications_archive`,
+    #      `permalink: /publications/archive/`, `paginate: true`,
+    #      AND `paginate_collection: publications` (the last is
+    #      required — without it the paginator falls back to posts).
+    archive:
+      enabled: true
+    # Detail page toggles — what appears on a single publication's
+    # page. Two kinds:
+    #
+    #   Metadata fields (mirrors the index `show_*` pattern; defaults
+    #   true on the detail page since most readers want full detail):
+    #     show_description, show_tagline, show_price,
+    #     show_isbn, show_pages, show_published
+    #
+    #   Hero image (a wide banner image rendered between the metadata
+    #   header and the body description). Driven by the override page's
+    #   `hero_image:` frontmatter (and optional `hero_alt:`):
+    #     show_hero
+    #
+    #   Section toggles (default true when Folio is configured):
+    #     testimonials       reader testimonials filtered by publication slug
+    #     related_books      other publications in the series, adaptive heading
+    #     related_bundles    bundles this publication is part of (Folio-driven)
+    show:
+      show_description: true
+      show_tagline:     true
+      show_price:       true
+      show_isbn:        true
+      show_pages:       true
+      show_published:   true
+      show_hero:        true
+      testimonials:     true
+      related_books:    true
+      related_bundles:  true
+
+      # Related publications at the bottom of each detail page. By
+      # default we match on tags; if you maintain a `category:` field,
+      # add it here.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+
+    # RSS + JSON Feed for the publications collection. Off by default —
+    # flip on when you want subscribers to be notified of new books.
+    # Renders to /publications/feed.xml and /publications/feed.json.
+    feeds:
+      enabled: false
+
+  # Bundles + series — companion meta-collections to `publications`.
+  # Each bundle/series page lists 2+ publications and links them
+  # together as a single retailable unit. Both are first-class built-in
+  # collections — they work out of the box from manual content at
+  # `content/bundles/<slug>/index.md` and `content/series/<slug>/index.md`,
+  # and Folio populates them automatically when configured (same
+  # collection name, same layout, same URL). Set `enabled: false` here
+  # to hide either if you don't ship multi-volume sets.
+  bundles:
+    enabled: true
+  series:
+    enabled: true
+
+  # Workshops — training offerings, consulting workshops, or similar
+  # services-for-sale content. Each workshop has structured metadata
+  # (when, where, format, instructors, price) rendered as a `<dl>`
+  # block above the body, and an optional registration CTA button.
+  #
+  # Frontmatter shape (all metadata fields optional — see
+  # app/views/layouts/workshop.html.erb for the full reference):
+  #
+  #     ---
+  #     layout: workshop
+  #     title: Crisis Response Foundations
+  #     description: Two-day workshop on building crisis-response capability.
+  #     date_from: 2026-06-15
+  #     date_to:   2026-06-16
+  #     duration:  2 days              # fallback when no specific dates
+  #     location:  Singapore           # city / country / "Remote"
+  #     format:    In-person           # In-person / Remote / Hybrid
+  #     instructors:
+  #       - Grant Rayner
+  #     price: $1,495
+  #     registration_url: https://...
+  #     tags: [crisis-management]
+  #     order: 1                       # optional, controls index sort
+  #     ---
+  #
+  # Set `enabled: false` if you don't run workshops.
+  workshops:
+    enabled: true
+
+    # Per-collection pagination. Workshops are typically fewer than
+    # posts/photos; 8 keeps upcoming + past sections compact when
+    # a workshops-list page uses `paginate: true`.
+    pagination:
+      per_page: 8
+
+    # `index:` controls per-card display on /workshops/. Heroes sit
+    # flush at the top of upcoming-workshop cards; past workshops
+    # always render compact, without the cover, regardless of the
+    # cover mode.
+    index:
+      # Cover slot on each upcoming-workshop card. Same four-value
+      # enum as `posts.index.cover` — see that block for the full
+      # vocabulary (photo / photo_or_svg / svg / none). Per-workshop
+      # override via frontmatter `cover:`.
+      cover: svg
+      show_description: true
+      show_dates:       true     # show date_from / date_to (or duration fallback)
+      show_location:    true
+      show_format:      true     # In-person / Remote / Hybrid
+      show_price:       true
+      description_truncate: 160
+    # `show:` controls the single-workshop detail page (`workshop.html.erb`).
+    # Independent of `index:` — flip `show_image` here off to suppress
+    # the hero on the workshop page itself while still showing covers
+    # in the listing, or vice versa.
+    show:
+      # Hero between the lede and the meta dl. Same four-value enum
+      # as `index.cover` (photo / photo_or_svg / svg / none).
+      cover: photo
+
+      # Related workshops at the bottom of each detail page. Match by
+      # tags so workshops sharing a topic surface together. Workshop
+      # cards carry richer meta than posts/photos, so the related card
+      # can show dates (date_from – date_to or `duration:` fallback)
+      # and location below the title — toggle each independently.
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+        show_dates: true            # date_from – date_to under the title
+        show_location: true         # city / country / "Remote" under the title
+
+    # Feeds: typically off for workshops — they're timeless content,
+    # not a chronological stream. Flip on if you run dated workshops
+    # and want subscribers to be notified of new ones.
+    feeds:
+      enabled: false
+
+  # Cookbook — a second posts-style collection for short, recipe-
+  # style entries (one task per page: "how do I X?"). Uses the
+  # `post` layout (same machinery: tags, related, next, RSS) but
+  # lives at its own URL prefix and source dir, separate from the
+  # narrative `posts` collection above. Sites that don't want a
+  # cookbook can set `enabled: false`.
+  cookbook:
+    enabled: true
+    source: content/cookbook
+    permalink: /cookbook/:slug/
+    layout: post
+    bundle: false              # flat single-file recipes; no colocated assets
+    pagination:
+      per_page: 20             # cookbooks are short — more per page is fine
+    index:
+      cover: none              # text-first listings; no per-recipe hero
+      show_date: false         # recipes are timeless, not dated
+      show_description: true
+      description_truncate: 160
+      show_reading_time: false
+      show_tags: true
+      latest_count: 8
+      series:
+        enabled: false
+    archive:
+      enabled: false
+    show:
+      cover: none
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]
+      next:
+        enabled: true
+      related:
+        enabled: true
+        limit: 4
+        match_by: tags
+        show_image: false
+    # Feeds: off for cookbook. Cookbook entries are timeless
+    # reference content — no dates means no chronological feed
+    # ordering, and Feed#write skips dateless items anyway. If
+    # you want a cookbook feed, give each entry a date.
+    feeds:
+      enabled: false
+
+  # Custom collections — to add your own (recipes, talks, case
+  # studies, etc.), extend this block. Set `bundle: false` for flat
+  # single-file collections (no colocated assets directory).
+  #
+  # Tip: if you want to rename a BUILT-IN collection (e.g. "stories"
+  # for posts, "books" for publications, "training" for workshops),
+  # use `slug:` on the built-in rather than creating a custom
+  # collection — see the `posts.slug: stories` example at the top
+  # of this block.
+  #
+  # recipes:
+  #   enabled: true
+  #   source: content/recipes
+  #   permalink: /recipes/:slug/
+  #   layout: recipe          # your own layout — engine doesn't ship one
+  #   bundle: true
+  #   index:
+  #     show_description: true
+  #   related:
+  #     enabled: true
+  #     match_by: tags
+
+# Home modules ──────────────────────────────────────────────────────────
+# Optional content modules rendered below the home page's markdown body.
+# Each module is a small self-contained section (latest post, random
+# post, latest publication, latest/random photo, contact button) that
+# pulls from the matching collection or config block. Renders nothing
+# when the underlying collection is empty or disabled, so flipping
+# `photos.enabled: false` won't break a home page that has photo
+# modules turned on.
+#
+# Order is fixed in the layout (latest_post first, contact last); use
+# config to toggle each on/off. Edit the dispatch block in
+# `app/views/layouts/home.html.erb` to reorder, swap, or add modules.
+home:
+  # All home modules are enabled in the engine's fixture site so the
+  # demo home page showcases every available module side-by-side.
+  # Real sites typically keep a smaller subset on — flip to false the
+  # ones you don't want.
+  latest_post:        true
+  random_post:        true
+
+  # Featured + latest publication cards.
+  #
+  # Cover image, title, and tagline are always rendered (the card's
+  # identity). Excerpt, price, and published_at are field-level
+  # toggles. `enabled: false` on either disables that module.
+  featured_publication:
+    enabled: true                # `enabled: false` disables;
+                                 #   absent = enabled
+    show_excerpt:      true      # default true
+    show_price:        false     # default false
+    show_published_at: false     # default false
+  latest_publication:
+    enabled: true
+    show_excerpt:      true
+    show_price:        true      # surface the price on this card
+    show_published_at: true      # …and the release date
+
+  # Next workshop card — soonest upcoming workshop (or evergreen
+  # workshops with no dates). Cover image and workshop title are
+  # always rendered; the fields below are field-level toggles.
+  next_workshop:
+    enabled: true
+    show_dates:       true     # date_from – date_to (or `duration` fallback)
+    show_description: true     # short summary
+    show_location:    true     # city / country
+    show_format:      false    # In-person / Remote / Hybrid
+    show_price:       false    # canonical `price.formatted`
+    show_tags:        false    # tag pills below the body
+
+  # Latest photo card. Cover image and photo title are always
+  # rendered; city + country combine into a single "City, Country"
+  # meta entry when both are on.
+  latest_photo:
+    enabled: true
+    show_caption: true
+    show_date:    true
+    show_city:    true
+    show_country: true
+    show_camera:  false
+    show_type:    false
+    show_series:  false
+    show_tags:    false
+
+  # Random photo card. Same field surface as `latest_photo`; the
+  # toggles apply uniformly to every card in the swap pool so the
+  # JS-randomised variant looks consistent with the initially
+  # visible one.
+  random_photo:
+    enabled: true
+    show_caption: true
+    show_date:    true
+    show_city:    true
+    show_country: true
+    show_camera:  false
+    show_type:    false
+    show_series:  false
+    show_tags:    false
+
+  photo_gallery:      latest       # 'latest' / 'random' / false — single-
+                                   # row gallery of four photos
+  contact:            true         # needs `contact.email` set (see below)
+
+# Taxonomies ─────────────────────────────────────────────────────────────
+# Tag-style classifications attached to pages. Each generates index pages
+# (one per term) at the configured permalink. The default `tags` taxonomy
+# is implicit.
+#
+# **`collection:`** scopes a taxonomy to one collection. Items in other
+# collections with the same field value are NOT aggregated into the same
+# page. Used below by the four per-collection series taxonomies so a
+# photo with `series: "Notes 2026"` and a post with the same name are
+# independent series, not a shared page.
+#
+# Frontmatter can be a single value (`country: Syria`) or a list
+# (`tags: [travel, photography]`) — both work.
+#
+# Series semantics:
+#   Every collection's items can carry `series:` + `series_position:`
+#   frontmatter. The taxonomies below auto-generate one page per series
+#   at `/<collection>/series/<slug>/`, sorted by `series_position`
+#   ascending (items without a position sort to the end).
+#
+#   For publications, the auto-page ALSO merges Folio publications
+#   whose `series` field matches (so a manual + Folio mix renders
+#   together).
+#
+#   The DEPRECATED `series` COLLECTION at `content/series/` (Folio
+#   book-series listing layout) still works — the per-collection
+#   `publications_series` below is the recommended path going forward.
+taxonomies:
+  countries:
+    field: country                 # reads `country:` from front matter
+    permalink: /country/:slug/
+    layout: country_index
+
+  posts_series:
+    field: series                  # `series:` in a post's frontmatter
+    collection: posts              # scope: only posts
+    permalink: /guides/series/:slug/   # follow posts.slug aliasing
+    layout: series_index
+
+  photos_series:
+    field: series                  # `series:` in a photo's frontmatter
+    collection: photos             # scope: only photos
+    permalink: /photos/series/:slug/
+    layout: series_index
+
+  publications_series:
+    field: series                  # `series:` in a publication's frontmatter
+    collection: publications       # scope: only publications (+ Folio merge)
+    permalink: /publications/series/:slug/
+    layout: series_index
+
+  workshops_series:
+    field: series                  # `series:` in a workshop's frontmatter
+    collection: workshops          # scope: only workshops
+    permalink: /workshops/series/:slug/
+    layout: series_index
+
+# Frontmatter validation ────────────────────────────────────────────────
+# Each entry maps a frontmatter field to a YAML whitelist — `bin/audit`
+# flags any value that doesn't appear as a top-level key in the file.
+# Catches typos like `country: Syra` before they ship as broken
+# /country/syra/ pages. Comment out fields you don't want validated.
+validate:
+  country: data/countries.yml
+
+# Drafts ─────────────────────────────────────────────────────────────────
+# Posts with `published: false` in their front matter are drafts. They
+# render in development with a visible "Draft" banner so you can preview
+# them without shipping. Production builds always exclude drafts unless
+# you set ABQARI_INCLUDE_DRAFTS=true (one-shot, for previewing prod).
+drafts:
+  show_in_development: true   # set to false to hide drafts in dev too
+
+# Pagination ─────────────────────────────────────────────────────────────
+# Page size for any page that opts into pagination via `paginate: true` in
+# its front matter (the default `content/posts/index.md` does this). To
+# override on a single page, use a number in that page's front matter:
+# `paginate: 25` wins over this default. `paginate: false` disables it.
+#
+# Pagination links only render when there's actually more than one page —
+# a 4-post blog with per_page: 10 shows no pagination at all.
+pagination:
+  per_page: 10                # change to set posts-per-page site-wide
+
+# Security contact ──────────────────────────────────────────────────────
+# Optional. When set, Abqari emits a /.well-known/security.txt file with
+# this contact. Helpful for security researchers reporting issues.
+# security_contact: mailto:security@example.com
+
+# Robots ─────────────────────────────────────────────────────────────────
+# Optional. Paths to disallow in robots.txt when the site is indexable.
+# Off by default — search engines crawl everything.
+# robots_disallow: [/admin, /private]
+
+# AI scraping ────────────────────────────────────────────────────────────
+# When true (default), robots.txt blocks the major AI training crawlers
+# that respect it: OpenAI's GPTBot / ChatGPT-User / OAI-SearchBot,
+# Anthropic's ClaudeBot / Claude-Web / anthropic-ai, Google-Extended
+# (the AI carve-out, separate from regular Googlebot search), Apple's
+# Applebot-Extended, Meta-ExternalAgent / FacebookBot, PerplexityBot,
+# YouBot, cohere-ai, Bytespider (TikTok), MistralAI-User, Common Crawl
+# (CCBot — used by many third-party trainers), Diffbot, and omgili.
+#
+# Regular search-engine indexing (Googlebot, Bingbot) is unaffected —
+# blocking Google-Extended does NOT touch your search ranking.
+#
+# Set false if you want AI training to use your content (e.g. you
+# write technical content and want it surfaced via AI search).
+block_ai_scraping: true
+
+# Deploy ─────────────────────────────────────────────────────────────────
+# `bin/deploy` builds the site and ships _site/ to the configured target.
+# Pass a target as the first argument (`bin/deploy cloudflare`) or set
+# `deploy.default` to skip the argument.
+#
+# Targets need their CLI installed once:
+#   cloudflare  npm install -g wrangler   && wrangler login
+#   netlify     npm install -g netlify-cli && netlify login
+#
+# deploy:
+#   default: cloudflare
+#   cloudflare:
+#     project: my-blog          # Cloudflare Pages project name
+#   netlify:
+#     site_id: 1234abcd-...     # Netlify site UUID
+
+# Visualizations ─────────────────────────────────────────────────────────
+# D3-powered visualizations of your tags + posts, generated at build time.
+# Each viz gets its own page at /visualizations/<name>/ that loads vendored
+# D3 (~280 KB) only on that route — site-wide pages stay JS-free.
+#
+#   tag_bubble           Circle-pack of tags sized by post count
+#   tag_cooccurrence     Chord diagram of which tags appear together
+#   topic_constellation  Force graph of posts connected by shared tags
+visualizations:
+  tag_bubble: false           # set to true to generate /visualizations/tag-bubble/
+  tag_cooccurrence: false     # set to true to generate /visualizations/tag-cooccurrence/
+  topic_constellation: false  # set to true to generate /visualizations/topic-constellation/
+
+# Folio ──────────────────────────────────────────────────────────────────
+# Pull book/bundle/series data from a Folio storefront (foliobooks.app)
+# at build time. Two HTTP endpoints are fetched (publications + bundles);
+# series are derived from publications' embedded in_series field.
+#
+# When configured, abqari auto-generates these pages:
+#   /books/                      — index of all books
+#   /books/<slug>/               — one per Folio publication
+#   /bundles/                    — index of bundles
+#   /bundles/<slug>/             — one per Folio bundle
+#   /series/                     — index of series
+#   /series/<slug>/              — one per derived series
+#
+# Override any auto-generated page by creating a markdown file at the
+# matching path (e.g. content/books/<slug>/index.md). Front matter takes
+# precedence; any markdown body is appended after the auto-rendered intro.
+#
+# `include_slugs` / `exclude_slugs` filter the publications list for
+# authors with multiple imprints under one Folio account.
+#
+# Cache: vendor/folio/{publications,bundles}.yml + ETag files. Gitignored.
+# Refresh manually with `bin/fetch-folio`.
+#
+# folio:
+#   base_url: https://foliobooks.app
+#   author_slug: your-author-slug
+#   include_slugs: [book-one, book-two]    # only these (otherwise: all)
+#   exclude_slugs: [some-other-book]
+#
+# Book detail page toggles live alongside other collections — see
+# `collections.books.show.*` above. Per-book hero image goes in the
+# override file's frontmatter:
+#
+#     # content/books/<slug>/index.md
+#     ---
+#     hero_image: /books/<slug>/hero.png
+#     hero_alt: "Optional alt text"
+#     ---
+
+# Search ─────────────────────────────────────────────────────────────────
+# Static search via Pagefind. When `true`, bin/build runs pagefind against
+# _site/ to generate a chunked search index at /pagefind/. The runtime is
+# served from your own origin (no third-party requests).
+#
+# Requires `pagefind` on PATH first:
+#   macOS:   brew install pagefind
+#   General: curl -LSf https://pagefind.app/install.sh | bash
+#
+# To show a search box, render the partial in any layout:
+#   <%%= render 'partials/search' %>
+search: false                 # set to true once pagefind is installed
+
+# Icon libraries ─────────────────────────────────────────────────────────
+# Three options, all opt-in. Each ships only when set; multiple can be
+# enabled at once.
+#
+#   fontawesome: true
+#     Loads vendored Font Awesome 6 Free from public/fontawesome/.
+#     Drop the dist (download from fontawesome.com/download) into
+#     public/fontawesome/{css,webfonts}/. Use as `<i class="fa-solid fa-book">`.
+#     Strict-CSP friendly — everything self-hosted.
+#
+#   fontawesome_kit: <kit-id>
+#     Loads the Font Awesome PRO kit script from kit.fontawesome.com,
+#     replacing the vendored link. Get the kit ID from your FA account.
+#     Auto-extends the CSP for the kit's hosts (script + font + connect),
+#     and adds 'unsafe-inline' to style-src because the kit injects CSS
+#     dynamically. Use the vendored Free path instead if strict CSP matters.
+#
+#   bootstrap_icons: true
+#     Loads vendored Bootstrap Icons from public/bootstrap-icons/font/.
+#     Drop the dist (github.com/twbs/icons) into that path. Use as
+#     `<i class="bi bi-book">`. Strict-CSP friendly.
+#
+# Heroicons works differently — drop SVGs into vendor/heroicons/<variant>/
+# (24/outline, 24/solid, 20/solid, 16/solid) and use the `heroicon` helper
+# in any layout: `<%%= heroicon('book-open', variant: :solid) %>`. No
+# config flag needed; the helper inlines the SVG at render time.
+#
+# See the cookbook for full setup details: /cookbook/icons/
+#
+# icons:
+#   fontawesome: true
+#   fontawesome_kit: fxxxxxxxxx   # mutually exclusive with `fontawesome:`
+#   bootstrap_icons: true
+
+# Web App Manifest + favicons ────────────────────────────────────────────
+# Abqari emits a /manifest.json on every build, populated from your site
+# title + locale. Override anything below; everything else falls back to
+# sensible defaults.
+#
+# Favicons: drop a 512×512 master into your project and run
+# `bin/icons path/to/master.png` once. The script generates the full set
+# (favicon-16/32, apple-touch-icon, icon-192/512) into public/, which is
+# copied to _site/ on every build. The <head> already references them.
+#
+# manifest:
+#   name: Long Site Name           # defaults to site.title
+#   short_name: Short              # defaults to site.title
+#   theme_color: "#0066cc"         # browser-chrome / OS UI tint (light mode)
+#   theme_color_dark: "#1a1a1a"    # browser-chrome tint when prefers-color-scheme: dark
+#                                  # (emitted as a media-scoped meta tag)
+#   background_color: "#ffffff"    # PWA splash background
+#   display: standalone
+
+# Plausible analytics ────────────────────────────────────────────────────
+# Privacy-friendly analytics with no cookies, no banner, ~1 KB tracker.
+# Both `enabled: true` AND `key:` must be set for the script to render —
+# leaving `enabled: false` (the default) lets you keep your key in the
+# config file without tracking. When enabled, Abqari injects the tracker
+# into <head> AND auto-extends the CSP to allow plausible.io — no manual
+# header tweaks needed.
+#
+# `key` is the slug in https://plausible.io/js/<key>.js — paste the
+# value Plausible shows you in the dashboard.
+#
+# plausible:
+#   enabled: true
+#   key: pa-your-script-key
+
+# Contact ────────────────────────────────────────────────────────────────
+# Add your email below to show a spam-resistant contact button at the
+# bottom of your About page. Leave email blank and no button appears.
+#
+# How the spam protection works: the address is split into two halves and
+# stored in HTML data attributes, then reassembled by JavaScript only when
+# the visitor clicks. Naive scrapers see HTML with no `@` and no `mailto:`,
+# so the address never gets harvested.
+#
+# To put the button somewhere other than About — e.g. in the footer —
+# render the partial from any layout: <%%= render 'partials/contact_button' %>
+contact:
+  # The project site keeps GitHub as the canonical contact surface
+  # (issues / discussions / PRs). Leave `email:` commented out unless
+  # you want a JavaScript-reassembled mailto button — see the
+  # spam-resistance commentary above.
+  # email: hello@example.com
+  label: Contact              # button text
+  subject:                    # optional — pre-fills the mail client's subject line
+
+# Newsletter ─────────────────────────────────────────────────────────────
+# Provider-agnostic subscription form. Works with any service that
+# accepts an HTML form POST: Cogent Notes, Mailchimp, Buttondown,
+# ConvertKit / Kit, TinyLetter, Substack, etc.
+#
+# To render the form anywhere in a layout / partial:
+#   <%%= render 'partials/newsletter_subscribe' %>
+#
+# Per-call overrides on any of `title`, `description`, `button`:
+#   <%%= render 'partials/newsletter_subscribe',
+#                 title: 'Get notified when new books drop',
+#                 description: 'One short email a month.',
+#                 button: 'Notify me' %>
+#
+# When `newsletter.action` is unset the partial emits nothing, so
+# it's safe to leave the partial call in place during initial setup.
+#
+# Provider hints:
+#   Cogent Notes  email_field: email          script + JS optional
+#   Mailchimp     email_field: EMAIL          hidden_fields for honeypot
+#   Buttondown    email_field: email          hidden_fields for tags
+#   ConvertKit    email_field: email_address  no script needed
+#   TinyLetter    email_field: email          no script needed
+#
+# newsletter:
+#   action: https://www.cogentnotes.app/s/MWAsQKqFXcs   # required
+#   email_field: email                                   # default 'email'
+#   title: Subscribe to the newsletter
+#   description: One short email a month — no spam.
+#   button: Subscribe
+#   hidden_fields:
+#     - { name: tags, value: blog }
+#   script: https://www.cogentnotes.app/js/subscribe.js  # optional
+#   attribution:
+#     text: Cogent Notes
+#     url: https://www.cogentnotes.app
+#     prefix: Powered by                                 # default
+
+# Social ─────────────────────────────────────────────────────────────────
+# Auto-renders one icon per entry in the footer. Each key must match an SVG
+# file in app/icons/<key>.svg. We ship: github, rss, mail, x, mastodon,
+# bluesky, linkedin. Drop your own SVGs into app/icons/ to support more.
+#
+# The fixture site below enables a sampler so the engine demo shows
+# every shipped icon in the footer. Replace with your own when forking.
+social:
+  github: https://github.com/grantrayner/abqari
+  # Fill in (or remove) the platforms you publish on. Each entry maps
+  # to a footer icon; setting `rel="me"` also unlocks `webmention.io`
+  # and Bridgy Fed verification when `indieweb.enabled: true`.
+  # mastodon: https://mastodon.social/@your-handle
+  # bluesky:  https://bsky.app/profile/your-handle.bsky.social
+  # x:        https://x.com/your-handle
+  # linkedin: https://linkedin.com/in/your-handle
+  # The posts collection is slug-aliased to /guides/ on this site,
+  # so the RSS feed lives at /guides/feed.xml. Default sites without
+  # the alias would use /feed.xml.
+  rss: /guides/feed.xml
+  # mail: mailto:you@example.com
+
+# Nav ────────────────────────────────────────────────────────────────────
+# The primary nav at the top of every page. Layout is
+#   [brand]                [links · links · links]    [theme toggle]
+#
+# The brand is a home link that defaults to the site title. Set
+# `nav.brand: false` to omit it entirely; set to a string to override
+# the text. Links are sourced from data/nav.yml (or per-page frontmatter
+# `nav:` entries when nav.yml is empty).
+#
+# nav:
+#   brand: false           # omit the brand link
+#   brand: My Site         # custom brand text instead of site title
+
+# Theme toggle ───────────────────────────────────────────────────────────
+# The light/dark button on the right side of the nav. Default: enabled.
+# Set to `false` to omit it entirely (sites that prefer to honour the
+# system preference silently, or themes that only look good in one mode).
+#
+# theme_toggle: false
+
+# Footer ─────────────────────────────────────────────────────────────────
+# The signature line ("Built with Abqari · <year>" by default) sits on
+# the left of the footer bar. Three states:
+#   unset                  → "Built with Abqari · <year>"   (default)
+#   signature: false       → omit the line entirely
+#   signature: "© {year} Acme"  → custom text; `{year}` is replaced
+#                                 with the current year at build time.
+#
+# Copyright — off by default. When enabled, REPLACES the year portion
+# of the default signature: "Built with Abqari · <year>" becomes
+# "Built with Abqari · © <year> <site.author>". Has no effect when
+# `signature:` is set to a custom string (you're being explicit) or to
+# false (no line to extend). Three states:
+#   unset / false          → signature uses bare year
+#   copyright: true        → "© <year> <site.author>" — auto-generated
+#                            from the `author:` field at the top of
+#                            this config
+#   copyright: "© {year} Acme Ltd."  → custom text in the same slot
+#
+# Footer LINKS (the row above the signature) are sourced from
+# data/footer.yml or per-page `footer:` frontmatter — see partials/_footer.
+footer:
+  copyright: true             # engine fixture turns this on to showcase
+                              # the option. Set to false (or remove) on
+                              # your own site if you don't want it.
+
+# Images ─────────────────────────────────────────────────────────────────
+# Build-time responsive image pipeline. ON by default. Generates AVIF,
+# WebP, and an optimised original-format fallback for every raster
+# image the engine sees — site-wide assets under `app/assets/images/`
+# AND post bundle images (`content/posts/<slug>/hero.jpg`, etc.).
+# `<img>` tags in rendered HTML are rewritten to `<picture>` blocks
+# with width-appropriate srcset entries. Authors get responsive
+# variants automatically — no per-image helper calls required.
+#
+# Uses libvips via the `ruby-vips` gem (added to the gemspec). Install
+# the C library once:
+#   macOS:    brew install vips
+#   Ubuntu:   apt install libvips42
+#   Alpine:   apk add vips
+# When libvips is missing the pipeline falls back to shell-out (vips
+# or magick CLI), and ultimately to passthrough mode (originals only,
+# no variants generated) with a clear warning.
+#
+# Defaults are tuned for prose-and-photos publishing: AVIF first
+# (smallest, listed first in <picture>), WebP as a broader-compat
+# fallback, original-format JPEG/PNG as the last-resort fallback.
+# Per-format quality lands at the perceptual-equivalence points —
+# numerically lower for AVIF, higher for original-JPEG.
+#
+# Skip-if-source-smaller: a 600px source with `widths: [400, 800,
+# 1200]` produces variants at 400 and 600 only. Upscaling is never
+# done — would produce blurrier-and-larger output for zero gain.
+#
+# Metadata stripped by default (EXIF / GPS / embedded thumbnails) —
+# 50–500 KB savings per photo plus a privacy bonus. Set
+# `preserve_metadata: true` if you run a photography portfolio that
+# surfaces camera info to readers.
+#
+# Set `optimise: false` to disable entirely (originals copied
+# verbatim, no libvips needed). Useful for text-only sites or when
+# pre-optimised images come in via another pipeline.
+#
+# images:
+#   optimise: true               # default — turn off only if you mean it
+#   processor: auto              # auto | vips-native | vips | imagemagick
+#   formats: [avif, webp]        # in srcset order — first match wins
+#   widths: [400, 800, 1200]
+#   quality:                     # per-format perceptual targets
+#     avif: 50
+#     webp: 80
+#     original: 85
+#   sizes: "(min-width: 768px) 50vw, 100vw"
+#   source_dir: app/assets/images   # site-wide imagery (not bundle images)
+#   preserve_metadata: false     # strip EXIF / GPS by default
+
+# Environments ───────────────────────────────────────────────────────────
+# bin/serve runs with ABQARI_ENV=development.
+# bin/build runs with ABQARI_ENV=production.
+# Override either: ABQARI_ENV=production bin/serve
+environments:
+  development:
+    url: http://localhost:4000
+    indexable: false        # robots.txt disallows everything
+
+  production:
+    # This is the project's own website. Forking the engine and want to
+    # deploy your own site instead? Edit this URL to your own domain
+    # before pushing to production, OR run `bin/new --name "..."` from
+    # a fresh clone to reset all the site-identity values to your own.
+    url: https://www.abqari.dev
+    indexable: true

@@ -1,0 +1,204 @@
+---
+layout: application
+---
+<!--
+  Photos landing — modular front page for the photos collection.
+  Mirrors the pattern of `posts_index.html.erb`: a curated landing
+  rather than an exhaustive grid. The full paginated list lives at
+  `photos_archive.html.erb` when `archive.enabled: true` (the default).
+
+  Sections, each independently toggleable in
+  `collections.photos.index` in config/site.yml:
+
+      display_showcase  — full-bleed "featured photo" block at the top
+                          (also requires `showcase: true` on one photo's
+                          frontmatter)
+
+      latest:           — row of recent photos, same visual as the home
+        enabled: true     page's _photo_gallery module
+        count: 8
+
+      series:           — row of tiles, one per series
+        enabled: true
+        limit: 8          max tiles before truncating; nil = show all
+        all_url:          optional destination for "View all" link
+
+      countries:        — same shape as `series`, keyed on country
+        enabled: true
+        limit: 8
+        all_url:
+
+  The archive link ("View all N photos →") appears below the body
+  when `archive.enabled: true`, pointing at the page configured via
+  `permalink: /photos/archive/` (conventionally `content/photos-archive.md`
+  with `layout: photos_archive`).
+
+  Page markdown body (any prose under the frontmatter) renders directly
+  below the header — same position as `posts_index` and
+  `publications_index` — wrapped in `<div class="index-intro">` so the
+  CSS can give it a uniform bottom gap. The wrapper only renders when
+  body content is present; leave the body empty for a widget-only
+  landing with no extra gap.
+
+  Sites that prefer the legacy single-grid view should set
+  `layout: gallery_index` in `content/photos/index.md` — the old
+  layout is still available unchanged.
+-->
+<%
+  description = page.frontmatter['description']
+  cfg         = site.collection_config('photos')
+  index_cfg   = cfg['index']   || {}
+  archive_cfg = cfg['archive'] || {}
+  archive_on  = archive_cfg.fetch('enabled', true)
+
+  display_showcase = index_cfg.fetch('display_showcase', false)
+  latest_cfg       = index_cfg['latest']    || {}
+  series_cfg       = index_cfg['series']    || {}
+  countries_cfg    = index_cfg['countries'] || {}
+
+  show_location = index_cfg.fetch('show_location', true)
+  show_date     = index_cfg.fetch('show_date',     true)
+  show_camera   = index_cfg.fetch('show_camera',   false)
+  show_caption  = index_cfg.fetch('show_caption',  false)
+  cols          = index_cfg['cols'].to_i
+  cols          = nil unless [2, 3, 4].include?(cols)
+
+  all_photos   = site.collection('photos')
+  total_photos = all_photos.size
+
+  # Showcase — opt-in via `display_showcase: true` AND `showcase: true`
+  # on one photo's frontmatter. First match wins. Removed from the
+  # "latest" row below so it doesn't appear twice.
+  showcase_photo = nil
+  if display_showcase
+    showcase_photo = all_photos.find { |p| p.frontmatter['showcase'] == true }
+  end
+
+  # Latest photos. Excludes the showcase so the section doesn't repeat
+  # the featured image. Sites with very few photos may end up with an
+  # empty row when the showcase is the only recent photo — the section
+  # falls back to no-op rather than rendering an empty grid.
+  latest_on    = latest_cfg.fetch('enabled', true)
+  latest_count = latest_cfg.fetch('count', 8).to_i
+  latest_photos = if latest_on
+                    pool = all_photos.reject { |p| p == showcase_photo }
+                    pool.first(latest_count)
+                  else
+                    []
+                  end
+
+  archive_url = "#{collection_index_url('photos')}archive/"
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Photos' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
+
+  <% if showcase_photo %>
+    <section class="photo-showcase" aria-label="Featured photo">
+      <a class="photo-showcase__link" href="<%= sanitized_url(showcase_photo.url) %>">
+        <% if (img = showcase_photo.frontmatter['image']) %>
+          <img class="photo-showcase__image"
+               src="<%= sanitized_url(bundle_asset_url_for(showcase_photo, img)) %>"
+               alt="<%= showcase_photo.frontmatter['caption'] || showcase_photo.title %>"
+               loading="eager"
+               fetchpriority="high">
+        <% end %>
+      </a>
+      <div class="photo-showcase__caption">
+        <p class="photo-showcase__eyebrow">Featured</p>
+        <h2 class="photo-showcase__title"><%= showcase_photo.title %></h2>
+        <% if (cap = showcase_photo.frontmatter['caption']) && !cap.to_s.empty? %>
+          <p class="photo-showcase__text"><%= cap %></p>
+        <% end %>
+        <% if showcase_photo.frontmatter['city'] || showcase_photo.frontmatter['country'] %>
+          <p class="photo-showcase__meta">
+            <%= [showcase_photo.frontmatter['city'], showcase_photo.frontmatter['country']].compact.join(', ') %>
+          </p>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if latest_photos.any? %>
+    <section class="photos-section" aria-label="Latest photos">
+      <%# `home-module__*` header classes are deliberately reused here —
+          the home modules' CSS comment notes the heading-row + CTA
+          pattern is shared. Keeps the visual rhythm identical to the
+          home page's latest-photos module without forking the styles. %>
+      <header class="home-module__header">
+        <h2 class="home-module__heading">Latest photos</h2>
+        <% if archive_on %>
+          <a class="home-module__see-all" href="<%= sanitized_url(archive_url) %>">View all &rarr;</a>
+        <% end %>
+      </header>
+      <ul class="gallery-index<%= " gallery-index--cols-#{cols}" if cols %>">
+        <% latest_photos.each_with_index do |photo, idx| %>
+          <% tint = "gallery-index__cover--tint-#{(idx % 4) + 1}" %>
+          <li>
+            <a href="<%= sanitized_url(photo.url) %>">
+              <div class="gallery-index__cover <%= tint %>">
+                <% if photo.frontmatter['image'] %>
+                  <img src="<%= sanitized_url(bundle_asset_url_for(photo, photo.frontmatter['image'])) %>"
+                       alt="<%= photo.frontmatter['caption'] || photo.title %>"
+                       width="1200" height="1200"
+                       loading="lazy"
+                       decoding="async">
+                <% end %>
+              </div>
+              <span class="gallery-index__title"><%= photo.title %></span>
+              <% if show_location && (photo.frontmatter['city'] || photo.frontmatter['country']) %>
+                <span class="gallery-index__location">
+                  <%= [photo.frontmatter['city'], photo.frontmatter['country']].compact.join(', ') %>
+                </span>
+              <% end %>
+              <% if show_date && photo.date %>
+                <span class="gallery-index__date">
+                  <time datetime="<%= photo.date.iso8601 %>"><%= local_time(photo.date) %></time>
+                </span>
+              <% end %>
+              <% if show_camera && photo.frontmatter['camera'] %>
+                <span class="gallery-index__camera"><%= photo.frontmatter['camera'] %></span>
+              <% end %>
+              <% if show_caption && photo.frontmatter['caption'] %>
+                <span class="gallery-index__caption"><%= truncate(photo.frontmatter['caption'], length: index_cfg.fetch('caption_truncate', 100)) %></span>
+              <% end %>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
+  <% if series_cfg.fetch('enabled', true) %>
+    <%== render 'partials/taxonomy_row',
+                heading: 'Series',
+                taxonomy: 'photos_series',
+                collection: 'photos',
+                limit: series_cfg['limit'],
+                all_url: series_cfg['all_url'],
+                cols_class: cols %>
+  <% end %>
+
+  <% if countries_cfg.fetch('enabled', true) %>
+    <%== render 'partials/taxonomy_row',
+                heading: 'Countries',
+                taxonomy: 'countries',
+                collection: 'photos',
+                limit: countries_cfg['limit'],
+                all_url: countries_cfg['all_url'],
+                cols_class: cols %>
+  <% end %>
+
+  <% if archive_on && total_photos.positive? %>
+    <p class="photos-index__more">
+      <a href="<%= sanitized_url(archive_url) %>">View all <%= total_photos %> photos &rarr;</a>
+    </p>
+  <% end %>
+</article>

@@ -1,0 +1,27 @@
+<!--
+  "Next in the series" card — renders below a show view when the
+  current page is part of a series AND a later-positioned item exists
+  in the same series. Functionally the series-ordered counterpart of
+  `_next_item.html.erb` (which uses chronological order).
+
+  Reuses the `_post_list` index card for the same reason as
+  `_next_item`: there's only one next-in-series post, so the
+  prominent index-row treatment (cover-left, title / date /
+  description right) fits. Heading style matches `.related__heading`
+  so the section still sits coherently alongside its siblings.
+
+  Required: the page must have BOTH `series:` and `series_position:`
+  in frontmatter and there must be a next page in the series.
+  `site.next_in_series` returns nil in every other case, and this
+  partial renders nothing.
+
+  Used by:  post.html.erb (in place of `_next_item` when the post is
+             in a series with a later position to advance to)
+-->
+<% next_post = site.next_in_series(page) %>
+<% if next_post %>
+<section class="next-item next-item--series" aria-labelledby="next-in-series-heading">
+  <h2 id="next-in-series-heading" class="next-item__heading">Next in the series</h2>
+  <%== render 'partials/post_list', posts: [next_post] %>
+</section>
+<% end %>

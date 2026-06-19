@@ -1,0 +1,7 @@
+post_id,post_date,title,subtitle,type,audience,status,slug,post_url
+101,2024-03-15T10:00:00.000Z,First post,A welcome,newsletter,everyone,published,first-post,https://example.substack.com/p/first-post
+102,2024-04-10T12:00:00.000Z,Second post,Free to all,newsletter,everyone,published,second-post,https://example.substack.com/p/second-post
+103,2024-05-01T08:30:00.000Z,Paid post,Subscribers only,newsletter,only_paid,published,paid-post,https://example.substack.com/p/paid-post
+104,2024-06-01T00:00:00.000Z,Draft,Work in progress,newsletter,everyone,draft,draft,https://example.substack.com/p/draft
+105,2024-07-15T00:00:00.000Z,Podcast,Audio episode,podcast,everyone,published,podcast,https://example.substack.com/p/podcast
+106,2024-08-01T00:00:00.000Z,Collision,Same slug as the next,newsletter,everyone,published,first-post,https://example.substack.com/p/first-post-2

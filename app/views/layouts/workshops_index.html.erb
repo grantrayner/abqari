@@ -1,0 +1,209 @@
+---
+layout: application
+---
+<!--
+  Workshops index — listing of all workshops in the collection.
+
+  The page splits workshops into two groups based on their dates:
+
+    - Upcoming (`date_to` ≥ today, or `date_from` ≥ today when no end
+      date is set, or no dates at all — evergreen offerings count as
+      "available"): rendered as full cards with description and full
+      meta line (date · location · format · price).
+
+    - Past (`date_to` < today, or `date_from` < today when no end
+      date): rendered in a separate "Past workshops" section using
+      a more compact list style — title + date + location only.
+      Same shape rationale as the related partials: less prominent,
+      less information, distinct from the primary listing.
+
+  Per-card display on the UPCOMING cards is controlled by
+  `collections.workshops.index.show_*` toggles in config/site.yml.
+  Past cards always render the compact treatment regardless of
+  config — the toggles are about adjusting upcoming density.
+
+  Title and description on this page come from
+  `content/workshops/index.md`'s frontmatter:
+
+      ---
+      title: Workshops
+      description: Hands-on training in crisis response, …
+      layout: workshops_index
+      ---
+
+  Sort order: stable alphabetic on title, with `order:` frontmatter
+  taking precedence. Past workshops sort newest-first (most recent
+  end date at the top).
+-->
+<%
+  description = page.frontmatter['description']
+  cfg = (site.collection_config('workshops')['index'] || {})
+  show_description = cfg.fetch('show_description', true)
+  show_dates       = cfg.fetch('show_dates',       true)
+  show_location    = cfg.fetch('show_location',    true)
+  show_format      = cfg.fetch('show_format',      true)
+  show_price       = cfg.fetch('show_price',       true)
+  truncate_at      = cfg.fetch('description_truncate', 160)
+
+  # Partition workshops into upcoming + past. A workshop is "past"
+  # only when its end-date (date_to ‖ date_from) is strictly before
+  # today. Workshops with no dates at all count as upcoming
+  # (evergreen offerings that run when requested).
+  today = Date.today
+  workshop_past = lambda do |fm|
+    end_date = fm['date_to'] || fm['date_from']
+    next false unless end_date
+    to_time(end_date).to_date < today
+  end
+
+  workshops = site.collection('workshops').reject { |w| w.url == page.url }
+  upcoming, past = workshops.partition { |w| !workshop_past.call(w.frontmatter) }
+
+  # Upcoming sort: by frontmatter order, then by start date asc, then title.
+  upcoming.sort_by! do |w|
+    fm = w.frontmatter
+    start_key = fm['date_from'] ? to_time(fm['date_from']).to_i : Float::INFINITY
+    [fm['order'] || Float::INFINITY, start_key, w.title.to_s]
+  end
+
+  # Past sort: most recent first (descending end date).
+  past.sort_by! do |w|
+    fm = w.frontmatter
+    end_date = fm['date_to'] || fm['date_from']
+    -(end_date ? to_time(end_date).to_i : 0)
+  end
+
+  # Date-range fragment for a card — `<time>` element(s) for the start
+  # date, plus an en-dash and a second `<time>` when there's a distinct
+  # end date. Returns nil if there are no dates and no duration to fall
+  # back on.
+  build_date_html = lambda do |fm|
+    if show_dates && (df = fm['date_from'])
+      html = %(<time datetime="#{to_time(df).iso8601}">#{local_time(df)}</time>)
+      if (dt = fm['date_to']) && dt != df
+        html += %( &ndash; <time datetime="#{to_time(dt).iso8601}">#{local_time(dt)}</time>)
+      end
+      html
+    elsif (duration = fm['duration'])
+      h(duration)
+    end
+  end
+
+  # Compact meta line for the past-workshops section — collapses
+  # date + location into a single bullet-separated row.
+  build_compact_meta = lambda do |fm|
+    parts = []
+    if (d = build_date_html.call(fm))
+      parts << d
+    end
+    parts << h(fm['location']) if show_location && fm['location']
+    parts
+  end
+%>
+<article>
+  <header>
+    <h1><%= page.title || 'Workshops' %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
+
+  <%# Future workshops — full cards. Renders a heading even when the
+      list is empty so the section structure stays parallel with past
+      workshops below. %>
+  <section class="workshops-index__group workshops-index__group--future">
+    <h2 class="workshops-index__heading">Future workshops</h2>
+    <% if upcoming.any? %>
+      <ul class="workshops-index">
+        <% upcoming.each do |w| %>
+          <% fm = w.frontmatter %>
+          <li class="workshops-index__item">
+            <a href="<%= w.url %>" class="workshops-index__link">
+              <%# Cover slot. `cover_choice_for` returns :photo /
+                  :placeholder / :svg / :none based on the
+                  `workshops.index.cover` enum + frontmatter override. %>
+              <% case cover_choice_for(w, context: :index) %>
+              <% when :photo %>
+                <span class="workshops-index__cover">
+                  <img src="<%= sanitized_url(bundle_asset_url_for(w, fm['image'])) %>"
+                       alt="<%= w.title %>"
+                       loading="lazy">
+                </span>
+              <% when :placeholder %>
+                <span class="workshops-index__cover">
+                  <svg class="workshops-index__cover-placeholder" viewBox="0 0 4 3"
+                       preserveAspectRatio="none" aria-hidden="true">
+                    <rect width="4" height="3" fill="currentColor"/>
+                  </svg>
+                </span>
+              <% when :svg %>
+                <span class="workshops-index__cover workshops-index__cover--svg">
+                  <%== cover_svg_for(w) %>
+                </span>
+              <% when :none %>
+              <% end %>
+              <span class="workshops-index__body">
+                <h3 class="workshops-index__title"><%= w.title %></h3>
+
+                <% if show_description && (desc = fm['description']) && !desc.to_s.empty? %>
+                  <p class="workshops-index__description"><%= truncate(desc.to_s, length: truncate_at) %></p>
+                <% end %>
+
+                <%# Meta block — three stacked lines on upcoming cards
+                    so each fact reads cleanly:
+                      1. Date range (or duration when no dates)
+                      2. Location · Format (joined by ·, both optional)
+                      3. Price
+                    Any line whose source data is absent or whose toggle
+                    is off renders nothing — the remaining lines close up. %>
+                <% if (date_html = build_date_html.call(fm)) %>
+                  <p class="workshops-index__meta workshops-index__meta--dates"><%== date_html %></p>
+                <% end %>
+                <%
+                  loc_parts = []
+                  loc_parts << h(fm['location']) if show_location && fm['location']
+                  loc_parts << h(fm['format'])   if show_format   && fm['format']
+                %>
+                <% if loc_parts.any? %>
+                  <p class="workshops-index__meta workshops-index__meta--location"><%== loc_parts.join(' &middot; ') %></p>
+                <% end %>
+                <% if show_price && (price = fm['price']) %>
+                  <p class="workshops-index__meta workshops-index__meta--price"><%= price %></p>
+                <% end %>
+              </span>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="workshops-index__empty muted">No future workshops scheduled.</p>
+    <% end %>
+  </section>
+
+  <%# Past workshops — compact treatment. Section header makes the
+      visual demotion explicit; cards drop description, format, price. %>
+  <% if past.any? %>
+    <section class="workshops-index__group workshops-index__group--past">
+      <h2 class="workshops-index__heading workshops-index__heading--past">Past workshops</h2>
+      <ul class="workshops-index workshops-index--past">
+        <% past.each do |w| %>
+          <% fm = w.frontmatter %>
+          <li class="workshops-index__item workshops-index__item--past">
+            <a href="<%= w.url %>" class="workshops-index__link">
+              <span class="workshops-index__body">
+                <h3 class="workshops-index__title"><%= w.title %></h3>
+                <% parts = build_compact_meta.call(fm) %>
+                <% if parts.any? %>
+                  <p class="workshops-index__meta"><%== parts.join(' &middot; ') %></p>
+                <% end %>
+              </span>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</article>

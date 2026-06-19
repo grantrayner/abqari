@@ -1,0 +1,146 @@
+---
+layout: application
+---
+<!--
+  Single post detail. Theme-neutral structure with semantic class
+  hooks (`.post__meta`, `.post__hero`, `.post__tags-footer`); themes
+  style via `themes/<name>/css/app.css`.
+
+  Hero image — set `image:` in the post's frontmatter and it renders
+  between the meta line and the body. Path is sanitized; alt text
+  defaults to the post title.
+
+      ---
+      title: My Post
+      date: 2026-04-15
+      image: hero.jpg            # relative within a bundled post
+      tags: [foo, bar]
+      ---
+
+  Hero rendering is gated by `collections.posts.show.cover` in
+  config/site.yml — `photo` (the default) renders the `image:` if
+  present and nothing otherwise; `photo_or_svg` falls back to a
+  decorative initial-tile SVG; `svg` always renders the decorative
+  SVG; `none` suppresses the hero entirely. The matching enum on the
+  index card is `collections.posts.index.cover` — independent of
+  this one, so a listing can use SVG tiles while detail pages render
+  real photos (or vice versa).
+
+  Per-post override: set `cover:` in frontmatter (boolean `false`
+  for none, or one of the enum strings) to override the collection
+  default for a single post.
+
+  Tags footer renders only when the post has tags. The "Up next" and
+  "Related" partials below the article are also conditional on the
+  collection's `next:` and `related:` config; both render nothing
+  when not applicable so they degrade silently.
+-->
+<%# `h-entry` is the IndieWeb microformats2 root class for a post.
+    Combined with `p-name` (title), `dt-published` (date), `e-content`
+    (body), `p-author` / `u-author` (author info), `u-url` (canonical
+    URL), and `p-category` (tags), this lets other IndieWeb sites and
+    feed readers parse the post without needing RSS. No visual impact
+    — pure metadata via class attributes. See indieweb.org/h-entry. %>
+<article class="h-entry">
+
+  <%== render 'partials/draft_banner' %>
+  <%== render 'partials/future_banner' %>
+  <%== render 'partials/back_to_index' %>
+
+  <header>
+    <h1 class="p-name"><%= page.title %></h1>
+    <a class="u-url" href="<%= sanitized_url(page.url) %>" hidden></a>
+    <p class="post__meta">
+      <%# Date is conditional so dateless collections that share the
+          `post` layout (cookbook, glossary, anything reference-y)
+          still render. Reading time renders either way. %>
+      <% if page.date %>
+        <time class="dt-published" datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
+        ·
+      <% end %>
+      <%= reading_time(page.content) %>
+      <%# Series breadcrumb — only when the post carries both `series:`
+          and `series_position:` in frontmatter. Position renders as a
+          plain "#N" prefix; the series name links back to the per-
+          collection series taxonomy page. %>
+      <% if (sn = page.frontmatter['series']) && (sp = page.frontmatter['series_position']) %>
+        · #<%= sp %> in the <a href="<%= sanitized_url(taxonomy_url('posts_series', sn)) %>"><%= sn %></a> series
+      <% end %>
+    </p>
+    <%# Hero — `cover_choice_for` returns :photo / :placeholder /
+        :svg / :none based on the cover enum + frontmatter override.
+        For the show page :placeholder maps to "no hero" (a blank
+        flat-tint banner above the body doesn't read as content), so
+        we only render :photo and :svg here. %>
+    <% case cover_choice_for(page, context: :show) %>
+    <% when :photo %>
+      <%# Emits a <picture> with AVIF/WebP sources when sibling files
+          exist alongside the bundle image (convention: generate
+          `hero.avif` + `hero.webp` next to `hero.jpg`), else a plain
+          <img>. SVG sources skip <picture> entirely (no format
+          negotiation benefit). See `bundle_picture_tag` in
+          render_context.rb. %>
+      <%== bundle_picture_tag(page, page.frontmatter['image'], alt: page.title, class_: 'post__hero') %>
+    <% when :svg %>
+      <div class="post__hero post__hero--svg" aria-hidden="true">
+        <%== cover_svg_for(page) %>
+      </div>
+    <% end %>
+  </header>
+
+  <%# Auto-generated TOC — renders nothing for posts with fewer than 3
+      h2/h3 headings, so short pieces stay clean. Override threshold
+      with `min_headings: N`. %>
+  <%== render 'partials/toc' %>
+
+  <%# `e-content` wraps the post body so microformats2 parsers can
+      lift the rich body content cleanly. The div is structural-only,
+      no visual treatment. %>
+  <div class="e-content">
+    <%== page.content %>
+  </div>
+
+  <% if page.tags.any? %>
+  <footer class="post__tags-footer">
+    <p>Tagged: <%== page.tags.map { |t| link_to(t, taxonomy_url('tags', t), class: 'p-category') }.join(', ') %></p>
+  </footer>
+  <% end %>
+</article>
+
+<%# Webmentions — replies, likes, reposts, bookmarks from around the
+    web. Renders nothing when the IndieWeb integration is off or no
+    mentions exist for this URL. See partials/_webmentions for shape. %>
+<%== render 'partials/webmentions' %>
+
+<%# Testimonials about this post — pulls from data/testimonials.yml
+    entries where `collection: posts` matches this page's slug. Same
+    polymorphic mechanism the workshop and publication views use. %>
+<%== render 'partials/testimonials', subject: page, heading: 'What readers say' %>
+
+<%# "Next" section — three-way dispatch:
+    1. Post is in a series AND a next-by-position exists  →  show
+       "Next in the series" with that post.
+    2. Post is in a series AND is the last position       →  show a
+       "this is the last post in <series> series" note, then still
+       offer chronological "Up next" so the reader has somewhere to go.
+    3. Post is not in a series                             →  the
+       historical default — chronological "Up next" only.
+    All three branches degrade silently when there's nothing to link to. %>
+<%
+  in_series = page.frontmatter['series'] && page.frontmatter['series_position']
+  next_in_series_post = in_series ? site.next_in_series(page) : nil
+%>
+<% if next_in_series_post %>
+  <%== render 'partials/next_in_series' %>
+<% elsif in_series %>
+  <aside class="series-end" aria-label="End of series">
+    <p>This is the last post in the
+      <a href="<%= sanitized_url(taxonomy_url('posts_series', page.frontmatter['series'])) %>"><%= page.frontmatter['series'] %></a>
+      series.</p>
+  </aside>
+  <%== render 'partials/next_item' %>
+<% else %>
+  <%== render 'partials/next_item' %>
+<% end %>
+
+<%== render 'partials/related_items' %>

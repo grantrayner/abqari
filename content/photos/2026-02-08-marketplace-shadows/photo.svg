@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b89870"/>
+      <stop offset="50%" stop-color="#704c2c"/>
+      <stop offset="100%" stop-color="#2a1d10"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#g)"/>
+  <text x="50%" y="50%" font-family="Inter, system-ui, sans-serif" font-size="56" fill="rgba(255,255,255,0.6)" text-anchor="middle" dominant-baseline="central" letter-spacing="2">Marketplace shadows</text>
+</svg>

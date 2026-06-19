@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Run every PR-gate check the CI workflow runs, in the same order:
+#
+#   1. bin/test        — minitest suite (security tests, audit-rule
+#                        coverage, ERB escape audit, etc.)
+#   2. bin/audit       — strict site audit (broken links, missing meta,
+#                        a11y, etc.). Exits non-zero on error-severity
+#                        findings.
+#   3. bundle audit    — bundler-audit CVE check against Gemfile.lock.
+#
+# Exits non-zero on the first failure. Useful as a single pre-commit /
+# pre-push command — mirrors what the GitHub Actions workflow gates
+# pull requests on, so you find out about failures locally rather than
+# 90 seconds into CI.
+#
+# Usage:
+#   bin/check               # run everything, stop on first failure
+#   bin/check --no-deps     # skip bundle-audit (faster; no network)
+#   bin/check --keep-going  # run every step regardless of failures
+#                           # and report aggregate status at the end
+
+require 'optparse'
+
+options = { deps: true, keep_going: false }
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/check [--no-deps] [--keep-going]'
+  opts.on('--no-deps', 'Skip bundle-audit (CVE) step') { options[:deps] = false }
+  opts.on('--keep-going', 'Run every step even when earlier ones fail') { options[:keep_going] = true }
+end.parse!(ARGV)
+
+ROOT = File.expand_path('..', __dir__)
+Dir.chdir(ROOT)
+
+steps = [
+  ['Tests',         %w[bundle exec bin/test]],
+  ['Audit (strict)', %w[bundle exec bin/audit --strict]]
+]
+steps << ['Bundle audit (CVEs)', %w[bundle exec bundle-audit check --update]] if options[:deps]
+
+results = []
+steps.each do |name, cmd|
+  puts "\n=== #{name} ==="
+  ok = system(*cmd)
+  results << [name, ok]
+  break unless ok || options[:keep_going]
+end
+
+puts "\n=== Summary ==="
+results.each do |name, ok|
+  status = ok ? '✓' : '✗'
+  puts "  #{status}  #{name}"
+end
+
+exit(1) if results.any? { |_, ok| !ok }

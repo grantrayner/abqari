@@ -1,0 +1,149 @@
+<!--
+  Testimonials block — semantic markup with `.testimonials*` and
+  `.testimonial*` class hooks. Theme CSS handles the visual.
+
+  Each testimonial can be "about" a record in any collection — a post,
+  a publication, a workshop, anything you ship. Tag it in the YAML
+  with either form below:
+
+      # Generic — works for any collection:
+      - quote: "Great workshop"
+        name:  Jane Doe
+        featured: true
+        collection: workshops
+        slug:       crisis-response-foundations
+
+      # Shorthand for publications (legacy, still supported):
+      - quote: "Couldn't put it down"
+        name:  Uri
+        featured: true
+        book:  memoirs-of-an-assassin           # equivalent to
+                                                # collection: publications
+                                                # slug:       memoirs-of-an-assassin
+
+  Filter modes (specify at most one — first match wins):
+
+      <%%= render 'partials/testimonials', subject: page %>
+                  # auto-detects collection + slug from the page; the
+                  # ergonomic call from any show view (post, workshop,
+                  # publication, anything else with `.collection` +
+                  # `.slug`).
+
+      <%%= render 'partials/testimonials',
+                    collection: 'workshops',
+                    slug: 'crisis-response-foundations' %>
+                  # explicit pair — for cases where you want testimonials
+                  # about a specific item from a context where the page
+                  # variable isn't that item.
+
+      <%%= render 'partials/testimonials', book_slug: 'memoirs-of-an-assassin' %>
+                  # legacy shorthand — equivalent to collection: publications.
+
+      <%%= render 'partials/testimonials', featured: true %>
+                  # no subject filter — show featured across all
+                  # collections. Useful on home / about pages.
+
+  Optional locals:
+      heading: 'Praise'        # section h2 text (defaults below)
+      featured: false          # by default the featured filter follows
+                               # the subject filter — no subject ⇒
+                               # featured-only (curated mix for home),
+                               # subject set ⇒ all matches. Pass true
+                               # or false to force either.
+
+  Renders nothing when there are no matching testimonials.
+
+  Note on indentation: when this partial is called from a markdown body
+  (with erb: true), commonmark interprets a blank line in the partial
+  output as the end of an HTML block, then treats subsequent indented
+  lines as a code block. So we keep all HTML at column 0 and use `-%>`
+  on control tags to avoid emitting blank/whitespace-only lines.
+-->
+<%
+  # Resolve the filter — subject (a page) ‖ explicit (collection,slug)
+  # ‖ legacy book_slug. First match wins; everything else is nil.
+  filter_collection = nil
+  filter_slug       = nil
+  if defined?(subject) && subject
+    filter_collection = subject.collection if subject.respond_to?(:collection)
+    filter_slug       = subject.slug       if subject.respond_to?(:slug)
+  elsif (defined?(collection) && collection) && (defined?(slug) && slug)
+    filter_collection = collection.to_s
+    filter_slug       = slug.to_s
+  elsif defined?(book_slug) && book_slug
+    filter_collection = 'publications'
+    filter_slug       = book_slug.to_s
+  end
+
+  # Featured filter default: show featured-only when there's no subject
+  # filter (curated mix for home/hub pages); show all matches when a
+  # subject IS set (it already narrows the list to one item — no
+  # additional curation needed). Callers can override either way.
+  filter_featured = defined?(featured) ? featured : filter_collection.nil?
+  show_heading    = defined?(heading)  ? heading  : 'What readers are saying'
+
+  # Normalize each testimonial's subject — accept generic
+  # `collection:` + `slug:`, OR the legacy `book:` shorthand. Returns
+  # [collection_name_or_nil, slug_or_nil].
+  t_subject = lambda do |t|
+    if t['collection'] && t['slug']
+      [t['collection'].to_s, t['slug'].to_s]
+    elsif t['book']
+      ['publications', t['book'].to_s]
+    else
+      [nil, nil]
+    end
+  end
+
+  testimonials = Array(site.data['testimonials']).select do |t|
+    t_col, t_sl = t_subject.call(t)
+    next false if filter_collection && (t_col != filter_collection || t_sl != filter_slug)
+    next false if filter_featured && t['featured'] != true
+    true
+  end
+
+  # Resolve a (collection, slug) pair to [url, title] for the citation
+  # link. Looks up the actual page first (any collection works); falls
+  # back to Folio data for publications; otherwise constructs a URL
+  # from the slug-aware `collection_index_url` and uses the slug as the
+  # title. Returns [nil, nil] if collection/slug aren't set.
+  resolve_subject = lambda do |c, s|
+    return [nil, nil] unless c && s
+    coll = site.collection(c) rescue nil
+    if coll && (item = coll.find { |i| i.respond_to?(:slug) && i.slug == s })
+      return [item.url, item.title]
+    end
+    if c == 'publications'
+      pub = (site.data['folio_publications'] || {})[s]
+      return ["#{collection_index_url('publications')}#{s}/", pub['title']] if pub
+    end
+    ["#{collection_index_url(c)}#{s}/", s]
+  end
+-%>
+<% if testimonials.any? -%>
+<section class="testimonials" aria-label="Reader testimonials">
+<% if show_heading -%>
+<h2 class="testimonials__heading"><%= show_heading %></h2>
+<% end -%>
+<div class="card-grid">
+<% testimonials.each do |t| -%>
+<% t_col, t_sl = t_subject.call(t) -%>
+<% subject_url, subject_title = resolve_subject.call(t_col, t_sl) -%>
+<figure class="testimonial">
+<blockquote class="testimonial__quote">
+&ldquo;<%= t['quote'] %>&rdquo;
+</blockquote>
+<figcaption class="testimonial__cite">
+<strong><%= t['name'] %></strong>
+<% if (date = t['date']) && !date.to_s.empty? -%>
+<span> &middot; <%= date %></span>
+<% end -%>
+<% if subject_url && subject_title -%>
+<span> &middot; on <a href="<%= sanitized_url(subject_url) %>"><%= subject_title %></a></span>
+<% end -%>
+</figcaption>
+</figure>
+<% end -%>
+</div>
+</section>
+<% end -%>

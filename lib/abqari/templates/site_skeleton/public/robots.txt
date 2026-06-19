@@ -1,0 +1,6 @@
+# Default robots policy. The engine emits a per-environment override at
+# /_site/robots.txt during build, so this file is the fallback / static
+# passthrough version (not normally served). Edit only if you want to
+# bypass the dynamic generator.
+User-agent: *
+Allow: /

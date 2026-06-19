@@ -1,0 +1,122 @@
+<!--
+  Schema.org Event JSON-LD. Designed for the workshops collection
+  (or any layout that surfaces a dated event). Reads the same
+  frontmatter the workshops index + show view use:
+
+      layout: workshop
+      title: Crisis Response Foundations
+      description: A two-day workshop on …
+      date_from: 2026-06-15
+      date_to:   2026-06-16
+      duration:  2 days            # fallback when no specific dates
+      location:  Singapore         # city / country / "Remote"
+      format:    In-person         # In-person / Remote / Hybrid
+      instructors:
+        - Grant Rayner
+      price:     $1,495
+      registration_url: https://...
+      image:     hero.svg
+
+  Then in the layout: <%%= render 'partials/event_jsonld' %>
+
+  Renders nothing when `date_from` is missing — the schema requires
+  a `startDate`, and dateless evergreen workshops aren't real events
+  in Google's eyes. Safe to render unconditionally; the partial guards.
+-->
+<%
+  fm = page.frontmatter
+  date_from = fm['date_from']
+%>
+<% if date_from %>
+<%
+  start_iso = to_time(date_from).iso8601
+  end_iso   = fm['date_to'] ? to_time(fm['date_to']).iso8601 : nil
+
+  jsonld = {
+    "@context"  => "https://schema.org",
+    "@type"     => "Event",
+    "name"      => page.title,
+    "startDate" => start_iso
+  }
+  jsonld["endDate"]     = end_iso          if end_iso
+  jsonld["description"] = fm['description'] if fm['description']
+
+  if site.config['url']
+    jsonld["url"] = "#{site.config['url'].sub(%r{/\z}, '')}#{page.url}"
+  end
+
+  # Image — workshops use bundled `image:` (relative) or absolute paths.
+  if (img = fm['image'])
+    resolved = if img.to_s.start_with?('http://', 'https://')
+                 img
+               elsif img.to_s.start_with?('/')
+                 "#{site.config['url'].to_s.sub(%r{/\z}, '')}#{img}"
+               else
+                 "#{site.config['url'].to_s.sub(%r{/\z}, '')}#{bundle_asset_url_for(page, img)}"
+               end
+    jsonld["image"] = resolved
+  end
+
+  # Location — workshops use a simple string. We model it as a Place
+  # with the string as the locality. Pure-online workshops (format:
+  # Remote / Online) get a VirtualLocation instead, with the URL
+  # pointing at the registration link (Google's recommended pattern).
+  fmt = fm['format'].to_s.downcase
+  if (loc = fm['location'])
+    jsonld["location"] = if %w[remote online virtual].any? { |k| fmt.include?(k) }
+                          { "@type" => "VirtualLocation",
+                            "url"   => fm['registration_url'] }.compact
+                        else
+                          { "@type"   => "Place",
+                            "name"    => loc.to_s,
+                            "address" => { "@type"           => "PostalAddress",
+                                           "addressLocality" => loc.to_s } }
+                        end
+  elsif %w[remote online virtual].any? { |k| fmt.include?(k) }
+    jsonld["location"] = { "@type" => "VirtualLocation",
+                           "url"   => fm['registration_url'] }.compact
+  end
+
+  # Event attendance mode — required by Google for events since 2020.
+  jsonld["eventAttendanceMode"] = if fmt.include?('hybrid')
+                                    'https://schema.org/MixedEventAttendanceMode'
+                                  elsif %w[remote online virtual].any? { |k| fmt.include?(k) }
+                                    'https://schema.org/OnlineEventAttendanceMode'
+                                  else
+                                    'https://schema.org/OfflineEventAttendanceMode'
+                                  end
+  jsonld["eventStatus"] = 'https://schema.org/EventScheduled'
+
+  # Offers — workshop prices are display strings like "$1,495". Parse
+  # leading currency symbol + digits, fall back to skipping the offer.
+  if (price_str = fm['price']) && fm['registration_url']
+    digits = price_str.to_s.gsub(/[^\d.]/, '')
+    if !digits.empty?
+      currency = case price_str.to_s
+                 when /\A\$/                              then 'USD'
+                 when /\A£/                               then 'GBP'
+                 when /\A€/                               then 'EUR'
+                 when /\A¥/                               then 'JPY'
+                 when /\AS\$/, /SGD/                      then 'SGD'
+                 else                                          'USD'
+                 end
+      jsonld["offers"] = {
+        "@type"         => "Offer",
+        "price"         => digits,
+        "priceCurrency" => currency,
+        "url"           => fm['registration_url'],
+        "availability"  => 'https://schema.org/InStock'
+      }
+    end
+  end
+
+  # Performers — workshop instructors. Each rendered as a Person.
+  instructors = Array(fm['instructors']).reject { |i| i.to_s.strip.empty? }
+  if instructors.any?
+    jsonld["performer"] = instructors.map { |name| { "@type" => "Person", "name" => name.to_s } }
+  end
+
+  jsonld["organizer"] = { "@type" => "Person", "name" => site.config['author'] } if site.config['author']
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
+<% end %>

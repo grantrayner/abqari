@@ -1,0 +1,235 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Multi-purpose generator for an Abqari site.
+#
+# Usage:
+#   bin/new                          Configure the site (interactive form via flags)
+#     --name "My Blog"               Set title and author (required for site config)
+#     --description "..."            Set description
+#     --locale fr                    ISO 639-1 locale (default: en)
+#     --theme bootstrap              Theme (default: minimal)
+#     --clean                        Wipe example posts, audit/, vendor/fonts, git history
+#
+#   bin/new post "Title"             Scaffold a new post bundle:
+#                                      content/posts/<YYYY-MM-DD>-<slug>/index.md
+#
+#   bin/new page "Title"             Scaffold a top-level page:
+#                                      content/<slug>.md
+#
+# Run site config once after `git clone`. Use `post` and `page` whenever you're
+# adding new content; both print the path of the file they created.
+
+require 'optparse'
+require 'fileutils'
+require 'time'
+
+VALID_THEMES = %w[minimal magazine notebook sand bootstrap custom none].freeze
+ROOT = File.expand_path('..', __dir__)
+
+# --- Shared helpers --------------------------------------------------------
+
+def slugify(text)
+  text.to_s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/\A-|-\z/, '')
+end
+
+# --- Subcommand: bin/new post "Title" --------------------------------------
+
+def create_post(title)
+  slug = slugify(title)
+  abort('Provide a non-empty title') if slug.empty?
+
+  date = Time.now.strftime('%Y-%m-%d')
+  bundle_dir = File.join(ROOT, 'content', 'posts', "#{date}-#{slug}")
+  index_path = File.join(bundle_dir, 'index.md')
+
+  if Dir.exist?(bundle_dir)
+    abort("Post already exists at content/posts/#{date}-#{slug}/")
+  end
+
+  FileUtils.mkdir_p(bundle_dir)
+  File.write(index_path, <<~MD)
+    ---
+    title: #{title}
+    published: true                # flip to `false` to keep this a draft —
+                                   #   stays out of production builds but
+                                   #   renders in `bin/serve` with a banner.
+    date: #{date}
+    description:
+    tags: []
+    # image: hero.jpg              # optional bundle hero — drop hero.jpg
+    #                              #   alongside this index.md and uncomment
+    # share_image:                 # optional explicit OG image override
+    ---
+
+    Write your post here.
+
+    Reference colocated images by relative name (`![alt](hero.jpg)`) —
+    the build's image pipeline rewrites them into responsive `<picture>`
+    blocks with AVIF + WebP + optimised fallback variants automatically.
+  MD
+
+  puts "✓ Created content/posts/#{date}-#{slug}/index.md"
+  puts ''
+  puts 'Next:'
+  puts '  - Drop colocated images alongside index.md (they go through the image pipeline).'
+  puts '  - bin/serve to preview locally.'
+  puts '  - Set `published: false` while drafting; it stays out of production builds.'
+end
+
+# --- Subcommand: bin/new page "Title" --------------------------------------
+
+def create_page(title)
+  slug = slugify(title)
+  abort('Provide a non-empty title') if slug.empty?
+
+  rel_path = "content/#{slug}.md"
+  abs_path = File.join(ROOT, rel_path)
+
+  if File.exist?(abs_path)
+    abort("Page already exists at #{rel_path}")
+  end
+
+  File.write(abs_path, <<~MD)
+    ---
+    title: #{title}
+    published: true                # flip to `false` to keep this a draft —
+                                   #   stays out of production builds but
+                                   #   renders in `bin/serve` with a banner.
+    description:
+    nav:
+      order: 99
+    ---
+
+    # #{title}
+
+    Write your page content here.
+  MD
+
+  puts "✓ Created #{rel_path}"
+  puts ''
+  puts "It will appear in the nav at order 99 (last) by default — adjust the `nav.order`"
+  puts "value in the front matter to position it. Set `nav: ~` (or remove the block) to"
+  puts 'keep it out of the nav entirely.'
+end
+
+# --- Subcommand: bin/new (no args) — site configuration --------------------
+
+def configure_site(options)
+  abort('--name is required (run `bin/new --help`)') unless options[:name]
+
+  unless VALID_THEMES.include?(options[:theme])
+    abort("Unknown theme: #{options[:theme]}. Valid: #{VALID_THEMES.join(', ')}")
+  end
+
+  config_path = File.join(ROOT, 'config', 'site.yml')
+  abort("config/site.yml not found at #{config_path}") unless File.exist?(config_path)
+
+  config = File.read(config_path, encoding: 'UTF-8')
+  config = replace_or_insert(config, 'title',       quote_yaml(options[:name]))
+  config = replace_or_insert(config, 'author',      quote_yaml(options[:name]))
+  config = replace_or_insert(config, 'description', quote_yaml(options[:description])) if options[:description]
+  config = replace_or_insert(config, 'locale',      options[:locale])
+  config = replace_or_insert(config, 'theme',       options[:theme])
+
+  File.write(config_path, config)
+  puts '✓ Updated config/site.yml'
+
+  clean_site if options[:clean]
+
+  puts ''
+  puts "Site configured: #{options[:name]} (locale: #{options[:locale]}, theme: #{options[:theme]})"
+  puts ''
+  puts 'Next steps:'
+  puts '  bundle install      # if not yet installed'
+  puts '  bin/new post "..."  # scaffold a new post bundle'
+  puts '  bin/serve           # start the dev server on http://localhost:4000'
+  puts ''
+  puts 'When ready, edit config/site.yml to set environments.production.url to your real domain.'
+end
+
+def clean_site
+  posts_dir = File.join(ROOT, 'content', 'posts')
+  if Dir.exist?(posts_dir)
+    Dir.glob(File.join(posts_dir, '*')).each { |entry| FileUtils.rm_rf(entry) if File.directory?(entry) }
+    puts '✓ Removed example posts'
+  end
+
+  audit_dir = File.join(ROOT, 'audit')
+  if Dir.exist?(audit_dir)
+    Dir.glob(File.join(audit_dir, '*.md')).each { |f| File.delete(f) }
+    puts '✓ Cleared audit/'
+  end
+
+  fonts_dir = File.join(ROOT, 'vendor', 'fonts')
+  if Dir.exist?(fonts_dir)
+    Dir.glob(File.join(fonts_dir, '*')).each { |f| File.delete(f) if File.file?(f) }
+    puts '✓ Cleared vendor/fonts/'
+  end
+
+  site_dir = File.join(ROOT, '_site')
+  if Dir.exist?(site_dir)
+    FileUtils.rm_rf(site_dir)
+    puts '✓ Removed _site/'
+  end
+
+  git_dir = File.join(ROOT, '.git')
+  if Dir.exist?(git_dir)
+    FileUtils.rm_rf(git_dir)
+    Dir.chdir(ROOT) do
+      system('git init -b main', out: File::NULL, err: File::NULL)
+    end
+    puts '✓ Re-initialised git on a fresh main branch'
+  end
+end
+
+def replace_or_insert(content, key, value)
+  pattern = /^#{Regexp.escape(key)}:\s*.*$/
+  if content.match?(pattern)
+    content.sub(pattern, "#{key}: #{value}")
+  else
+    "#{content.chomp}\n#{key}: #{value}\n"
+  end
+end
+
+def quote_yaml(value)
+  return value unless value.match?(/[:#&*\[\]{}|>]|^\s|\s$/)
+
+  "\"#{value.gsub('"', '\\"')}\""
+end
+
+# --- Dispatcher ------------------------------------------------------------
+
+case ARGV.first
+when 'post'
+  ARGV.shift
+  abort('Usage: bin/new post "Title"') if ARGV.empty?
+  create_post(ARGV.join(' '))
+when 'page'
+  ARGV.shift
+  abort('Usage: bin/new page "Title"') if ARGV.empty?
+  create_page(ARGV.join(' '))
+else
+  options = { locale: 'en', theme: 'minimal', clean: false }
+
+  OptionParser.new do |opts|
+    opts.banner = 'Usage: bin/new [post|page] "Title"   OR   bin/new --name NAME [options]'
+    opts.separator ''
+    opts.separator 'Subcommands:'
+    opts.separator '    post "Title"                 Scaffold a new post bundle'
+    opts.separator '    page "Title"                 Scaffold a top-level page'
+    opts.separator ''
+    opts.separator 'Site configuration options (no subcommand):'
+    opts.on('--name NAME', 'Site title (required)') { |v| options[:name] = v }
+    opts.on('--description TEXT', 'Site description (used in <meta>, OG, RSS)') { |v| options[:description] = v }
+    opts.on('--locale CODE', 'ISO 639-1 locale (en, es, fr, de, …) [default: en]') { |v| options[:locale] = v }
+    opts.on('--theme NAME', "Theme: #{VALID_THEMES.join(', ')} [default: minimal]") { |v| options[:theme] = v }
+    opts.on('--clean', 'Remove example posts, audit reports, and reset git history') { options[:clean] = true }
+    opts.on('-h', '--help', 'Show this message') do
+      puts opts
+      exit
+    end
+  end.parse!
+
+  configure_site(options)
+end

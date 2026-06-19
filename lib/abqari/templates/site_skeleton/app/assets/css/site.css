@@ -1,0 +1,9 @@
+/* Site-local CSS overrides.
+ *
+ * Loaded AFTER the theme's app.css, so anything in here wins on equal
+ * specificity. Use this for site-specific brand colours, font swaps,
+ * or one-off component tweaks — without forking the engine's themes.
+ *
+ * The file is yours; the engine never touches it on upgrade. Empty by
+ * default (no overrides) so the theme's defaults are what you see.
+ */

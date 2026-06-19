@@ -1,0 +1,151 @@
+/* Sand — warm, earth-toned palette for prose-led sites (memoirs,
+   travel writing, fiction). Merriweather body + Merriweather Sans
+   for UI, brand red accent. Inherits structural CSS from
+   `_common.css`. This file just sets:
+
+     1. Theme tokens (palette + typography) for both light and dark
+     2. Light/dark mode overrides
+     3. Theme-specific aesthetic refinements
+*/
+
+
+/* ============================================================
+ * Theme tokens — overrides _common.css defaults.
+ *
+ * Light is declared in `:root`. Dark redeclares only the values
+ * that differ from light, in two contexts:
+ *
+ *   1. @media (prefers-color-scheme: dark) :root:not([data-theme="light"])
+ *      — system-pref dark, unless the user toggled to light.
+ *   2. [data-theme="dark"] — explicit user toggle to dark.
+ *
+ * No [data-theme="light"] block — `:root` already holds light, and
+ * the `:not()` guard lets explicit light fall through.
+ * ============================================================ */
+
+:root {
+  /* Base palette — warm-beige light mode */
+  --color-text:    #212529;
+  --color-bg:      #f3f0ee;
+  --color-muted:   #6c757d;
+  --color-link:    #444;
+  --color-rule:    rgba(60, 40, 30, 0.18);
+  --color-card-bg: #fff;
+  --color-code-bg: #ece6dd;
+
+  /* Component palette */
+  --color-primary:        #990000;             /* brand red */
+  --color-on-primary:     #fff;
+  --color-secondary:      #6c757d;
+  --color-on-secondary:   #fff;
+  --color-success:        #2d6a4f;
+  --color-on-success:     #fff;
+  --color-danger:         #c1121f;
+  --color-on-danger:      #fff;
+  --color-warning:        #e6a700;
+  --color-on-warning:     #212529;
+  --color-info:           #4a6fa5;
+  --color-on-info:        #fff;
+  --color-light:          #f3f0ee;
+  --color-on-light:       #212529;
+  --color-dark:           #212529;
+  --color-on-dark:        #f3f0ee;
+
+  /* Typography */
+  --font-body:    "Merriweather", Georgia, serif;
+  --font-heading: "Merriweather Sans", system-ui, sans-serif;
+  --font-meta:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Buttons + UI elements use the same display sans as headings,
+     keeping the theme's typographic voice consistent across h1–h6
+     and `.btn` / `.folio-button`. */
+  --font-sans:    var(--font-heading);
+
+  /* Shadow tokens — warm tints for light mode */
+  --shadow-card:  0 2px 8px rgba(60, 40, 30, 0.10);
+}
+
+/* Dark deltas — only redeclare values that differ from `:root`.
+   Tokens whose light value already works in dark (e.g.
+   --color-on-primary: #fff, --color-warning: #e6a700) are
+   intentionally omitted. Both blocks must stay in sync — pure CSS
+   can't share rule bodies across selectors. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-text:    #ece6dd;
+    --color-bg:      #1a1410;
+    --color-muted:   #a8a098;
+    --color-link:    #d4c4b0;
+    --color-rule:    rgba(220, 200, 180, 0.15);
+    --color-card-bg: #2a201a;
+    --color-code-bg: #261d18;
+
+    --color-primary:        #c14545;          /* brighter red for dark contrast */
+    --color-secondary:      #a8a098;
+    --color-on-secondary:   #1a1410;
+    --color-success:        #4a8c6e;
+    --color-danger:         #d8453a;
+    --color-on-warning:     #1a1410;
+    --color-info:           #6189ba;
+    --color-light:          #2a201a;
+    --color-on-light:       #ece6dd;
+    --color-dark:           #ece6dd;
+    --color-on-dark:        #1a1410;
+  }
+}
+
+[data-theme="dark"] {
+  --color-text:    #ece6dd;
+  --color-bg:      #1a1410;
+  --color-muted:   #a8a098;
+  --color-link:    #d4c4b0;
+  --color-rule:    rgba(220, 200, 180, 0.15);
+  --color-card-bg: #2a201a;
+  --color-code-bg: #261d18;
+
+  --color-primary:        #c14545;
+  --color-secondary:      #a8a098;
+  --color-on-secondary:   #1a1410;
+  --color-success:        #4a8c6e;
+  --color-danger:         #d8453a;
+  --color-on-warning:     #1a1410;
+  --color-info:           #6189ba;
+  --color-light:          #2a201a;
+  --color-on-light:       #ece6dd;
+  --color-dark:           #ece6dd;
+  --color-on-dark:        #1a1410;
+}
+
+
+/* ============================================================
+ * Theme-specific aesthetic refinements
+ * ============================================================ */
+
+/* Anchor decoration — a hint of warm brown rather than the default
+   neutral rule color. Only override when the theme looks better with
+   a deliberate undertone. */
+a {
+  text-decoration-color: rgba(60, 40, 30, 0.4);
+}
+@media (prefers-color-scheme: dark) {
+  a { text-decoration-color: rgba(220, 200, 180, 0.4); }
+}
+[data-theme="dark"]  a { text-decoration-color: rgba(220, 200, 180, 0.4); }
+[data-theme="light"] a { text-decoration-color: rgba(60, 40, 30, 0.4); }
+
+/* Buttons inherit `--font-sans` (set to var(--font-heading) above),
+   so they read in Merriweather Sans. Bump the weight to match the
+   theme's overall display feel. */
+.btn,
+.folio-button {
+  font-weight: 500;
+}
+
+/* Nav-link hover: deepen to body text rather than light up brand red.
+   Matches the footer social icons' muted→text treatment — a low-key
+   pointer affordance that doesn't compete with the page content.
+   The active-page indicator (`[aria-current="page"]`) keeps brand red
+   for a clear "you are here" cue. */
+.nav__links a:hover {
+  color: var(--color-text);
+}

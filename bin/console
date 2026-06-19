@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Drop into an IRB session with Abqari loaded and a Site instance
+# bound to `site`. Convenient for poking at internals during engine
+# development without spinning up a full build each time.
+#
+# Examples once inside:
+#
+#   site.pages.size                  # before build: 0 (lazy)
+#   site.loader.load_pages.size      # explicit load
+#   site.collections.keys
+#   site.collection('posts').first.frontmatter
+#   site.posts_by_term('tags').keys
+#   site.compiled_template(
+#     site.find_in_paths('app/views/partials/_head.html.erb')
+#   )
+#
+# Use --site=PATH to point at a consuming site instead of the engine
+# fixture. Use --env=ENV to override ABQARI_ENV.
+
+require 'optparse'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/console [--site=PATH] [--env=ENV]'
+  opts.on('--site=PATH', 'Site root (default: engine fixture)') { |v| options[:site] = v }
+  opts.on('--env=ENV',   'ABQARI_ENV override (default: development)') { |v| options[:env] = v }
+end.parse!(ARGV)
+
+ENV['ABQARI_SITE_ROOT'] = options[:site] || File.expand_path('..', __dir__)
+ENV['ABQARI_ENV']       = options[:env]  || 'development'
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+require 'irb'
+
+# Top-level handles. Made available to IRB via `binding.irb` below so
+# they survive into the interactive session as locals.
+site      = Abqari::Site.new
+loader    = site.loader
+renderer  = site.renderer
+artifacts = site.artifacts
+
+# Silence rubocop / linters that complain about "unused" locals: they
+# exist for the IRB session below.
+_ = loader, renderer, artifacts
+
+puts "Abqari console — site_root=#{site.site_root}, env=#{site.env}"
+puts 'Available: site, loader, renderer, artifacts'
+puts 'Use `loader.load_pages` to populate site.pages without a full build.'
+puts
+
+# Drop into IRB with the current binding so `site`, `loader`, etc.
+# are visible. `binding.irb` is the preferred entry point — it
+# preserves local variables, unlike `IRB.start` which sets up a
+# fresh top-level context.
+binding.irb # rubocop:disable Lint/Debugger

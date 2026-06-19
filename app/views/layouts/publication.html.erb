@@ -1,0 +1,116 @@
+---
+layout: application
+---
+<!--
+  Publication detail page. One layout, one data source: the page's
+  frontmatter, in canonical shape (see docs/publications.md). Whether
+  the page is a manual `content/publications/<slug>/index.md` or
+  auto-generated from an external publisher, the field names are
+  the same.
+
+  Driven by `collections.publications.show.*` config toggles:
+
+    Metadata fields:
+      show_description, show_tagline, show_price,
+      show_isbn, show_pages, show_published
+
+    Hero image (between header and body, driven by `hero_image:`
+    frontmatter):
+      show_hero
+
+    Section toggles:
+      testimonials       filter data/testimonials.yml by slug
+      related_books      other publications in the series
+      related_bundles    bundles this publication is part of
+-->
+<%
+  fm    = page.frontmatter
+  show  = (site.collection_config('publications')['show'] || {})
+
+  show_description = show.fetch('show_description', true)
+  show_hero        = show.fetch('show_hero',        true)
+%>
+
+<article class="publication">
+  <%== render 'partials/draft_banner' %>
+  <%== render 'partials/future_banner' %>
+  <%== render 'partials/back_to_index' %>
+
+  <%== render 'partials/publication_header' %>
+
+  <%# Hero image — wide banner image placed between the header
+      metadata and the body description. Driven by frontmatter
+      `hero_image:` (and optional `hero_alt:`). Renders nothing when
+      absent or `show_hero` is false. %>
+  <% if show_hero && (hero_image = fm['hero_image']) %>
+    <figure class="publication__hero">
+      <img src="<%= sanitized_url(hero_image) %>"
+           alt="<%= fm['hero_alt'] || page.title %>"
+           loading="lazy">
+    </figure>
+  <% end %>
+
+  <%# Description — Folio's `excerpt_html` (pre-rendered) when present,
+      otherwise the `excerpt` source escaped. Both fields are in
+      canonical shape. The selected source is exposed as
+      `data-source="…"` so you can see in DevTools which path the
+      data came from. %>
+  <%
+    description_source, description_content =
+      if (html = fm['excerpt_html']) && !html.to_s.strip.empty?
+        [:excerpt_html, html]
+      elsif (excerpt = fm['excerpt']) && !excerpt.to_s.strip.empty?
+        [:excerpt, h(excerpt)]
+      else
+        [nil, nil]
+      end
+  %>
+  <% if show_description && description_source %>
+    <div class="publication__description" data-source="<%= description_source %>">
+      <%== description_content %>
+    </div>
+  <% end %>
+
+  <%# Markdown body — additional content (CTAs, related-content links,
+      etc.) that is NOT in the excerpt. Synopsis prose belongs in
+      `excerpt:`, not here. %>
+  <%== page.content %>
+
+  <%# Series — canonical `in_series` Hash. Reads from frontmatter
+      whether the source is manual or Folio. %>
+  <% if (in_series = fm['in_series']).is_a?(Hash) && in_series['slug'] %>
+    <p class="publication__series">
+      Part of the
+      <a href="/series/<%= in_series['slug'] %>/"><%= in_series['name'] || in_series['slug'] %></a>
+      series<% if in_series['position'] %> (#<%= in_series['position'] %>)<% end %>.
+    </p>
+  <% end %>
+
+  <% if show.fetch('testimonials', true) %>
+    <%== render 'partials/testimonials', subject: page %>
+  <% end %>
+
+  <% if show.fetch('related_books', true) %>
+    <%== render 'partials/book_related' %>
+  <% end %>
+
+  <%# Bundle CTAs — derive from canonical `in_bundles` (Folio supplies
+      it directly) AND from the inverse lookup (bundles that list
+      this publication's slug, native or Folio). %>
+  <% if show.fetch('related_bundles', true) %>
+    <%
+      explicit_bundles = Array(fm['in_bundles']).map { |b| b.is_a?(Hash) ? b['slug'] : b.to_s }
+      inverse_bundles  = site.collection('bundles').select do |b|
+        Array(b.frontmatter['publications']).map { |x| x.is_a?(Hash) ? x['slug'] : x.to_s }.include?(page.slug)
+      end.map(&:slug)
+      bundle_slugs = (explicit_bundles + inverse_bundles).uniq
+    %>
+    <% bundle_slugs.each do |bundle_slug| %>
+      <%== render 'partials/bundle_cta', bundle_slug: bundle_slug %>
+    <% end %>
+  <% end %>
+
+  <%== render 'partials/book_jsonld' %>
+</article>
+
+<%== render 'partials/related_items' %>

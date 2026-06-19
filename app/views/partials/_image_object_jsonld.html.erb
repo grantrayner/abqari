@@ -1,0 +1,61 @@
+<!--
+  Schema.org ImageObject JSON-LD for a single photo's show page.
+  Reads the same frontmatter the photo layout uses: image,
+  caption, date, city/country, camera, series.
+
+  Lets Google Images surface the photo with attribution + location
+  metadata. Renders nothing when the page has no `image:` frontmatter.
+
+  Wire it into the photo layout:
+      <%%= render 'partials/image_object_jsonld' %>
+-->
+<%
+  fm       = page.frontmatter || {}
+  img      = fm['image']
+  site_url = site.config['url'].to_s.sub(%r{/\z}, '')
+%>
+<% if img && !site_url.empty? %>
+<%
+  resolved_img = if img.to_s.start_with?('http://', 'https://')
+                   img
+                 elsif img.to_s.start_with?('/')
+                   "#{site_url}#{img}"
+                 else
+                   "#{site_url}#{bundle_asset_url_for(page, img)}"
+                 end
+
+  jsonld = {
+    "@context"   => "https://schema.org",
+    "@type"      => "ImageObject",
+    "name"       => page.title,
+    "contentUrl" => resolved_img,
+    "url"        => "#{site_url}#{page.url}"
+  }
+  jsonld["caption"]     = fm['caption']     if fm['caption']
+  jsonld["description"] = fm['description'] if fm['description'] && fm['description'] != fm['caption']
+
+  if page.respond_to?(:date) && page.date
+    jsonld["datePublished"] = page.date.iso8601
+  end
+
+  jsonld["author"] = { "@type" => "Person", "name" => fm['author'] || site.config['author'] } if (fm['author'] || site.config['author'])
+
+  # Location — photos carry `city:` and `country:`. Model as a Place
+  # with PostalAddress so Google can map them.
+  if fm['city'] || fm['country']
+    jsonld["contentLocation"] = {
+      "@type"   => "Place",
+      "name"    => [fm['city'], fm['country']].compact.join(', '),
+      "address" => {
+        "@type"           => "PostalAddress",
+        "addressLocality" => fm['city'],
+        "addressCountry"  => fm['country']
+      }.compact
+    }
+  end
+
+  # Camera as exifData (free-form). Could also map to `creditText`.
+  jsonld["creditText"] = fm['camera'] if fm['camera']
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
+<% end %>

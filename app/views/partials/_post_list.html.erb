@@ -1,0 +1,101 @@
+<!--
+  Post list — the cards on /<posts-slug>/ and tag-index pages. Each
+  card is title, optional hero image, date, truncated description,
+  reading time, and tags, all toggled via `collections.posts.index.*`
+  in config/site.yml:
+
+    collections:
+      posts:
+        index:
+          cover: photo                   # photo | photo_or_svg | svg | none
+                                         #   photo        — image: if set, basic
+                                         #                  flat-tint placeholder otherwise
+                                         #   photo_or_svg — image: if set, decorative
+                                         #                  initial-tile SVG otherwise
+                                         #   svg          — always decorative SVG
+                                         #                  (image: ignored)
+                                         #   none         — no cover slot at all
+          show_date: true
+          show_description: true
+          description_truncate: 160      # characters
+          show_reading_time: true
+          show_tags: false
+
+  Per-post override: set `cover: false` (or one of the enum values)
+  in frontmatter to override the collection default for that one post.
+
+  The semantic class names (`.post-list__cover`, `.post-list__title`,
+  `.post-list__body`, etc.) are theme-neutral hooks. Themes style them
+  to match their visual language — the `bootstrap` theme renders cards
+  with a cover-on-left layout, `minimal` renders a flat list. Edit
+  themes/<name>/css/app.css to change appearance; edit this partial
+  to change structure or add fields.
+-->
+<%
+  cfg = (site.collection_config('posts')['index'] || {})
+  show_date         = cfg.fetch('show_date',         true)
+  show_description  = cfg.fetch('show_description',  true)
+  show_reading_time = cfg.fetch('show_reading_time', true)
+  show_tags         = cfg.fetch('show_tags',         false)
+  truncate_at       = cfg.fetch('description_truncate', 160)
+%>
+<ul class="post-list h-feed">
+  <% posts.each do |post| %>
+    <%# `h-entry` on each card lets feed readers and IndieWeb parsers
+        treat the index as a microformats2 feed; `h-feed` on the <ul>
+        marks the surrounding container. Class names are invisible. %>
+    <li class="post-list__item h-entry">
+      <%# Cover slot. `cover_choice_for` returns one of :photo /
+          :placeholder / :svg / :none — see CoverHelpers for the
+          mode resolution (frontmatter > collection config > default).
+          When `:none`, the slot doesn't render at all and the body
+          fills the card via the `:not(:has(.post-list__cover))`
+          CSS rule. %>
+      <% case cover_choice_for(post, context: :index) %>
+      <% when :photo %>
+        <a class="post-list__cover" href="<%= post.url %>" aria-label="<%= post.title %>">
+          <img src="<%= sanitized_url(bundle_asset_url_for(post, post.frontmatter['image'])) %>" alt="<%= post.title %>" loading="lazy">
+        </a>
+      <% when :placeholder %>
+        <a class="post-list__cover" href="<%= post.url %>" aria-label="<%= post.title %>">
+          <svg class="post-list__cover-placeholder" viewBox="0 0 4 3"
+               preserveAspectRatio="none" aria-hidden="true">
+            <rect width="4" height="3" fill="currentColor"/>
+          </svg>
+        </a>
+      <% when :svg %>
+        <a class="post-list__cover post-list__cover--svg" href="<%= post.url %>" aria-label="<%= post.title %>">
+          <%== cover_svg_for(post) %>
+        </a>
+      <% when :none %>
+      <% end %>
+
+      <div class="post-list__body">
+        <h2 class="post-list__title p-name">
+          <% if (pos = post.frontmatter['series_position']) %><span class="series-position">#<%= pos %></span> <% end %><a class="u-url" href="<%= post.url %>"><%= post.title %></a>
+        </h2>
+
+        <% if show_date && post.date %>
+          <p class="post-list__meta">
+            <time class="dt-published" datetime="<%= post.date.iso8601 %>"><%= local_time(post.date) %></time>
+            <% if show_reading_time && post.respond_to?(:content) && post.content.to_s.length.positive? %>
+              · <%= reading_time(post.content) %>
+            <% end %>
+          </p>
+        <% end %>
+
+        <% if show_description && (desc = post.frontmatter['description'].to_s) && !desc.empty? %>
+          <p class="post-list__description p-summary"><%= truncate(desc, length: truncate_at) %></p>
+        <% end %>
+
+        <% if show_tags && post.tags.any? %>
+          <p class="post-list__tags">
+            <% post.tags.each do |tag| %>
+              <a class="post-list__tag p-category" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
+            <% end %>
+          </p>
+        <% end %>
+      </div>
+    </li>
+  <% end %>
+</ul>

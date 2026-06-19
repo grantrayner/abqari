@@ -1,0 +1,75 @@
+<%#
+  Publication card — one book rendered as a horizontal card (cover-left,
+  body-right). Same markup and CSS hooks used in two contexts so the
+  styling stays consistent everywhere a publication is listed:
+    - publications-index (the /books/ or /publications/ listing)
+    - bundle.html.erb's "What's included" section
+
+  Required locals:
+    pub             Hash with normalized fields:
+                      :slug, :title, :cover, :description, :price,
+                      :isbn, :pages, :published, :position
+                    All optional except :slug + :title. When :position
+                    is set (e.g. on a series page), a small `#N` prefix
+                    renders before the title.
+    idx             Integer — used to cycle through the 4-tint placeholder
+                    classes so each cover-wrap holds its 2:3 shape before
+                    the image bytes arrive.
+    pubs_prefix     URL prefix for the publication link (honors
+                    `publications.slug:` aliasing — e.g. "/books/").
+
+  Optional locals (all default to the publications collection's
+  index.* config; override per-call if needed):
+    heading_level   Heading tag for the title (default 2). Set to 3
+                    when the partial sits inside a section that
+                    already has its own h2 (e.g. bundle's
+                    "What's included").
+    show_description, show_price, show_isbn, show_pages, show_published
+    truncate_at     Character limit for the description (default 200).
+%>
+<%
+  cfg = (site.collection_config('publications')['index'] || {})
+  level = defined?(heading_level) && heading_level ? heading_level : 2
+  _show_description = defined?(show_description) ? show_description : cfg.fetch('show_description', true)
+  _show_price       = defined?(show_price)       ? show_price       : cfg.fetch('show_price',       true)
+  _show_isbn        = defined?(show_isbn)        ? show_isbn        : cfg.fetch('show_isbn',        false)
+  _show_pages       = defined?(show_pages)       ? show_pages       : cfg.fetch('show_pages',       false)
+  _show_published   = defined?(show_published)   ? show_published   : cfg.fetch('show_published',   false)
+  _truncate_at      = defined?(truncate_at)      ? truncate_at      : cfg.fetch('description_truncate', 200)
+  tint = "publications-index__cover--tint-#{(idx % 4) + 1}"
+  heading_open  = "<h#{level} class=\"publications-index__title\">"
+  heading_close = "</h#{level}>"
+%>
+<li class="publications-index__item">
+  <a href="<%= pubs_prefix %><%= pub[:slug] %>/">
+    <div class="publications-index__cover <%= tint %>">
+      <% if pub[:cover] %>
+        <img src="<%= sanitized_url(pub[:cover]) %>"
+             alt="<%= pub[:title] %> cover"
+             width="600" height="900"
+             loading="lazy"
+             decoding="async">
+      <% end %>
+    </div>
+    <div class="publications-index__body">
+      <%== heading_open %><% if pub[:position] %><span class="publications-index__position">#<%= pub[:position] %></span> <% end %><%= pub[:title] %><%== heading_close %>
+      <% if _show_description && pub[:description] && !pub[:description].to_s.empty? %>
+        <p class="publications-index__description"><%= truncate(pub[:description].to_s, length: _truncate_at) %></p>
+      <% end %>
+      <% if _show_price && pub[:price] %>
+        <p class="publications-index__price"><%= pub[:price] %></p>
+      <% end %>
+      <% if _show_isbn && pub[:isbn] %>
+        <p class="publications-index__isbn">ISBN <%= pub[:isbn] %></p>
+      <% end %>
+      <% if _show_pages && pub[:pages] %>
+        <p class="publications-index__pages"><%= pluralize(pub[:pages], 'page') %></p>
+      <% end %>
+      <% if _show_published && pub[:published] %>
+        <p class="publications-index__published">
+          Published <time datetime="<%= pub[:published] %>"><%= local_time(pub[:published]) %></time>
+        </p>
+      <% end %>
+    </div>
+  </a>
+</li>

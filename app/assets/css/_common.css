@@ -1,0 +1,3021 @@
+/* Abqari — _common.css ----------------------------------------------------
+ *
+ * Shared structural CSS loaded alongside every hand-written theme
+ * (minimal, magazine, notebook, sand). The theme file in
+ * themes/<name>/css/app.css provides the palette + typography + any
+ * per-theme aesthetic refinements; this file holds everything else
+ * — layout, components, page structure, banners, theme toggle.
+ *
+ * The bootstrap theme bundles its own CSS framework and skips this
+ * file (see the conditional in `app/views/partials/_head.html.erb`).
+ *
+ * Load order: this file loads BEFORE the theme's app.css, so themes
+ * win on cascade-equal specificity. Override anything below by
+ * re-declaring it in your theme's app.css.
+ *
+ * Sections:
+ *   1.  Tokens                — spacing, radii, fonts, shadows, palette
+ *   2.  Reset                 — box-sizing, html
+ *   3.  Layout                — sticky-footer body, --content-max-width scaffold
+ *   4.  Typography            — body, headings, anchors, p, lists, hr, code
+ *   5.  A11y primitives       — skip-link, visually-hidden, reduced-motion
+ *   6.  Header / nav          — full-width header bar
+ *   7.  Footer                — full-width footer bar
+ *   8.  Soft tints            — placeholder colours for cover wrappers
+ *   9.  Banners               — draft + future-post indicators
+ *  10.  Buttons               — .btn-* + .folio-button-* component families
+ *  11.  Cards + utilities     — .card, .card-grid, .rounded-*, .shadow-*
+ *  12.  Page lede + back link — index-page lede, slug-aware back link
+ *  13.  Single-post detail    — .post__meta, .post__hero, .story-image, etc.
+ *  14.  Posts index           — .post-list cards
+ *  15.  Pagination            — .pagination prev/next
+ *  16.  Publication detail    — cover-left + intro-right header layout
+ *  17.  Publications index    — list cards with 3D-tilt covers
+ *  18.  Folio book grid       — home-page card grid
+ *  19.  Book cover            — 3D-tilt cover wrapper
+ *  20.  Testimonials          — quote cards
+ *  21.  Related books         — sister-publications cards
+ *  22.  Home modules          — latest-post / -publication / -photo / contact
+ *  23.  Theme toggle          — sun/moon visibility logic
+ *  24.  Photo single-page     — image-centric post detail
+ *  25.  Up next + Related     — show-view follow-up blocks
+ *  26.  Carousel              — slideshow component
+ *  27.  Gallery + grid        — image-grid layouts
+ *  28.  Workshops             — show view + index for training offerings
+ *  29.  Newsletter subscribe  — provider-agnostic signup form
+ *  30.  Visualisations        — D3 viz pages
+ */
+
+
+/* ============================================================
+ * 1. Tokens
+ * ============================================================ */
+
+:root {
+  /* Tell the browser this site supports both light and dark — native
+     UI (scrollbars, form controls, autofill, default text-selection)
+     picks the right rendering automatically based on system pref or
+     [data-theme] toggle. Costs nothing, fixes "white scrollbar on
+     dark page" instantly. */
+  color-scheme: light dark;
+
+  /* Spacing scale — geometric, each step ~1.5–2x the previous. */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 3rem;
+
+  /* Container widths — themes choose one for `body { max-width }`. */
+  --container-narrow:   640px;
+  --container-default:  720px;
+  --container-wide:     880px;
+  --container-full:    1200px;
+
+  /* Border radii — six steps from sharp to pill. */
+  --radius-0:    0;
+  --radius-1:    0.25rem;
+  --radius-2:    0.375rem;
+  --radius-3:    0.5rem;
+  --radius-4:    1rem;
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
+  /* Legacy aliases (kept for back-compat). */
+  --radius-sm: var(--radius-1);
+  --radius-md: var(--radius-2);
+  --radius-lg: var(--radius-3);
+
+  /* Typography defaults.
+       --font-body     — prose body
+       --font-heading  — h1–h6
+       --font-meta     — small metadata lines (timestamps, etc.)
+       --font-sans     — buttons + other UI elements where a sans is
+                         needed regardless of body/heading family
+       --font-mono     — code, pre, and any theme that opts in to a
+                         mono-typeface elsewhere (e.g. notebook's
+                         `--font-heading: var(--font-mono)` trick)
+
+     Themes typically override `--font-body` and `--font-heading`; the
+     other three default to sensible values and only need overriding
+     when the theme wants a specific face. */
+  --font-body:    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-body);
+  --font-meta:    var(--font-body);
+  --font-sans:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Body density — `--font-size-body` is the prose body size,
+     `--line-height-body` controls its line-height. Themes can swing
+     between "prose vibe" (defaults: 1.0625rem / 1.7) and "docs vibe"
+     (e.g. notebook: 1rem / 1.55) entirely via these variables, so the
+     theme stylesheet stays nothing but token declarations + minor
+     decoration. */
+  --font-size-body:   1.0625rem;
+  --line-height-body: 1.7;
+
+  /* Shadow tokens — themes can override these tones if they want. */
+  --shadow-soft:  0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-card:  0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-cover: 0 6px 20px rgba(0, 0, 0, 0.2);
+
+  /* Default colour palette — themes redefine these. The values below
+     are deliberately neutral; real palettes come from the theme file. */
+  --color-text:           #1a1a1a;
+  --color-bg:             #fafafa;
+  --color-muted:          #6b6b6b;
+  --color-link:           #0d6efd;
+  --color-rule:           rgba(0, 0, 0, 0.12);
+  --color-card-bg:        #fff;
+  --color-code-bg:        rgba(0, 0, 0, 0.05);
+
+  /* Component palette — feeds .btn-*, .folio-button-* etc. */
+  --color-primary:        #0d6efd;
+  --color-on-primary:     #fff;
+  --color-secondary:      #6c757d;
+  --color-on-secondary:   #fff;
+  --color-success:        #198754;
+  --color-on-success:     #fff;
+  --color-danger:         #dc3545;
+  --color-on-danger:      #fff;
+  --color-warning:        #ffc107;
+  --color-on-warning:     #212529;
+  --color-info:           #0dcaf0;
+  --color-on-info:        #212529;
+  --color-light:          #f8f9fa;
+  --color-on-light:       #212529;
+  --color-dark:           #212529;
+  --color-on-dark:        #f8f9fa;
+
+  /* Responsive content max-width — col-12 / col-md-10 / col-lg-9 / col-xl-8. */
+  --content-max-width: 100%;
+}
+
+@media (min-width: 768px)  { :root { --content-max-width: 83.333%; } }
+@media (min-width: 992px)  { :root { --content-max-width: 75%; } }
+@media (min-width: 1200px) { :root { --content-max-width: 66.666%; } }
+
+
+/* ============================================================
+ * 2. Reset
+ * ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  /* Suppress iOS Safari's gray tap-flash on links and buttons. Focus
+     and active states still apply — this only removes the involuntary
+     highlight overlay. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Defensive media element rule — a markdown image wider than its
+   container would otherwise overflow horizontally on mobile and
+   break the layout. Applies to every replaced element so video,
+   svg, canvas, iframe all behave consistently. */
+img, picture, video, svg, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+
+/* ============================================================
+ * 3. Layout — sticky-footer flex body + responsive content scaffold.
+ * ============================================================ */
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  /* `100dvh` (dynamic viewport height) tracks the actual visible
+     area as mobile address bars expand/collapse — fixes the iOS
+     Safari issue where `100vh` is the *expanded* viewport, so
+     content can scroll under the address bar. `100vh` stays as a
+     fallback for browsers without dvh support. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  /* Sizing routed through `--font-size-body` / `--line-height-body`
+     tokens so themes can express density choices declaratively in
+     their `:root` rather than overriding the `body` rule. Defaults
+     in `_common.css` are 1.0625rem / 1.7 (prose vibe). */
+  font-size:   var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  flex: 1 0 auto;
+  padding-top: var(--space-xl);
+}
+
+/* Single wrapper element used inside `<header>`, `<main>`, and
+   `<footer>` (see `application.html.erb` and `_footer.html.erb`).
+   The wrappers themselves stay full-width so borders / backgrounds
+   extend edge-to-edge; the `.container` inside is what's centred at
+   `--content-max-width`.
+
+   This replaces an older `* > *` scaffold rule that constrained
+   direct children of those wrappers — that approach silently broke
+   horizontal alignment whenever a component used shorthand `margin`
+   (which expanded to `margin-inline: 0`) and required every contributor
+   to remember the `margin-block` discipline. With a single wrapper,
+   children flow naturally — no margin gymnastics required. */
+.container {
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  /* `max()` with safe-area-inset gives the container at least 1rem of
+     horizontal padding, and more if the device has a notch / curved
+     edges (landscape iPhone X+, foldables). On flat screens the
+     env() values evaluate to 0, so the rule falls through to 1rem. */
+  padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+}
+
+
+/* ============================================================
+ * 4. Typography
+ * ============================================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text);
+  margin: var(--space-2xl) 0 var(--space-md);
+  /* Pull lone words back from the end of a heading so the last line
+     is balanced with the lines above. Pure typography polish — no
+     fallback needed; browsers without support just wrap normally. */
+  text-wrap: balance;
+}
+
+/* Heading sizes use `clamp(min, fluid, max)` so they scale smoothly
+   from phone to desktop without manual breakpoints. `min` is the
+   small-phone floor, `max` is the desktop ceiling, and `vw` between
+   them lets the size respond to viewport width. Replaces the older
+   max-width@576/400 patches for h1 only. */
+h1 { font-size: clamp(1.25rem,   4vw, 2.5rem); }
+h2 { font-size: clamp(1.25rem,   3vw, 1.5rem); }
+h3 { font-size: clamp(1.125rem, 2.5vw, 1.25rem); }
+h4 { font-size: 1.125rem; }
+h5 { font-size: 1rem; }
+h6 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); }
+
+article > header > h1:first-child,
+article > h1:first-child { margin-top: 0; }
+
+a {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-decoration-color: var(--color-rule);
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 1px;
+}
+a:hover {
+  color: var(--color-text);
+  text-decoration-color: currentColor;
+}
+
+/* `text-wrap: pretty` reshuffles paragraph wrapping to avoid orphans
+   (lone words on the last line) and unbalanced rivers. Modern, very
+   broadly supported, with graceful fallback to default wrap. */
+p {
+  margin: 0 0 var(--space-md);
+  text-wrap: pretty;
+}
+
+ol, ul {
+  padding-left: 1.5rem;
+  margin: 0 0 var(--space-lg);
+  color: var(--color-muted);
+}
+ol li, ul li { margin-bottom: var(--space-sm); }
+
+/* GFM task lists — kramdown emits the rendered list as a plain `<ul>`
+   with `<li><input type="checkbox" disabled></li>` for each row. With
+   no class hook on the list or items, the default disc marker shows
+   alongside the checkbox, giving a bullet + circle pair. Detect the
+   pattern with `:has()` and hide the marker (and the corresponding
+   indent) so only the checkbox carries the "this is a list item"
+   signal. `:has()` is supported in all evergreen browsers since
+   late 2023; older browsers fall back to the bullet + checkbox
+   double, which is ugly but readable. */
+ul:has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-left: 0;
+}
+ul > li:has(> input[type="checkbox"]) {
+  list-style: none;
+}
+ul > li > input[type="checkbox"] {
+  margin-right: 0.4em;
+}
+
+blockquote {
+  margin: var(--space-lg) 0;
+  padding-left: var(--space-md);
+  border-left: 3px solid var(--color-rule);
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--color-rule);
+  margin: var(--space-2xl) 0;
+}
+
+/* ---- Type utilities --------------------------------------------------
+   A small Bootstrap-flavoured family for the one-off cases where a
+   BEM component class would be overkill. Use sparingly — the codebase
+   leans toward semantic component classes (.related__date, .post__meta)
+   for anything that recurs. Reach for these when you have a single span
+   or paragraph that needs a quick treatment and inventing a new class
+   would be heavier than the change deserves.
+   --------------------------------------------------------------------- */
+
+/* `.small` and the semantic <small> element. Sized in `em` (relative
+   to parent), so a `.small` span inside an h2 reads at 87.5% of the
+   h2's size, not at an absolute 14px. */
+small,
+.small {
+  font-size: 0.875em;
+}
+
+/* De-emphasized text — captions, secondary metadata, fine print. */
+.muted {
+  color: var(--color-muted);
+}
+
+/* Logical-property alignment. `text-end` mirrors automatically in RTL
+   contexts, where it becomes left-align — preferred over `text-right`
+   for locale-aware sites. */
+.text-center { text-align: center; }
+.text-end    { text-align: end; }
+
+/* Lede paragraph — the journalism term for the opening summary
+   that sits under a page title. Slightly larger size and tighter
+   line-height to set the lede apart from body copy. Pattern:
+       <h1>Page title</h1>
+       <p class="lede">Short standfirst paragraph…</p>
+   Used by every index / show layout as the description under the
+   H1, and also available inline anywhere in body content for one-off
+   prominent paragraphs. The extra-spacing rule for top-of-page
+   usage lives below. */
+.lede {
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+code, pre {
+  /* Routes through `--font-mono` so a theme can swap in its own mono
+     face (e.g. notebook's JetBrains Mono) without overriding this
+     rule. Default mono stack is set in Section 1 (`--font-mono`). */
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+code {
+  padding: 0.125rem 0.375rem;
+  background: var(--color-code-bg);
+  border-radius: var(--radius-1);
+}
+pre {
+  padding: var(--space-md);
+  overflow-x: auto;
+  background: var(--color-code-bg);
+  border-radius: var(--radius-2);
+}
+pre code { padding: 0; background: transparent; }
+
+
+/* ============================================================
+ * 5. Accessibility primitives
+ * ============================================================ */
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-text);
+  color: var(--color-bg);
+  text-decoration: none;
+  border-radius: 0 0 var(--radius-2) 0;
+  transform: translateY(-100%);
+  transition: transform 0.1s;
+  z-index: 100;
+}
+.skip-link:focus { transform: translateY(0); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* ============================================================
+ * 6. Header / nav
+ * ============================================================ */
+
+.site-header {
+  padding-block: var(--space-md);
+  border-bottom: 1px solid var(--color-rule);
+  /* Navigation reads as UI, not prose — uses the same sans face as
+     buttons and other controls. Themes that want a thematic sans
+     (sand → Merriweather Sans) override `--font-sans` once and the
+     header inherits automatically; the bare-default sans stack works
+     fine for themes that don't override. Footer mirrors this on the
+     same rationale — see Section 7. */
+  font-family: var(--font-sans);
+}
+
+nav[aria-label="Primary"] {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: 0;
+}
+.nav__brand {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+.nav__brand:hover { opacity: 0.7; }
+.nav__links { margin-left: auto; font-size: 0.9375rem; }
+.nav__links a {
+  color: var(--color-muted);
+  text-decoration: none;
+  margin-left: 0.5rem;
+}
+.nav__links a:hover,
+.nav__links a[aria-current="page"] { color: var(--color-primary); }
+
+nav[aria-label="Primary"] [aria-current="page"] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+
+/* ============================================================
+ * 7. Footer
+ * ============================================================ */
+
+body > footer {
+  margin-top: var(--space-2xl);
+  padding-block: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  /* Mirror the header — footer reads as UI/meta, not prose. Themes
+     override `--font-sans` once and both regions follow. */
+  font-family: var(--font-sans);
+}
+.footer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.footer-bar > p { margin: 0; }
+.footer-bar .footer-social { display: flex; gap: var(--space-sm); align-items: center; }
+.footer-bar .footer-social a { display: inline-flex; align-items: center; color: var(--color-muted); }
+.footer-bar .footer-social a:hover { color: var(--color-text); }
+.footer-meta { margin: 0; }
+.footer-social { margin: 0; }
+.footer-links { margin: 0 0 var(--space-md); }
+
+
+/* ============================================================
+ * 8. Soft-tint placeholder colours (CLS-safe cover wrappers)
+ * ============================================================ */
+
+/* Diagonal linear gradients — same palette as the previous solid-
+   colour tints, but with ~20% light-to-dark depth across each tile
+   so empty covers don't feel flat. 135deg keeps the highlight in
+   the top-left corner consistently across all four tints, so a
+   gallery cycling through tints reads as a unified set rather than
+   four independent stickers. Used by photos / publications listings
+   and image-gallery placeholders. */
+
+.gallery-index__cover--tint-1,
+.image-gallery__placeholder--tint-1,
+.publications-index__cover--tint-1 {
+  background: linear-gradient(135deg, #e6d4ad 0%, #c8b88f 100%);   /* warm sand */
+}
+
+.gallery-index__cover--tint-2,
+.image-gallery__placeholder--tint-2,
+.publications-index__cover--tint-2 {
+  background: linear-gradient(135deg, #d5c5d8 0%, #b3a3b8 100%);   /* dusty lavender */
+}
+
+.gallery-index__cover--tint-3,
+.image-gallery__placeholder--tint-3,
+.publications-index__cover--tint-3 {
+  background: linear-gradient(135deg, #c4d6c5 0%, #a3b8a6 100%);   /* sage */
+}
+
+.gallery-index__cover--tint-4,
+.image-gallery__placeholder--tint-4,
+.publications-index__cover--tint-4 {
+  background: linear-gradient(135deg, #e2c4ad 0%, #c39d80 100%);   /* terracotta */
+}
+
+
+/* ============================================================
+ * 9. Banners — draft + future-post indicators (theme-agnostic)
+ * ============================================================
+ *
+ * Banner colours are intentionally fixed warning palettes so authors
+ * can't miss the "this isn't shipped yet" signal regardless of theme.
+ */
+
+.draft-banner,
+.future-banner {
+  margin: var(--space-md) 0 var(--space-xl);
+  padding: 0.75rem 1rem;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: var(--radius-1);
+  font-size: 0.9375rem;
+}
+.draft-banner p,
+.future-banner p { margin: 0; }
+.draft-banner code,
+.future-banner code { color: inherit; }
+.future-banner time { font-variant-numeric: tabular-nums; }
+
+.draft-banner       { background: #fff4d6; color: #5c4400; border-color: #d9a900; }
+.draft-banner code  { background: rgba(217, 169, 0, 0.15); }
+.future-banner      { background: #e0eef9; color: #133757; border-color: #4a90c4; }
+
+@media (prefers-color-scheme: dark) {
+  .draft-banner       { background: #3a2e10; color: #ffe8a8; border-color: #b88800; }
+  .draft-banner code  { background: rgba(184, 136, 0, 0.25); }
+  .future-banner      { background: #142436; color: #b8d6f0; border-color: #3a78a8; }
+}
+[data-theme="dark"] .draft-banner       { background: #3a2e10; color: #ffe8a8; border-color: #b88800; }
+[data-theme="dark"] .draft-banner code  { background: rgba(184, 136, 0, 0.25); }
+[data-theme="dark"] .future-banner      { background: #142436; color: #b8d6f0; border-color: #3a78a8; }
+[data-theme="light"] .draft-banner      { background: #fff4d6; color: #5c4400; border-color: #d9a900; }
+[data-theme="light"] .draft-banner code { background: rgba(217, 169, 0, 0.15); }
+[data-theme="light"] .future-banner     { background: #e0eef9; color: #133757; border-color: #4a90c4; }
+
+
+/* ============================================================
+ * 10. Buttons — .btn family + .folio-button family.
+ * ============================================================
+ *
+ * Two button systems coexist:
+ *
+ *   .btn .btn-primary, .btn-outline-secondary, etc.
+ *     The engine's general-purpose button family. Bootstrap-style
+ *     naming. Use for site-specific CTAs.
+ *
+ *   .folio-button .folio-button--buy / --cart / --outline
+ *     Folio-compatible button family — matches the class names used
+ *     by Folio's storefront pages, so users can paste Folio HTML
+ *     and get a consistent look.
+ *
+ * Both pull colours from theme-defined CSS variables.
+ */
+
+/* --- General buttons (.btn family) ------------------------------- */
+
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  /* Always sans, never inherit body font — themes with a serif body
+     (e.g. magazine) still get crisp buttons. Themes with a thematic
+     sans set `--font-sans` once in `:root`. */
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  border-radius: var(--radius-2);
+  background-color: transparent;
+  color: var(--color-text);
+  text-decoration: none;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease,
+              border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.btn:disabled,
+.btn.disabled { opacity: 0.6; pointer-events: none; }
+
+.btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+.btn-lg { padding: 0.75rem 1.5rem; font-size: 1.125rem; }
+
+.btn-primary    { background-color: var(--color-primary);   color: var(--color-on-primary);   border-color: var(--color-primary); }
+.btn-secondary  { background-color: var(--color-secondary); color: var(--color-on-secondary); border-color: var(--color-secondary); }
+.btn-success    { background-color: var(--color-success);   color: var(--color-on-success);   border-color: var(--color-success); }
+.btn-danger     { background-color: var(--color-danger);    color: var(--color-on-danger);    border-color: var(--color-danger); }
+.btn-warning    { background-color: var(--color-warning);   color: var(--color-on-warning);   border-color: var(--color-warning); }
+.btn-info       { background-color: var(--color-info);      color: var(--color-on-info);      border-color: var(--color-info); }
+.btn-light      { background-color: var(--color-light);     color: var(--color-on-light);     border-color: var(--color-light); }
+.btn-dark       { background-color: var(--color-dark);      color: var(--color-on-dark);      border-color: var(--color-dark); }
+
+.btn-primary:hover   { background-color: color-mix(in srgb, var(--color-primary)   85%, black); border-color: color-mix(in srgb, var(--color-primary)   85%, black); color: var(--color-on-primary); }
+.btn-secondary:hover { background-color: color-mix(in srgb, var(--color-secondary) 85%, black); border-color: color-mix(in srgb, var(--color-secondary) 85%, black); color: var(--color-on-secondary); }
+.btn-success:hover   { background-color: color-mix(in srgb, var(--color-success)   85%, black); border-color: color-mix(in srgb, var(--color-success)   85%, black); color: var(--color-on-success); }
+.btn-danger:hover    { background-color: color-mix(in srgb, var(--color-danger)    85%, black); border-color: color-mix(in srgb, var(--color-danger)    85%, black); color: var(--color-on-danger); }
+.btn-warning:hover   { background-color: color-mix(in srgb, var(--color-warning)   85%, black); border-color: color-mix(in srgb, var(--color-warning)   85%, black); color: var(--color-on-warning); }
+.btn-info:hover      { background-color: color-mix(in srgb, var(--color-info)      85%, black); border-color: color-mix(in srgb, var(--color-info)      85%, black); color: var(--color-on-info); }
+.btn-light:hover     { background-color: color-mix(in srgb, var(--color-light)     85%, black); border-color: color-mix(in srgb, var(--color-light)     85%, black); color: var(--color-on-light); }
+.btn-dark:hover      { background-color: color-mix(in srgb, var(--color-dark)      85%, black); border-color: color-mix(in srgb, var(--color-dark)      85%, black); color: var(--color-on-dark); }
+
+.btn-outline-primary    { background-color: transparent; color: var(--color-primary);   border-color: var(--color-primary); }
+.btn-outline-secondary  { background-color: transparent; color: var(--color-secondary); border-color: var(--color-secondary); }
+.btn-outline-success    { background-color: transparent; color: var(--color-success);   border-color: var(--color-success); }
+.btn-outline-danger     { background-color: transparent; color: var(--color-danger);    border-color: var(--color-danger); }
+.btn-outline-warning    { background-color: transparent; color: var(--color-warning);   border-color: var(--color-warning); }
+.btn-outline-info       { background-color: transparent; color: var(--color-info);      border-color: var(--color-info); }
+.btn-outline-light      { background-color: transparent; color: var(--color-light);     border-color: var(--color-light); }
+.btn-outline-dark       { background-color: transparent; color: var(--color-dark);      border-color: var(--color-dark); }
+
+.btn-outline-primary:hover    { background-color: var(--color-primary);   color: var(--color-on-primary); }
+.btn-outline-secondary:hover  { background-color: var(--color-secondary); color: var(--color-on-secondary); }
+.btn-outline-success:hover    { background-color: var(--color-success);   color: var(--color-on-success); }
+.btn-outline-danger:hover     { background-color: var(--color-danger);    color: var(--color-on-danger); }
+.btn-outline-warning:hover    { background-color: var(--color-warning);   color: var(--color-on-warning); }
+.btn-outline-info:hover       { background-color: var(--color-info);      color: var(--color-on-info); }
+.btn-outline-light:hover      { background-color: var(--color-light);     color: var(--color-on-light); }
+.btn-outline-dark:hover       { background-color: var(--color-dark);      color: var(--color-on-dark); }
+
+
+/* --- Folio-compatible buttons (.folio-button family) -------------
+ *
+ * Class names + structure mirror Folio's storefront output, so users
+ * can paste Folio HTML (Buy now, Add to cart) and get a consistent
+ * look without rewriting markup.
+ *
+ * Folio's button-theme generator (foliobooks.app) emits its own CSS
+ * — to use those styles instead of these defaults, paste the
+ * generator's CSS into your active theme's app.css. Theme CSS loads
+ * AFTER _common.css so your rules win on cascade order without
+ * !important. To zero out our defaults entirely:
+ *
+ *   .folio-button { all: revert; }
+ *   .folio-button--buy, .folio-button--cart, .folio-button--outline {
+ *     all: revert;
+ *   }
+ */
+
+/* Standard layout for any row of buy / cart / outline buttons. The
+   five classes below all render `[Buy now] [Add to cart]` rows in
+   different contexts (generic, publication header, bundle show view,
+   bundle CTA on a publication page, series show view); a single
+   shared rule keeps the gap and wrap behaviour identical everywhere.
+   Per-context margins stay on each class individually, because each
+   context sits in a different flow (header vs body vs aside). */
+.folio-buttons,
+.publication__buttons,
+.bundle__buttons,
+.series__buttons,
+.folio-bundle-cta__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.folio-buttons { margin: var(--space-md) 0; }
+
+.folio-button {
+  display: inline-block;
+  font-family: var(--font-sans);   /* see `.btn` above */
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-3);
+  border: 1px solid transparent;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.folio-button--buy {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+.folio-button--buy:hover,
+.folio-button--buy:focus {
+  background-color: color-mix(in srgb, var(--color-primary) 85%, black);
+  border-color: color-mix(in srgb, var(--color-primary) 85%, black);
+  color: var(--color-on-primary);
+  text-decoration: none;
+}
+
+.folio-button--cart {
+  background-color: transparent;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.folio-button--cart:hover,
+.folio-button--cart:focus {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  text-decoration: none;
+}
+
+.folio-button--outline {
+  background-color: transparent;
+  color: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+.folio-button--outline:hover,
+.folio-button--outline:focus {
+  background-color: var(--color-secondary);
+  color: var(--color-on-secondary);
+  text-decoration: none;
+}
+
+.folio-bundle-cta .folio-button {
+  font-size: 0.875rem;
+  padding: 0.35rem 0.75rem;
+}
+
+/* Touch-target sizing — Apple HIG / WCAG recommend a minimum 44×44
+   tap target on touch devices. The default button padding hits ~38–40px,
+   fine for mouse precision but cramped under a fingertip. `pointer:
+   coarse` matches touchscreens (phones, tablets, touch laptops) and
+   leaves precision-pointer devices on the tighter desktop sizing. */
+@media (pointer: coarse) {
+  .btn,
+  .folio-button {
+    padding-block: 0.625rem;
+  }
+}
+
+
+/* ============================================================
+ * 11. Cards + radii + shadow utilities
+ * ============================================================ */
+
+.rounded-0      { border-radius: var(--radius-0)      !important; }
+.rounded-1      { border-radius: var(--radius-1)      !important; }
+.rounded-2      { border-radius: var(--radius-2)      !important; }
+.rounded-3      { border-radius: var(--radius-3)      !important; }
+.rounded-4      { border-radius: var(--radius-4)      !important; }
+.rounded-pill   { border-radius: var(--radius-pill)   !important; }
+.rounded-circle { border-radius: var(--radius-circle) !important; }
+
+/* Shadow utilities — three depth tiers + an explicit-off class. Map
+   to the existing shadow tokens, so a theme that overrides any of
+   `--shadow-card / --shadow-soft / --shadow-cover` cascades through
+   these utilities AND the component CSS that uses the same tokens.
+   `!important` follows the `.rounded-*` precedent so utility classes
+   win over component-class shadow declarations on the same element. */
+.shadow-sm      { box-shadow: var(--shadow-card)      !important; }
+.shadow         { box-shadow: var(--shadow-soft)      !important; }
+.shadow-lg      { box-shadow: var(--shadow-cover)     !important; }
+.shadow-none    { box-shadow: none                    !important; }
+
+.card {
+  display: block;
+  padding: var(--space-lg);
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-3);
+}
+a.card { color: inherit; text-decoration: none; }
+a.card:hover { border-color: var(--color-primary); }
+
+.card-grid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .card-grid--2 { grid-template-columns: 1fr 1fr; }
+  .card-grid--3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+.contact-button-wrapper { margin: var(--space-xl) 0; }
+
+
+/* ============================================================
+ * 12. Page lede + back link
+ * ============================================================ */
+
+/* When a `.lede` paragraph sits at the top of an `<article><header>`
+   (the index-page pattern: title, then short standfirst, then list of
+   items below), give it extra bottom margin so the lede stands apart
+   from the content that follows. Regular in-body `.lede` paragraphs
+   keep the default body-paragraph margin. */
+article > header > .lede {
+  margin: 0 0 var(--space-2xl);
+}
+
+/* `.index-intro` — wraps the markdown body content on every collection
+   index layout (posts, photos, publications, workshops, bundles,
+   series, archives). The wrapper renders only when the page actually
+   has body content, so it never adds gap when an index is widget-only.
+   Sets a uniform bottom gap between the intro prose and the first
+   listing/widget below, so all collection landing pages share the same
+   visual rhythm. */
+.index-intro {
+  margin-bottom: var(--space-2xl);
+}
+
+.back-link { margin: var(--space-lg) 0; }
+.back-link a {
+  color: var(--color-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+.back-link a:hover { color: var(--color-text); }
+
+
+/* ============================================================
+ * 13. Single-post detail
+ * ============================================================
+ *
+ * Page hero (`.post__hero`, an <img>) renders at the image's
+ * natural aspect — author uploads vary (4:3, 3:2, square, 16:9,
+ * portrait), and the show view is where the full image gets to
+ * breathe. Index/listing views crop to 4:3 for grid consistency.
+ *
+ * Inline body figures (`.story-image`, a <figure>) DO crop to
+ * 16:9 since authors curate those within the body and a fixed
+ * banner crop reads better in flowing prose than a variable-
+ * height block.
+ */
+
+.post__meta,
+.story-meta {
+  font-family: var(--font-meta);
+  color: var(--color-muted);
+  margin: 0 0 var(--space-lg);
+}
+
+/* `.post__hero` renders at the image's NATURAL aspect — most user
+   uploads are 4:3 or 3:2, so forcing a wide 16:9 box would crop
+   the top + bottom of typical photographs. Same approach as the
+   photo show view (`.photo__image`): width fills the column, height
+   follows the image's intrinsic ratio. Index/list views still crop
+   to 4:3 (via `.post-list__cover`, `.posts-archive__cover`, etc.)
+   for grid consistency — the show view is where the full image
+   gets to breathe. */
+.post__hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 var(--space-xl);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Workshop heroes and inline body figures keep the 16:9 banner
+   crop — workshops are typically event imagery (room photos,
+   flyers) that read best wide, and inline `.story-image` figures
+   are author-curated within the body so a fixed crop is fine. */
+.workshop__hero,
+.story-image {
+  display: block;
+  width: 100%;
+  margin: var(--space-xl) 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-3);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+.workshop__hero {
+  object-fit: cover;
+  margin-top: 0;
+}
+.story-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.post__tags-footer {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-rule);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+.post__tags-footer a { color: var(--color-muted); text-decoration: none; }
+.post__tags-footer a:hover { color: var(--color-text); }
+
+/* IndieWeb webmentions — receives from webmention.io at build time,
+   renders as a "Replies & mentions" section below the post body.
+   Conversational mentions (in-reply-to, mention-of) get the full
+   author + body card; likes/reposts/bookmarks render facepile-style
+   (avatar grid) because the body text adds nothing the avatar +
+   count doesn't. Class hooks only — themes can override completely
+   via `themes/<name>/css/app.css`. */
+.webmentions {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+.webmentions__heading {
+  font-size: 1.125rem;
+  margin: 0 0 var(--space-md);
+}
+.webmentions__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.webmention {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.webmention__avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.webmention__body { flex: 1; min-width: 0; }
+.webmention__byline {
+  margin: 0 0 var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+.webmention__author { color: var(--color-text); font-weight: 600; text-decoration: none; }
+.webmention__author:hover { text-decoration: underline; }
+.webmention__permalink { color: var(--color-muted); text-decoration: none; margin-left: var(--space-xs); }
+.webmention__permalink:hover { color: var(--color-text); }
+.webmention__text { margin: 0; }
+
+.webmentions__facepile { margin-top: var(--space-lg); }
+.webmentions__facepile-label {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+.webmentions__facepile-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.webmentions__facepile-list img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Table of contents — auto-generated from h2/h3 headings via the
+   `_toc` partial. Sits inline above the body when the layout
+   renders it. Compact list with indented h3 entries (the `--h3`
+   modifier class) so the hierarchy reads at a glance. */
+.toc {
+  margin: var(--space-xl) 0;
+  padding: var(--space-lg);
+  background: var(--color-card-bg);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-soft);
+}
+/* `.toc__heading` typography is defined in the shared `__heading`
+   rule. */
+
+/* Native `<details>` collapse. The TOC starts expanded (the `open`
+   attribute on the element) — the toggle is for readers who'd
+   rather hide a long contents list while reading. Click or
+   Enter/Space on the summary; chevron rotates to signal state.
+   No JS, no ARIA polyfilling — browser handles all of it. */
+.toc__details { display: block; }
+.toc__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  cursor: pointer;
+  /* Strip the default disclosure triangle in every browser. The
+     chevron we ship is positioned on the right and rotates with
+     the open state. */
+  list-style: none;
+}
+.toc__summary::-webkit-details-marker { display: none; }
+.toc__summary::marker { content: ''; }
+/* Zero the heading margin inside the summary — the gap between
+   heading and list lives on the list (`margin-top` below) instead,
+   so the gap only renders when the details is open (the list is
+   hidden when closed, taking its margin with it). */
+.toc__summary .toc__heading { margin-bottom: 0; }
+.toc__chevron {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  transition: transform 0.15s ease-out;
+  /* Default (open) — chevron points down. Collapsed — rotated -90°
+     so it points right. `prefers-reduced-motion` disables the
+     transition via the global motion rule. */
+  transform: rotate(0deg);
+}
+.toc__details:not([open]) .toc__chevron { transform: rotate(-90deg); }
+
+.toc__list {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+}
+.toc__item {
+  margin: 0 0 var(--space-xs);
+}
+/* Indent + slight size step per heading level so the hierarchy reads
+   at a glance. h2 (no modifier class beyond `.toc__item`) sits flush;
+   h3 indents one step, h4 indents two. Deeper levels (h5/h6) fall
+   through to the h4 style — almost no TOC realistically needs them,
+   and adding more indent steps starts to look like a directory
+   listing rather than a contents list. */
+.toc__item--h3 {
+  padding-left: var(--space-md);
+  font-size: 0.9375rem;
+}
+.toc__item--h4,
+.toc__item--h5,
+.toc__item--h6 {
+  padding-left: calc(var(--space-md) * 2);
+  font-size: 0.875rem;
+}
+.toc a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.toc a:hover { color: var(--color-primary); }
+
+.story-break {
+  border: 0;
+  text-align: center;
+  margin: var(--space-xl) 0;
+  color: var(--color-muted);
+}
+.story-break::before {
+  content: "* * *";
+  letter-spacing: 0.5em;
+  font-size: 1rem;
+}
+
+/* Hero image on the publication detail page (legacy `.book__hero`). */
+.book__hero { margin: var(--space-xl) 0; }
+.book__hero img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-2);
+}
+
+
+/* ============================================================
+ * 14. Posts index — .post-list partial
+ * ============================================================
+ *
+ * Each card is title + (optional) cover image + meta + description
+ * + tags. Cover renders cover-left / body-right on >= 768px when
+ * the post has `image:` frontmatter; text-only cards stay single-
+ * column at every breakpoint.
+ */
+
+/* Zero the <ul>'s browser-default padding-inline-start: 40px (the
+   bullet-space the user-agent reserves) so each `.post-list__item`
+   aligns flush with the article's content edges. `list-style: none`
+   removes the bullets; the padding zero removes their reserved gap. */
+.post-list {
+  list-style: none;
+  margin: 0;
+  padding-inline: 0;
+}
+
+/* "View all N posts →" link at the bottom of the front index when
+   the archive is enabled. Same button-style treatment as the related
+   "Show all N" CTA — pill-shaped, modest, centered. */
+/* `.posts-index__more`, `.photos-index__more`, and `.publications-index__more`
+   share the same pill-button styling — the "View all N <items> →" link
+   at the bottom of each landing page. Same shape, same hover. */
+.posts-index__more,
+.photos-index__more,
+.publications-index__more {
+  margin: var(--space-2xl) 0 0;
+  text-align: center;
+  font-size: 0.9375rem;
+}
+.posts-index__more a,
+.photos-index__more a,
+.publications-index__more a {
+  display: inline-block;
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+}
+.posts-index__more a:hover,
+.photos-index__more a:hover,
+.publications-index__more a:hover { border-color: var(--color-primary); }
+
+/* Posts archive — each entry uses the same card shape as the home
+   page's "Latest photo" / "Latest publication" modules: cover image
+   on the left, body (title → meta → description) on the right at
+   ≥ 600px; stacked on smaller screens. Posts without a hero fall
+   back to a single column so the body fills the row. */
+.posts-archive {
+  list-style: none;
+  margin: var(--space-xl) 0 0;
+  padding-inline: 0;
+}
+.posts-archive__item {
+  display: grid;
+  grid-template-columns: 1fr;        /* mobile: stack */
+  gap: var(--space-lg);
+  padding: var(--space-lg) 0;
+  border-top: 1px solid var(--color-rule);
+}
+.posts-archive__item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.posts-archive__item:last-child {
+  padding-bottom: 0;
+}
+@media (min-width: 600px) {
+  .posts-archive__item:has(.posts-archive__cover) {
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    align-items: start;
+  }
+}
+/* 4:3 in the archive (an index view) — post heroes are authored at
+   16:9 to suit the show view; `object-fit: cover` on the img crops
+   to the archive's 4:3 thumbnail. Flat (no rounded corners, no
+   shadow) to match `.post-list__cover` on the front posts index —
+   the archive and the front index share visual treatment. */
+.posts-archive__cover {
+  display: block;
+  max-width: 200px;
+}
+.posts-archive__cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  /* Same neutral surface the placeholder SVG paints, so a real `<img>`
+     that's still on the wire fills its 4:3 box rather than flashing
+     transparent — `object-fit: cover` paints over this entirely once
+     the image arrives, so loaded thumbnails are unchanged. */
+  background-color: var(--color-code-bg);
+}
+/* Placeholder rendered when a post has no hero. Matches the `<img>`
+   shape so heroless rows keep the same grid alignment as their
+   hero-bearing siblings. Flat (no shadow / no radius) so it reads
+   the same as the front-index post-list placeholder. */
+.posts-archive__cover-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  color: var(--color-code-bg);
+}
+.posts-archive__body { min-width: 0; }
+.posts-archive__title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+}
+.posts-archive__title a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.posts-archive__meta {
+  font-family: var(--font-meta);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-sm);
+}
+.posts-archive__description {
+  margin: 0;
+  color: var(--color-muted);
+}
+.post-list__item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-2xl);
+}
+.post-list__item:last-child { margin-bottom: 0; }
+
+@media (min-width: 768px) {
+  .post-list__item { grid-template-columns: 1fr 2fr; gap: var(--space-xl); }
+  .post-list__item:not(:has(.post-list__cover)) { grid-template-columns: 1fr; }
+}
+
+.post-list__cover {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;                 /* default index aspect (vs. 16:9 on show views) */
+  /* Same colour the placeholder SVG uses — so a real `<img>` that's
+     still loading paints the same surface as a heroless card. Once
+     the image arrives `object-fit: cover` paints over this entirely,
+     so loaded cards are unchanged. */
+  background-color: var(--color-code-bg);
+}
+.post-list__cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+/* Placeholder filler — rendered inside `.post-list__cover` when a
+   post has no hero image, so the card keeps the same shape and the
+   grid stays aligned across mixed has-hero / no-hero rows. The
+   `<rect>` paints in `currentColor`, so the theme token sets the
+   tint (same `--color-code-bg` used for workshop covers + inline
+   code, so it reads as a neutral "no image here" surface rather
+   than a real photo placeholder). */
+.post-list__cover-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--color-code-bg);
+}
+
+/* Decorative initial-tile SVG variant of the cover. Inline SVG
+   already carries its own gradient + text — the cover wrapper just
+   needs the SVG to fill the slot. Generic `.cover-svg` class lets
+   the same SVG render correctly inside any cover container (post
+   list, workshop list, show-view heroes). */
+.cover-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.post-list__cover--svg .cover-svg,
+.workshops-index__cover--svg .cover-svg {
+  aspect-ratio: 4 / 3;
+}
+
+/* Decorative SVG hero on show views. Render as a wide banner with
+   the same shape the photo-hero treatment uses (image-replacement
+   shape), so theme styles that target `.post__hero` / `.workshop__hero`
+   keep working. */
+.post__hero--svg,
+.workshop__hero--svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-2);
+}
+@media (min-width: 768px) {
+  .post__hero--svg,
+  .workshop__hero--svg { aspect-ratio: 16 / 9; }
+}
+
+.post-list__body { min-width: 0; }
+
+.post-list__title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+.post-list__title a { color: var(--color-text); text-decoration: none; }
+.post-list__title a:hover { color: var(--color-text); }
+
+.post-list__meta {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-meta);
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+
+.post-list__description { margin: 0 0 0.75rem; color: var(--color-muted); }
+
+.post-list__tags { margin: 0; font-size: 0.875rem; }
+/* Tag chip — themes customise via component tokens rather than
+   re-declaring the rule. Defaults: plain inline link, no chrome, no
+   prefix. Set these in a theme's `:root` to opt into chip styles:
+     --tag-prefix     — `"#"` to restore the hash, `""` to drop it
+     --tag-padding    — non-zero to add chrome (e.g. `0.125rem 0.5rem`)
+     --tag-bg         — chip background (typically `var(--color-code-bg)`)
+     --tag-radius     — corner shape (`var(--radius-pill)` for pills)
+     --tag-font       — override font-family (e.g. mono for terminal feel)
+     --tag-font-size  — override font-size for a smaller "label" look
+   Notebook layers a `border` on top of the tokens for its outline
+   variant — that's the only theme that still needs a rule of its own. */
+.post-list__tag {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: var(--tag-padding, 0);
+  background: var(--tag-bg, transparent);
+  border-radius: var(--tag-radius, 0);
+  font-family: var(--tag-font, inherit);
+  font-size: var(--tag-font-size, inherit);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.post-list__tag::before { content: var(--tag-prefix, ""); }
+.post-list__tag:hover { color: var(--color-text); }
+
+
+/* ============================================================
+ * 15. Pagination
+ * ============================================================ */
+
+.pagination {
+  margin: var(--space-2xl) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9375rem;
+}
+.pagination a { color: var(--color-link); text-decoration: none; }
+.pagination a:hover { color: var(--color-primary); }
+.pagination__prev::before { content: "← "; }
+.pagination__next::after  { content: " →"; }
+
+
+/* ============================================================
+ * 16. Publication detail — cover-left + intro-right header
+ * ============================================================ */
+
+.publication__header {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+  margin: var(--space-md) 0 var(--space-2xl);
+}
+@media (min-width: 768px) {
+  .publication__header {
+    grid-template-columns: minmax(140px, 220px) 1fr;
+  }
+}
+
+.publication__cover {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 220px;
+  margin: 0 auto;
+  box-shadow: var(--shadow-cover);
+  border-radius: var(--radius-1);
+}
+@media (min-width: 768px) {
+  .publication__cover { margin: 0; }
+}
+
+.publication__intro h1 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+}
+
+.publication__tagline {
+  font-style: italic;
+  color: var(--color-muted);
+  font-size: 1.0625rem;
+  margin: 0 0 var(--space-lg);
+}
+
+.publication__isbn,
+.publication__pages,
+.publication__published {
+  margin: 0 0 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+.publication__published + .publication__price,
+.publication__pages     + .publication__price,
+.publication__isbn      + .publication__price {
+  margin-top: var(--space-md);
+}
+
+.publication__price {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+  margin: 0 0 0.75rem;
+}
+
+/* Layout (flex/wrap/gap) is in the shared rule above; this rule
+   only specifies the no-margin override for the publication header
+   context, where buttons sit directly below the price with no
+   additional spacing wanted. */
+.publication__buttons { margin: 0; }
+
+.publication__hero {
+  display: block;
+  width: 100%;
+  margin: 0 0 var(--space-xl);
+  aspect-ratio: 16 / 9;                /* show-view default */
+  border-radius: var(--radius-3);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+.publication__hero img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Description renders as normal body text (inherits body font-size
+   and color). Only the wrapper margin and the last-paragraph margin
+   reset are component-specific. */
+.publication__description { margin: 0 0 var(--space-xl); }
+.publication__description p:last-child { margin-bottom: 0; }
+
+/* On bundle / series pages the description sits directly above the
+   markdown body (`page.content`). Let the description's paragraphs
+   carry their natural `<p>` bottom margin so the description-to-
+   content gap matches the paragraph-to-paragraph rhythm in the body
+   — anything larger reads as a spacing bug because the two visually
+   identical blocks of prose are pushed apart for no reason. */
+.bundle__description,
+.series__description { margin: 0; }
+
+.publication__series {
+  margin: var(--space-xl) 0;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+
+/* Bundle + series show-view header price. Prominent — heading font,
+   bumped size — so the price reads clearly above the buy button on
+   the landing page. Body text colour rather than the link/primary
+   colour so it doesn't read as clickable. */
+.bundle__price,
+.series__price {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--color-text);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+/* Bundle + series taglines use `.lede` for prominence (1.25rem,
+   tightened line-height). The generic `article > header > .lede`
+   rule adds 2xl bottom margin assuming the lede is the LAST item in
+   the header — but here it's followed by price + buttons, so a
+   smaller gap reads better. Same specificity as the generic rule,
+   declared later so it wins. */
+article > header > .bundle__tagline,
+article > header > .series__tagline {
+  margin: 0 0 var(--space-md);
+}
+
+
+/* ============================================================
+ * 17. Publications index — list of cards with 3D-tilt covers,
+ *     plus Bundles + Series groupings (stack + row preview cards),
+ *     plus the optional showcase block at the top
+ * ============================================================ */
+
+/* Showcase — a single emphasized publication card at the top of the
+   page when `collections.publications.index.display_showcase` is on
+   and one of the books has `showcase: true` in its frontmatter. Cover
+   is larger and the body has more room than the regular index card. */
+.publication-showcase {
+  margin: var(--space-xl) 0 var(--space-2xl);
+  padding: var(--space-xl);
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+}
+.publication-showcase__link {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  color: inherit;
+  text-decoration: none;
+  align-items: start;
+}
+@media (min-width: 600px) {
+  .publication-showcase__link {
+    grid-template-columns: 200px 1fr;
+    gap: var(--space-xl);
+  }
+}
+.publication-showcase__cover {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  box-shadow: var(--shadow-cover);
+  background: var(--color-code-bg);
+}
+.publication-showcase__cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.publication-showcase__eyebrow {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-meta);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+.publication-showcase__title {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.publication-showcase__tagline {
+  margin: 0 0 var(--space-md);
+  font-style: italic;
+  color: var(--color-muted);
+  font-size: 1.125rem;
+}
+.publication-showcase__description {
+  margin: 0 0 var(--space-md);
+}
+.publication-showcase__price {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Section heading shared by Bundles + Series. Styled to match
+   `.home-module__heading` (small caps muted) so the publications
+   landing's grouping headings read consistently with the home-page
+   modules and the posts-landing Series row, which use the same
+   typographic pattern. */
+.pubs-grouping {
+  margin: var(--space-2xl) 0 0;
+}
+/* `.pubs-grouping__heading` typography is defined in the shared
+   `__heading` rule. */
+
+/* Bundle previews — a stack of 2-3 covers at slight angles, like a
+   small deck of books on a desk. Each preview is a single link with
+   the stack on top and a title + count below. On hover, the back/
+   front covers fan out a little. Cap is 3 covers in the markup; if
+   a bundle has more, additional ones aren't rendered in the stack
+   (the link still leads to the bundle page, which shows them all). */
+.bundle-previews {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2xl);
+}
+.bundle-preview__link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.bundle-preview__stack {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* Row sized to hug the cover stack with a deliberate gap below
+     before the per-tile title. Cover height (76% × 1.5 = 1.14W) plus
+     padding-top (6% W) plus ~8% W gap below the cover = 1.3W → row
+     aspect-ratio 10/13. Using a tighter ratio than 2/3 keeps the
+     section heading flush above the covers rather than leaving
+     ~30% of row-width as empty space at the top. */
+  aspect-ratio: 10 / 13;
+  margin-bottom: 0;
+  /* Inset so rotated covers don't get clipped by the column edge. */
+  padding: 6% 12%;
+}
+.bundle-preview__cover {
+  position: absolute;
+  /* Top-anchored — keeps the section heading sitting just above the
+     stack. The deliberate ~8% W gap *below* the stack (before the
+     per-tile title) comes from the row's tighter aspect-ratio above,
+     not from a bottom offset on the cover. */
+  top: 6%;
+  left: 50%;
+  width: 76%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  margin-left: -38%;
+  display: block;
+  border-radius: 2px;
+  box-shadow: var(--shadow-cover);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  background: var(--color-card-bg);
+}
+/* Near-flat pile: all three covers sit at the same centered position
+   (no translate), differentiated only by a shallow rotation. Front
+   cover dominates; back + mid peek out as small wedges at the edges
+   from beneath. The contrast with the series stack on the same
+   landing is the splayed fan vs flat pile — see `.series-preview__cover`. */
+.bundle-preview__cover--back  { transform: rotate(-5deg); z-index: 1; }
+.bundle-preview__cover--mid   { transform: rotate(0deg);  z-index: 2; }
+.bundle-preview__cover--front { transform: rotate(5deg);  z-index: 3; }
+@media (hover: hover) {
+  .bundle-preview__link:hover .bundle-preview__cover--back  { transform: rotate(-8deg); }
+  .bundle-preview__link:hover .bundle-preview__cover--front { transform: rotate(8deg);  }
+}
+.bundle-preview__body {
+  display: block;
+  text-align: center;
+}
+.bundle-preview__title {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  margin-bottom: 0.25rem;
+}
+.bundle-preview__meta {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+/* Series previews — structurally identical to `.bundle-preview__stack`
+   / `.bundle-preview__cover`. Same tile, same cover size, same anchor
+   point within the tile. The *only* difference is how the N covers
+   stack: series fans out with continuous --i/--n rotation (±9°) plus
+   translate (±12% X, ±2% Y), so the leftmost cover leans + slides
+   left, the rightmost leans + slides right; bundles sit in a near-
+   flat pile with shallow rotation only (see `.bundle-preview__cover`
+   above). This is the intended visual contrast on the publications
+   landing — same shape of "tile", different shape of "stack".
+
+   Posts series previews override below to keep their flex-row layout
+   for landscape hero images. */
+.series-previews {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2xl);
+}
+.series-preview__link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.series-preview__row {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* Match `.bundle-preview__stack`: tighter than 2/3 so the section
+     heading sits just above the cover stack and a deliberate ~8% W
+     gap is left below the stack before the per-tile title. See the
+     bundle stack rule above for the breakdown of how 10/13 is
+     derived from cover height + top padding + gap-below. */
+  aspect-ratio: 10 / 13;
+  margin-bottom: 0;
+  /* Same inset as `.bundle-preview__stack` so the cover edges sit at
+     the same tile coordinates as the bundle covers. */
+  padding: 6% 12%;
+}
+.series-preview__cover {
+  position: absolute;
+  /* Top-anchored, matching `.bundle-preview__cover`. The gap below
+     the stack comes from the row's tighter aspect-ratio (10/13). */
+  top: 6%;
+  left: 50%;
+  width: 76%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  margin-left: -38%;
+  display: block;
+  border-radius: 2px;
+  box-shadow: var(--shadow-cover);
+  background: var(--color-card-bg);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  /* Later-positioned covers (higher --i) stack on top. */
+  z-index: calc(var(--i, 0) + 1);
+  /* Splayed fan: rotation AND translate interpolate linearly across
+     the row. For a 3-cover series the leftmost cover ends up at
+     rotate(-9°) translate(-12%, -2%) and the rightmost at
+     rotate(+9°) translate(+12%, +2%) — the same fanned silhouette
+     the bundles partial used to carry, now reassigned to series to
+     contrast with bundles' new flat pile. */
+  --max-rot: 6deg;
+  --max-tx:  8%;
+  --max-ty:  1.5%;
+  transform:
+    translate(
+      calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-tx)),
+      calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-ty))
+    )
+    rotate(calc((var(--i, 0) / max(var(--n, 1) - 1, 1) - 0.5) * 2 * var(--max-rot)));
+}
+@media (hover: hover) {
+  .series-preview__link:hover .series-preview__cover {
+    --max-rot: 9deg;
+    --max-tx:  11%;
+    --max-ty:  2%;
+  }
+}
+
+/* Posts series preview — flex row of landscape hero images, with
+   tight horizontal overlap. Different visual metaphor from the book
+   stack above: heroes lined up side-by-side with overlap, not a
+   pile of book covers. Override the absolute-positioned book stack
+   structure inherited from the base rule. */
+.post-series-previews .series-previews {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.series-preview--posts .series-preview__row {
+  position: static;
+  display: flex;
+  /* Anchor the stack to the left edge of the partial so the leftmost
+     cover lines up with the post-list cards above (which also sit
+     against the partial's left edge). The overlap cascade runs to
+     the right from there. */
+  justify-content: flex-start;
+  align-items: flex-end;
+  aspect-ratio: auto;
+  /* Drop the row's left padding to 0 so the first cover starts at
+     the section edge; keep top/right/bottom so rotated covers don't
+     get clipped and the row stays vertically inset. */
+  padding: 4% 6% 6% 0;
+}
+/* Constrain the title/meta body to the stack's horizontal extent so
+   `text-align: center` (inherited from the base `.series-preview__body`
+   rule) lands at the stack's visual center rather than the tile's
+   geometric center. With the stack left-anchored at 0% and ending
+   near 86% of the tile width (cover width 58% + two cascading -44%
+   margins), capping body width to match keeps title + post-count
+   visually centred under the heroes above.
+
+   Adjacent tiles get 3rem of breathing room from the parent
+   `.series-previews` grid `gap`, so a multi-series listing is
+   already separated without further work. */
+.series-preview--posts .series-preview__body {
+  width: 86%;
+}
+.series-preview--posts .series-preview__cover {
+  position: static;
+  /* Match the 4:3 aspect of `.post-list__cover` so the stacked heroes
+     read as the same shape as the cards above. Post hero images are
+     stored at 16:9; `object-fit: cover` crops top/bottom into the
+     4:3 box without distorting. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  width: 58%;
+  /* Overlap only on the right edge so the first cover sits flush with
+     the row's left edge. Each subsequent cover slides under the next
+     by 44% of the row width — heavy overlap so only ~14% of each
+     back cover peeks out from behind the front, reading as one
+     tightly-grouped stack. */
+  margin: 0 -44% 0 0;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  --max-rot: 6deg;
+  /* Posts use flex margin-based horizontal overlap, not transform
+     translate — zero out the translate tokens inherited from the
+     publications fan above. */
+  --max-tx:  0%;
+  --max-ty:  0%;
+}
+@media (hover: hover) {
+  .series-preview--posts .series-preview__link:hover .series-preview__cover {
+    --max-rot: 9deg;
+    --max-tx:  0%;
+    --max-ty:  0%;
+  }
+}
+
+/* `.post-series-previews` section sits beneath the post list on the
+   posts landing. Borrows the home-module divider rule (1px line on
+   top + breathing room) so the visual rhythm between the post list
+   and this row matches the rhythm between home modules. */
+.post-series-previews {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-rule);
+}
+
+.series-preview__body {
+  display: block;
+  text-align: center;
+}
+.series-preview__title {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  margin-bottom: 0.25rem;
+}
+.series-preview__meta {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.publications-index {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-xl) 0;
+}
+.publications-index__item {
+  padding: var(--space-xl) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.publications-index__item:last-child { border-bottom: 0; }
+
+/* Mobile-first: phone defaults are 110px cover + tighter gap. Above
+   480px the layout scales up to the larger 160px cover and wider
+   gap. Matches the rest of the file's `min-width` breakpoint style. */
+.publications-index a {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-md);
+  align-items: start;
+  color: inherit;
+  text-decoration: none;
+}
+
+.publications-index__cover {
+  width: 110px;
+  aspect-ratio: 2 / 3;
+  background-color: #d8c8a0;
+  box-shadow: var(--shadow-cover);
+  overflow: hidden;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+.publications-index__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Gate the 3D-tilt transform on hover-capable pointers — on touch
+   devices the hover state sticks until the user taps elsewhere,
+   leaving the cover stuck mid-rotation. `@media (hover: hover)`
+   means "device has a real hover capability" (mouse, trackpad, pen).
+   Colour-only hovers don't need this guard; transform-based ones do. */
+@media (hover: hover) {
+  .publications-index a:hover .publications-index__cover {
+    transform: perspective(900px) rotateY(-6deg);
+    box-shadow: 8px 8px 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.publications-index__body { min-width: 0; }
+.publications-index__title {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+/* Series-position prefix on a publication-card title (e.g. "#1") —
+   muted so the title stays the primary read; only renders on cards
+   passed a `:position` field (currently the series detail page). */
+.publications-index__position,
+.series-position {
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-right: 0.25ch;
+}
+.publications-index__tagline {
+  margin: 0 0 0.75rem;
+  font-style: italic;
+  color: var(--color-muted);
+  font-size: 1.0625rem;
+}
+.publications-index__description {
+  margin: 0 0 0.75rem;
+  color: var(--color-muted);
+  font-size: 1rem;
+}
+.publications-index__price {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.publications-index__isbn,
+.publications-index__pages,
+.publications-index__published {
+  margin: 0 0 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+/* Scale the publications-index card up above 480px — larger cover,
+   more generous gap, full-size title. Below this width the defaults
+   above keep the layout compact for phones. */
+@media (min-width: 480px) {
+  .publications-index a          { grid-template-columns: 160px 1fr; gap: var(--space-xl); }
+  .publications-index__cover     { width: 160px; }
+  .publications-index__title     { font-size: 1.5rem; }
+}
+
+
+/* ============================================================
+ * 18. Folio book grid — home-page card grid
+ * ============================================================ */
+
+.folio-book-grid { margin: var(--space-2xl) 0; }
+
+/* `.folio-book-grid__heading` typography is defined in the shared
+   `__heading` rule below (small-caps muted, matching every other
+   show-view section heading). */
+
+.folio-book-grid__list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+}
+@media (min-width: 768px) {
+  .folio-book-grid__list { grid-template-columns: 1fr 1fr; }
+}
+
+.folio-book-grid__item {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl);
+}
+
+.folio-book-grid__cover-link {
+  display: block;
+  margin: 0 auto var(--space-lg);
+  max-width: 220px;
+}
+
+.folio-book-grid__title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-sm);
+}
+.folio-book-grid__title a { color: var(--color-text); text-decoration: none; }
+
+.folio-book-grid__tagline {
+  font-style: italic;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-md);
+}
+
+.folio-book-grid__cta { margin: auto 0 0; }
+
+
+/* ============================================================
+ * 19. Book cover — 3D-tilt hover + spine groove
+ * ============================================================ */
+
+.book-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  margin: 20px auto;
+  overflow: hidden;
+  box-shadow: 3px 3px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.5s ease, box-shadow 0.5s ease;
+}
+.book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.book-cover-link {
+  display: block;
+  margin: 0 auto;
+  max-width: 220px;
+  width: 100%;
+}
+.book-cover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 2%;
+  height: 100%;
+  width: 6px;
+  background: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 3px 0 3px -3px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+/* Same hover-gate rationale as `.publications-index` above — the 3D
+   tilt would stick mid-rotation on touch devices. Only apply the
+   transform when the pointer can actually hover.
+   The nested `prefers-reduced-motion` block keeps the no-motion
+   behaviour for users who request it, on top of the hover guard. */
+@media (hover: hover) {
+  .book-cover:hover {
+    transform: perspective(1000px) rotateY(-10deg);
+    box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-cover { transition: none; }
+  .book-cover:hover { transform: none; box-shadow: 3px 3px 15px rgba(0, 0, 0, 0.3); }
+}
+
+
+/* ============================================================
+ * 20. Testimonials — quote cards
+ * ============================================================ */
+
+/* Section margin matches `.folio-book-grid` so testimonials sit at
+   the same vertical rhythm as the other home-page sections. */
+.testimonials { margin: var(--space-2xl) 0; }
+
+/* `.testimonials__heading` typography is defined in the shared
+   `__heading` rule below. */
+
+/* Card matches the article's content width — zero out the browser
+   default <figure> margin (margin-inline: 40px) so the card extends
+   to the article's content edges. Internal padding gives the quote
+   breathing room from the card's coloured edge. */
+.testimonial {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+  margin: 0;
+  padding: var(--space-lg) var(--space-md);
+}
+.testimonial__quote {
+  margin: 0 0 var(--space-md);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  border-left: 0;
+  padding-left: 0;
+  font-style: normal;
+}
+.testimonial__cite {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+.testimonial__cite strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.testimonial__cite a {
+  color: var(--color-muted);
+  text-decoration: underline;
+}
+
+
+/* ============================================================
+ * 21. Related books — sister-publications cards
+ * ============================================================ */
+
+.book-related { margin: var(--space-2xl) 0; }
+/* `.book-related__heading` typography is defined in the shared
+   `__heading` rule below. */
+.book-related__item {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl);
+  margin: 0 0 var(--space-lg);
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .book-related__item { grid-template-columns: 140px 1fr; }
+}
+.book-related__cover img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-1);
+  box-shadow: var(--shadow-soft);
+}
+/* `.book-cover` (Section 19) carries a `margin: 20px auto` for the
+   home-page book grid, where the cover stacks above the title and
+   needs breathing room from the card's top padding. Inside the
+   side-by-side `.book-related__item` grid, that margin pushes the
+   cover down and breaks alignment with the title text. Zero it
+   here so cover-top and title-top sit on the same line. */
+.book-related__cover .book-cover { margin: 0; }
+.book-related__title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-sm);
+}
+.book-related__title a { color: var(--color-text); text-decoration: none; }
+.book-related__tagline {
+  font-style: italic;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-md);
+}
+.book-related__cta {
+  display: inline-block;
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.book-related__cta:hover { color: var(--color-primary); }
+
+
+/* ============================================================
+ * 22. Home modules — latest-post / -publication / -photo / contact
+ * ============================================================ */
+
+.home-module {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-rule);
+}
+
+/* `.home-module__heading` typography is defined in the shared
+   `__heading` rule. The contextual override that zeros its margin
+   when wrapped in `.home-module__header` lives below. */
+
+/* `.home-module__header` wraps a heading + a "see all" link so they
+   sit on one row with the heading on the left and the link aligned
+   right. Used by the home page's modules (latest photo, latest post,
+   etc.) AND by the photos landing's "Latest photos" row, plus the
+   Series / Countries rows (via the `_taxonomy_row` partial). The
+   class prefix is historical — the pattern is intentionally shared.
+   When `__header` is present, it owns the bottom margin; the inner
+   heading drops its own. */
+.home-module__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-md);
+}
+.home-module__header .home-module__heading { margin: 0; }
+.home-module__see-all {
+  font-family: var(--font-meta);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.home-module__see-all:hover { color: var(--color-text); }
+
+.home-module__item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+}
+/* The `display: grid` above overrides the user-agent's
+   `[hidden] { display: none }`, so candidate cards in a random-pool
+   would all show without this rule. Specificity 0,2,0 beats the
+   `.home-module__item` rule above (0,1,0) cleanly — no !important
+   needed. */
+.home-module__item[hidden] { display: none; }
+@media (min-width: 600px) {
+  .home-module--latest-post          .home-module__item,
+  .home-module--random-post          .home-module__item,
+  .home-module--latest-publication   .home-module__item,
+  .home-module--featured-publication .home-module__item,
+  .home-module--latest-photo         .home-module__item,
+  .home-module--random-photo         .home-module__item,
+  .home-module--next-workshop        .home-module__item {
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    align-items: start;
+  }
+  /* When a post has no hero image, fall back to single column so the
+     body fills the card. The :has() match excludes items that lack
+     `.home-module__cover` from the cover-left grid rule above. */
+  .home-module--latest-post .home-module__item:not(:has(.home-module__cover)),
+  .home-module--random-post .home-module__item:not(:has(.home-module__cover)) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-module__cover {
+  display: block;
+  max-width: 200px;
+}
+.home-module__cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-1);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Post home modules — force 4:3 cropping on the cover, since post
+   heroes are authored at 16:9 (show-view ratio) and we want them
+   to read as 4:3 thumbnails in the home module too. Same approach
+   as `.home-module--latest-photo .home-module__cover`: the visual
+   treatment (border-radius + shadow) stays on the img, the wrapper
+   just sizes. `aspect-ratio` + `object-fit: cover` on the img
+   handles the crop without needing `overflow: hidden` (which would
+   clip the radius and shadow). Other modules keep natural aspect:
+   publications are 2:3 (book-cover convention), photos are 4:3
+   already in source, workshops render their 16:9 hero. */
+.home-module--latest-post .home-module__cover img,
+.home-module--random-post .home-module__cover img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.home-module__title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+}
+.home-module__title a { color: var(--color-text); text-decoration: none; }
+
+.home-module__tagline {
+  font-style: italic;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.home-module__meta {
+  font-family: var(--font-meta);
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.home-module__description { margin: 0; color: var(--color-muted); }
+
+
+/* ============================================================
+ * 23. Theme toggle — sun/moon visibility
+ * ============================================================
+ *
+ * Default (light) → moon visible, click → switch to dark.
+ * Dark → sun visible, click → switch to light.
+ * System dark preference behaves the same as explicit dark.
+ * Explicit choice (data-theme) wins over system pref.
+ */
+
+.theme-toggle {
+  background: transparent;
+  border: 0;
+  padding: 0.25rem;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.theme-toggle:hover { opacity: 0.7; }
+
+.theme-toggle__sun  { display: none; }
+.theme-toggle__moon { display: inline-flex; }
+
+@media (prefers-color-scheme: dark) {
+  .theme-toggle__sun  { display: inline-flex; }
+  .theme-toggle__moon { display: none; }
+}
+[data-theme="dark"]  .theme-toggle__sun  { display: inline-flex; }
+[data-theme="dark"]  .theme-toggle__moon { display: none; }
+[data-theme="light"] .theme-toggle__sun  { display: none; }
+[data-theme="light"] .theme-toggle__moon { display: inline-flex; }
+
+
+/* ============================================================
+ * 24. Photo single-page detail
+ * ============================================================
+ *
+ * Layout for content/photos/<slug>/index.md — image-centric posts
+ * with a hero photo, optional caption, equipment + location metadata,
+ * and a "more from this series" related strip.
+ */
+
+.photo__image {
+  width: 100%;
+  height: auto;
+  margin: 0 0 var(--space-xl);
+  box-shadow: var(--shadow-soft);
+}
+.photo__title { margin-bottom: var(--space-sm); }
+.photo__caption {
+  font-size: 1.125rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-lg);
+}
+.photo__meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem var(--space-md);
+  margin: var(--space-lg) 0;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+/* Each `<dt>/<dd>` pair is wrapped in a `<div>` in the markup so the
+   row reads as a single semantic unit. `display: contents` removes
+   the div from the layout tree so the inner `<dt>` and `<dd>`
+   participate directly in the parent grid — one pair per row with
+   labels aligned in the first column. Without this, each `<div>` is
+   a single grid item and two pairs land side-by-side per row. */
+.photo__meta > div { display: contents; }
+.photo__meta dt { font-weight: 600; }
+.photo__meta dd { margin: 0; }
+.photo__related {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-rule);
+}
+.photo__related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+.photo__related-grid img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;                 /* index default */
+  object-fit: cover;
+}
+.photo__related-title {
+  display: block;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+
+/* ============================================================
+ * 25. "Up next" + Related items
+ * ============================================================
+ *
+ * `.next-item` — single-card section below the post body linking to
+ * the chronologically-newer post (or, with the `--series` modifier,
+ * the next post by series position). Reuses `.post-list` so the
+ * card reads exactly like a row from the posts index — there's only
+ * ever one up-next post, so the full index treatment fits.
+ *
+ * `.related` — block below each show view (post, photo, publication)
+ * listing items from the same collection ranked by tag/series
+ * overlap. Compact multi-card grid, different shape from the
+ * up-next card by design (the cases are different: one prominent
+ * card vs. several thumbnails). `.related__list--full` is the
+ * dedicated /<slug>/related/ index-page variant.
+ *
+ * The two sections share their heading style (small uppercase muted)
+ * via the consolidated `__heading` rule below — so the show-view
+ * tail reads as a coherent run of sections even though the card
+ * shapes differ.
+ */
+
+.next-item {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+/* The lone post-list item is also the `:last-child`, so its bottom
+   margin is already 0 from `.post-list__item:last-child`. Zero out
+   the wrapping `.post-list` margin so the card sits flush against
+   the heading. */
+.next-item .post-list { margin: 0; }
+
+/* Section heading — ONE rule that owns the typography for every
+   "small section heading" across the app. Show-view tails ("Related",
+   "Up next", "Next in the series", "Other books in the series"),
+   in-page groupings ("What's included" on bundles, "Books in this
+   series" on series, "Testimonials"), home-page modules, the
+   publications-landing Bundles / Series rows, the TOC, and the
+   book grid all live here.
+
+   Centralised so a change to the section-heading style propagates
+   to every show view at once — and so adding a new section type is
+   one selector addition, not one new copy of the seven declarations.
+
+   The matching contextual override for `.home-module__header`
+   children sits with the rest of the home-module rules above. */
+.toc__heading,
+.pubs-grouping__heading,
+.folio-book-grid__heading,
+.testimonials__heading,
+.book-related__heading,
+.home-module__heading,
+.next-item__heading,
+.related__heading,
+.bundle__contents-heading,
+.series__contents-heading {
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.related {
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+/* `.related__heading` typography is defined in the shared `__heading`
+   rule above. */
+/* Grid track minimum drives the desktop card count. At 240px, the
+   typical content max-width (~768px inner) fits 3 cards per row;
+   smaller screens reflow to 2 or 1 automatically via auto-fill. */
+.related__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+.related__item a {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.related__cover {
+  width: 100%;
+  aspect-ratio: 4 / 3;                 /* index default */
+  overflow: hidden;
+  border-radius: var(--radius-1);
+  background-color: var(--color-code-bg);
+  margin-bottom: var(--space-sm);
+}
+.related__cover img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Publications-context override — book covers are 2:3, not the 4:3
+   landscape default. Without this, `object-fit: cover` crops the
+   top + bottom of a book thumbnail. Also narrow the grid column so
+   a 2:3 cover doesn't dominate the listing row (240px wide × 360px
+   tall is too tall; 150 × 225 reads as a book thumbnail). The
+   modifier is set on the `<section>` by `_related_items.html.erb`
+   when `source_collection == 'publications'`. */
+.related--book .related__list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.related--book .related__cover {
+  aspect-ratio: 2 / 3;
+}
+/* Title is a `<span>` (not an `<h*>`), so it doesn't pick up the
+   browser's heading font-weight. Bump to 700 and pin to `--color-text`
+   so it reads as substantial as the post-list/h2 titles elsewhere. */
+.related__title {
+  display: block;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.related__date,
+.related__location { display: block; color: var(--color-muted); font-size: 0.8125rem; }
+.related__more {
+  margin: 1.25rem 0 0;
+  text-align: center;
+  font-size: 0.9375rem;
+}
+.related__more a {
+  display: inline-block;
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+}
+.related__more a:hover { border-color: var(--color-primary); }
+.related__list--full {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+.related__back { margin-top: var(--space-xl); font-size: 0.9375rem; }
+
+
+/* ============================================================
+ * 26. Carousel — slideshow used by the _carousel partial
+ * ============================================================
+ *
+ * CSS-only show/hide via `.is-active`; navigation handled by carousel.js.
+ */
+
+.carousel { position: relative; margin: var(--space-lg) 0; }
+.carousel__track { position: relative; min-height: 200px; }
+.carousel__slide { display: none; margin: 0; }
+.carousel__slide.is-active { display: block; }
+.carousel__image {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: var(--shadow-soft);
+}
+.carousel__caption { padding: 0.75rem 0; text-align: center; }
+.carousel__title { font-weight: 600; font-size: 1.125rem; }
+.carousel__quote { color: var(--color-muted); margin: 0.25rem 0; }
+.carousel__meta { font-size: 0.875rem; color: var(--color-muted); margin: 0.25rem 0; }
+.carousel__prev,
+.carousel__next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.25rem;
+  cursor: pointer;
+  border-radius: var(--radius-1);
+}
+.carousel__prev { left: 0.5rem; }
+.carousel__next { right: 0.5rem; }
+.carousel__prev:hover,
+.carousel__next:hover { background: rgba(0, 0, 0, 0.75); }
+.carousel__counter { text-align: center; font-size: 0.875rem; color: var(--color-muted); }
+
+
+/* ============================================================
+ * 27. Gallery index + image gallery + photo showcase
+ * ============================================================
+ *
+ * `.gallery-index` — the grid of thumbnails on /photos/, /country/<x>/,
+ * /series/<x>/. CLS-safe 1:1 wrappers with soft-tint placeholders
+ * (defined in section 8) that show until image bytes load.
+ *
+ * `.image-gallery` — grid for the inline `_image_gallery` partial.
+ * Default is auto-fill; override column count with
+ * `.image-gallery--cols-{2,3,4}`.
+ *
+ * `.photo-showcase` — optional feature block at the top of the gallery
+ * index when `collections.photos.index.display_showcase` is on and one
+ * photo has `showcase: true` in its frontmatter. Renders the photo
+ * full-width (same treatment as the show view), then a caption block
+ * below with title + caption + location.
+ */
+
+.photo-showcase {
+  margin: var(--space-xl) 0 var(--space-2xl);
+}
+/* Other photos_index widgets — `<section class="photos-section">` for
+   the "latest photos" row, and `<section class="taxonomy-row">` for
+   the series + countries rows — get a top margin so the vertical
+   rhythm stays consistent regardless of which widget renders first
+   (when the showcase is disabled, latest_photos becomes the first
+   block below the page header; when latest_photos is also off,
+   taxonomy_row is first; and so on).
+   `<section>` has no default margin, so without this rule the gap
+   between the header (or `.index-intro`) and the first widget would
+   collapse to whatever the last header element carries on its own —
+   typically smaller than we want. `.index-intro` carries its own
+   `margin-bottom`, so when body content is present margin-collapse
+   selects the larger of the two and the gap stays even either way. */
+.photos-section,
+.taxonomy-row {
+  margin-top: var(--space-2xl);
+}
+.photo-showcase__link {
+  display: block;
+}
+.photo-showcase__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  box-shadow: var(--shadow-soft);
+}
+.photo-showcase__caption {
+  margin-top: var(--space-md);
+}
+.photo-showcase__eyebrow {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+.photo-showcase__title {
+  margin: var(--space-sm) 0 var(--space-xs);
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.photo-showcase__text {
+  margin: 0 0 var(--space-xs);
+  font-size: 1.0625rem;
+}
+.photo-showcase__meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.gallery-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+  list-style: none;
+  padding: 0;
+  margin: var(--space-lg) 0;
+}
+/* Explicit desktop column counts — opt in via `collections.photos.index.cols`
+   in config/site.yml (one of 2, 3, 4). Desktop-only: below 768px the
+   modifier has no effect and the grid falls back to the base auto-fill
+   rule above, which already handles tablet/mobile reflow on its own. */
+@media (min-width: 768px) {
+  .gallery-index--cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .gallery-index--cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .gallery-index--cols-4 { grid-template-columns: repeat(4, 1fr); }
+}
+.gallery-index a {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.gallery-index__cover {
+  width: 100%;
+  aspect-ratio: 4 / 3;                 /* index default */
+  overflow: hidden;
+  border-radius: var(--radius-1);
+  margin-bottom: var(--space-sm);
+  background-color: #d8c8a0;
+}
+.gallery-index__cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.gallery-index__title { display: block; font-weight: 600; }
+.gallery-index__location { display: block; color: var(--color-muted); font-size: 0.875rem; }
+.gallery-index__date,
+.gallery-index__camera {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+.gallery-index__caption {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.image-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0;
+}
+.image-gallery--cols-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.image-gallery--cols-3 { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.image-gallery--cols-4 { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.image-gallery__placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;                 /* index default */
+  overflow: hidden;
+  border-radius: var(--radius-1);
+  background-color: #d8c8a0;
+}
+.image-gallery__placeholder img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+
+/* ============================================================
+ * 28. Workshops — show view + index
+ * ============================================================ */
+
+/* Workshop show-view metadata table — definition list with each
+   `<dt>/<dd>` pair wrapped in a `<div>` for flex/grid-friendly
+   row layout. Same pattern as `.photo__meta`. Above 480px the
+   label/value sit side-by-side; below, they stack. */
+.workshop__meta {
+  margin: var(--space-lg) 0 var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+}
+.workshop__meta div {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.125rem var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.workshop__meta div:last-child { border-bottom: 0; }
+@media (min-width: 480px) {
+  .workshop__meta div { grid-template-columns: 8em 1fr; }
+}
+.workshop__meta dt {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+.workshop__meta dd {
+  margin: 0;
+}
+
+/* Registration CTA wrapper — typically renders directly after the
+   meta block. Margin-top groups visually with meta; margin-bottom
+   separates from the body content that follows. */
+.workshop__cta {
+  margin: 0 0 var(--space-xl);
+}
+
+/* Workshops index — flat list of cards. Each card is a link to the
+   workshop detail page; the metadata line below the description
+   gives quick scan-info (when / where / format / price) at the
+   index level so visitors can skim without clicking through.
+
+   Optional cover image (driven by `image:` frontmatter + the
+   `index.show_image` config toggle):
+     - mobile: sits flush at the top of the card, body below
+     - >= 768px: sits on the left at ~1/3 card width, body on the right
+   Same `1fr 2fr` cover-left pattern as `.post-list__item`. `overflow:
+   hidden` on the item card clips the cover to the card's rounded
+   corners regardless of which side it's on. */
+.workshops-index {
+  list-style: none;
+  margin: var(--space-xl) 0;
+  padding-inline: 0;
+  display: grid;
+  gap: var(--space-lg);
+}
+.workshops-index__item {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;                    /* clip cover to rounded corners */
+}
+.workshops-index__link {
+  display: grid;
+  grid-template-columns: 1fr;          /* mobile + cards without a cover */
+  color: inherit;
+  text-decoration: none;
+}
+.workshops-index__link:hover {
+  text-decoration: none;
+}
+@media (min-width: 768px) {
+  /* When the card has a cover, switch to cover-left / body-right. Cards
+     without a cover stay single-column at every breakpoint so the body
+     fills the full card width. */
+  .workshops-index__link:has(.workshops-index__cover) {
+    grid-template-columns: 1fr 2fr;
+  }
+}
+.workshops-index__cover {
+  display: block;
+  aspect-ratio: 4 / 3;                 /* mobile + no-body fallback */
+  overflow: hidden;
+  background-color: var(--color-code-bg);
+  align-self: stretch;                 /* explicit — fill the grid row's
+                                          height when side-by-side at
+                                          ≥768px, even before the
+                                          aspect-ratio override below
+                                          drops the 4:3 constraint. */
+}
+.workshops-index__cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+@media (min-width: 768px) {
+  /* In the side-by-side layout the cover lives in a `1fr 2fr` grid
+     cell that stretches to match the body's height (title +
+     description + three meta lines).
+
+     Release the 4:3 constraint AND switch the cover to a
+     `position: relative` box whose img is absolutely positioned with
+     `inset: 0`. The absolute-positioning pattern is the bulletproof
+     "fill the parent" idiom — relying on `img { height: 100%; }`
+     against a grid-stretched parent has a known resolution edge case
+     where the img keeps its intrinsic aspect ratio instead of
+     filling the cell, leaving a gap below the photo on cards whose
+     body is taller than the cover's 4:3 natural height (e.g. when
+     the description wraps to two lines). */
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover {
+    aspect-ratio: auto;
+    position: relative;
+  }
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover > img,
+  .workshops-index__link:has(.workshops-index__cover) .workshops-index__cover > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
+/* Flex column with `justify-content: center` so the title / description /
+   meta block sits VERTICALLY CENTRED in the body cell. With the
+   side-by-side grid (cover-left / body-right) the cover stretches to
+   match the row height; centring the body content here keeps the
+   text balanced top + bottom instead of hugging the top edge with
+   surplus space below the price. The body retains symmetric `--space-lg`
+   padding so the centred content has equal breathing room on all
+   sides; nothing more is needed. */
+.workshops-index__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+.workshops-index__title {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.25rem;
+}
+.workshops-index__description {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-muted);
+}
+.workshops-index__meta {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+/* Upcoming cards emit one meta line per fact (date / location+format
+   / price) so each reads cleanly. This rule gives adjacent lines a
+   small gap. Past-card meta is always a single line so this is a
+   no-op there. */
+.workshops-index__meta + .workshops-index__meta {
+  margin-top: 0.125rem;
+}
+/* Price gets a small contrast bump — halfway between muted and the
+   body text colour — so it reads as the prominent fact on the card
+   without going to full body weight/colour. */
+.workshops-index__meta--price {
+  color: color-mix(in srgb, var(--color-muted) 50%, var(--color-text));
+}
+
+/* Future + past sections share the same `.workshops-index__group`
+   wrapper so they can stack with consistent vertical rhythm. The
+   future section sits directly under the page header; the past
+   section is separated by a rule + extra spacing as visual demotion. */
+.workshops-index__group {
+  margin: var(--space-xl) 0 0;
+}
+.workshops-index__group--past {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-rule);
+}
+.workshops-index__heading {
+  margin: 0 0 var(--space-md);
+  font-size: 1.25rem;
+}
+.workshops-index__heading--past {
+  font-size: 1.125rem;
+  color: var(--color-muted);
+}
+.workshops-index__empty {
+  margin: 0;
+}
+
+/* Past workshops — compact list-style treatment (no card background,
+   no shadow). Each entry is a single divider-separated row showing
+   title + date + location. Similar to the related partials' compact
+   density: demotes past workshops visually without hiding them. */
+.workshops-index--past {
+  gap: 0;                              /* rows abut, separated by border */
+  margin: 0;
+}
+.workshops-index__item--past {
+  background: transparent;             /* no card chrome */
+  box-shadow: none;
+  border-radius: 0;
+  border-top: 1px solid var(--color-rule);
+  overflow: visible;                   /* no cover to clip; cancel the upcoming-card clip */
+}
+.workshops-index__item--past:first-child { border-top: 0; }
+.workshops-index__item--past .workshops-index__body {
+  padding: var(--space-md) 0;          /* tighter rows, no horizontal padding */
+}
+.workshops-index__item--past .workshops-index__title {
+  margin: 0 0 0.125rem;
+  font-size: 1rem;
+  color: var(--color-text);            /* full body color; only the size +
+                                          meta-line muting demote past
+                                          cards, not the title color */
+}
+.workshops-index__item--past .workshops-index__meta {
+  font-size: 0.875rem;
+}
+
+
+/* ============================================================
+ * 29. Newsletter subscribe — card-shaped form
+ * ============================================================ */
+
+/* The card itself — looks like a `.testimonial` / `.book-related__item`
+   shape (background + radius + shadow + padding) so it sits naturally
+   alongside other card-shaped content blocks. Renders via the
+   `partials/_newsletter_subscribe` partial when `newsletter:` is
+   configured in `config/site.yml`. */
+.newsletter-subscribe {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+.newsletter-subscribe__title       { margin: 0 0 var(--space-sm); font-size: 1.25rem; }
+.newsletter-subscribe__description { margin: 0 0 var(--space-md); color: var(--color-muted); }
+
+/* Form layout — input + button on one row at ≥480px, stacked below. */
+.newsletter-subscribe__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+.newsletter-subscribe__input {
+  flex: 1 1 18em;          /* takes available width, drops to its own row on narrow viewports */
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-2);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.newsletter-subscribe__input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.newsletter-subscribe__button {
+  flex: 0 0 auto;          /* button keeps its natural width */
+}
+
+.newsletter-subscribe__attribution {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+
+/* ============================================================
+ * 30. Visualisations
+ * ============================================================ */
+
+.viz { margin: var(--space-xl) 0; }
+.viz__title { margin: 0 0 var(--space-sm); }
+.viz__caption { color: var(--color-muted); font-size: 0.9375rem; }
+
+/* D3-visualization scaffolding — moved here from inline `style=` on the
+   visualization layout so the rendered HTML stays CSP-clean (no inline
+   styles allowed under a strict CSP). */
+.viz-container {
+  position: relative;
+  min-height: 500px;
+}
+.viz-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+}
+.viz-tooltip {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  background: var(--color-bg);
+  border: 1px solid currentColor;
+  padding: var(--space-sm) 0.75rem;
+  border-radius: var(--radius-2);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-card);
+  z-index: 1000;
+  max-width: 300px;
+}

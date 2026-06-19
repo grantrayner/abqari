@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3d6b4e"/>
+      <stop offset="100%" stop-color="#1a3324"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#g)"/>
+  <rect x="40" y="40" width="520" height="820" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+  <text x="50%" y="44%" font-family="Georgia, serif" font-size="36" fill="white" text-anchor="middle" letter-spacing="1">An Atlas of</text>
+  <text x="50%" y="54%" font-family="Georgia, serif" font-size="36" fill="white" text-anchor="middle" letter-spacing="1">Small Things</text>
+  <line x1="200" y1="64%" x2="400" y2="64%" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+  <text x="50%" y="74%" font-family="Inter, sans-serif" font-size="16" fill="rgba(255,255,255,0.65)" text-anchor="middle" letter-spacing="2">Photographs &amp; Notes</text>
+</svg>

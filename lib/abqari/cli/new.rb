@@ -1,0 +1,293 @@
+# frozen_string_literal: true
+
+require 'fileutils'
+require 'optparse'
+require 'erb'
+
+module Abqari
+  module CLI
+    # `abqari new <projectname>` — scaffolds a new Abqari site by
+    # recursive-copying `lib/abqari/templates/site_skeleton/` into the
+    # target directory, with simple ERB token substitution on files
+    # whose name ends in `.tt`. Modelled on Jekyll's `jekyll new`,
+    # Rails's `rails new`, and Astro's `npm create astro@latest`.
+    #
+    # Defaults — zero prompts:
+    #   * `title:`       = the projectname, title-cased
+    #   * `description:` = a short placeholder
+    #   * `author:`      = "Your name" (operator edits later)
+    #   * `theme:`       = minimal
+    #   * `locale:`      = en
+    #   * Engine source  = whichever shape the user passes via
+    #                      `--engine`. Defaults to "git" (a github URL
+    #                      placeholder — operator edits to point at
+    #                      their fork) since the engine isn't on
+    #                      RubyGems yet.
+    #
+    # Flags:
+    #   --name "..."          Site title (defaults to projectname)
+    #   --description "..."   Site description
+    #   --author "..."        Author
+    #   --theme NAME          Theme (one of VALID_THEMES below)
+    #   --locale CODE         ISO 639-1 (en, fr, ja, …)
+    #   --engine SOURCE       'git' (default — github placeholder),
+    #                         'path' (path-source to ../abqari, useful
+    #                         for engine devs), or a literal Gemfile
+    #                         line (anything starting with "gem ").
+    #   --blank               Bare-minimum scaffold: no example post,
+    #                         no tutorial text on the home / about
+    #                         pages, no in-line docs in
+    #                         `config/site.yml`. Useful for users who
+    #                         already know Abqari and want a clean
+    #                         slate. Default mode includes a welcome
+    #                         post, populated home page, and heavily-
+    #                         commented config to demo the surface.
+    #   --skip-bundle         Skip running `bundle install` afterwards
+    #   --force               Overwrite target directory if non-empty
+    class New
+      VALID_THEMES = %w[minimal magazine notebook sand bootstrap custom none].freeze
+      VALID_ENGINES = %w[git path].freeze
+
+      # Directories that are example-only — skipped when --blank is
+      # passed. Paths are relative to the skeleton root, no trailing
+      # slash. Each path matches itself AND anything underneath it.
+      BLANK_MODE_SKIP = %w[
+        content/posts/welcome
+      ].freeze
+
+      # Default engine-source line in the scaffolded Gemfile. Placeholder
+      # github URL — the operator edits it to their fork. Once Abqari is
+      # on RubyGems, this default becomes `gem 'abqari', '~> X.Y'`.
+      DEFAULT_GIT_GEMFILE_LINE  = "gem 'abqari', git: 'https://github.com/your-handle/abqari.git'"
+      DEFAULT_PATH_GEMFILE_LINE = "gem 'abqari', path: '../abqari'"
+
+      def self.run(argv)
+        new.run(argv)
+      end
+
+      def initialize
+        @options = {
+          theme:         'minimal',
+          locale:        'en',
+          engine:        'git',
+          blank:         false,
+          skip_bundle:   false,
+          force:         false
+        }
+      end
+
+      def run(argv)
+        parser = build_parser
+        rest = parser.parse(argv)
+
+        if rest.empty?
+          warn parser.help
+          warn "\nMissing required argument: projectname"
+          return false
+        end
+
+        projectname = rest.first
+        target_dir  = File.expand_path(projectname)
+
+        return false unless preflight_ok?(target_dir)
+        return false unless validate_options!
+
+        copy_skeleton!(target_dir, build_template_vars(projectname))
+        run_bundle_install!(target_dir) unless @options[:skip_bundle]
+        print_next_steps(projectname, target_dir)
+        true
+      end
+
+      private
+
+      def build_parser
+        OptionParser.new do |opts|
+          opts.banner = 'Usage: abqari new <projectname> [options]'
+          opts.separator ''
+          opts.separator 'Options:'
+          opts.on('--name TITLE',         'Site title (defaults to projectname)')                 { |v| @options[:name] = v }
+          opts.on('--description DESC',   'Site description')                                     { |v| @options[:description] = v }
+          opts.on('--author NAME',        'Author')                                               { |v| @options[:author] = v }
+          opts.on('--theme NAME',         "Theme (#{VALID_THEMES.join('/')})")                    { |v| @options[:theme] = v }
+          opts.on('--locale CODE',        'ISO 639-1 locale (en, fr, ja, …)')                    { |v| @options[:locale] = v }
+          opts.on('--engine SOURCE',      "Gem source: 'git' (default) or 'path'")                { |v| @options[:engine] = v }
+          opts.on('--blank',              'Minimum-viable scaffold (no example post, no tutorial text, no in-line config docs)') { @options[:blank] = true }
+          opts.on('--skip-bundle',        "Don't run `bundle install` after scaffolding")         {     @options[:skip_bundle] = true }
+          opts.on('--force',              'Overwrite the target directory if non-empty')         {     @options[:force] = true }
+          opts.on('-h', '--help', 'Show this message') { puts opts; exit }
+        end
+      end
+
+      # --- Preflight + validation ----------------------------------------
+
+      def preflight_ok?(target_dir)
+        if File.exist?(target_dir) && !@options[:force]
+          contents = Dir.children(target_dir) rescue []
+          unless contents.empty?
+            warn "Target directory #{target_dir} already exists and is non-empty."
+            warn 'Re-run with --force to overwrite, or pick a different name.'
+            return false
+          end
+        end
+        true
+      end
+
+      def validate_options!
+        unless VALID_THEMES.include?(@options[:theme])
+          warn "Unknown theme: #{@options[:theme].inspect}. Valid: #{VALID_THEMES.join(', ')}"
+          return false
+        end
+        unless VALID_ENGINES.include?(@options[:engine])
+          warn "Unknown --engine: #{@options[:engine].inspect}. Valid: #{VALID_ENGINES.join(', ')}"
+          return false
+        end
+        true
+      end
+
+      # --- Template vars passed to ERB (.tt) files ------------------------
+
+      def build_template_vars(projectname)
+        title = @options[:name] || titleize(projectname)
+        {
+          projectname:  projectname,
+          title:        title,
+          description:  @options[:description] || "A new Abqari site.",
+          author:       @options[:author] || 'Your Name',
+          theme:        @options[:theme],
+          locale:       @options[:locale],
+          gemfile_line: engine_gemfile_line,
+          year:         Time.now.year
+        }
+      end
+
+      def engine_gemfile_line
+        case @options[:engine]
+        when 'git'  then DEFAULT_GIT_GEMFILE_LINE
+        when 'path' then DEFAULT_PATH_GEMFILE_LINE
+        end
+      end
+
+      def titleize(slug)
+        slug.to_s.tr('-_', ' ').split(/\s+/).map(&:capitalize).join(' ')
+      end
+
+      # --- Copy the skeleton, with .tt → ERB substitution ----------------
+      #
+      # Two modes:
+      #   default — copy everything, render `.tt` files, skip `.blank.*`
+      #             variants. Default mode is the "full" experience —
+      #             example post, populated home page, commented config.
+      #   --blank — skip directories listed in `BLANK_MODE_SKIP`, prefer
+      #             `.blank.<ext>.tt` variants over the regular `.tt`
+      #             when both exist. The blank variant renders at the
+      #             same destination path (e.g. `content/index.blank.md.tt`
+      #             → `content/index.md`).
+      def copy_skeleton!(target_dir, vars)
+        skeleton = File.expand_path('../templates/site_skeleton', __dir__)
+        unless Dir.exist?(skeleton)
+          raise "Site skeleton not found at #{skeleton}. (Engine install bug — please report.)"
+        end
+
+        FileUtils.mkdir_p(target_dir)
+
+        blank = @options[:blank]
+
+        Dir.glob(File.join(skeleton, '**', '*'), File::FNM_DOTMATCH).each do |src|
+          next if %w[. ..].include?(File.basename(src))
+
+          rel = src.sub(skeleton, '').sub(%r{\A/}, '')
+          next if skip_in_mode?(rel, blank, skeleton)
+
+          dest = File.join(target_dir, destination_for(rel))
+
+          if File.directory?(src)
+            FileUtils.mkdir_p(dest)
+          elsif src.end_with?('.tt')
+            File.write(dest, render_erb(File.read(src, encoding: 'UTF-8'), vars))
+          else
+            FileUtils.cp(src, dest)
+            FileUtils.chmod('+x', dest) if File.executable?(src)
+          end
+        end
+
+        puts "Created #{target_dir}#{' (blank scaffold)' if blank}"
+      end
+
+      # True when the skeleton entry at `rel` should not be copied in
+      # the current mode. Two rules:
+      #   1. Anything under a `BLANK_MODE_SKIP` path is dropped in
+      #      blank mode.
+      #   2. `.blank.<ext>.tt` files are skipped UNLESS we're in blank
+      #      mode. In blank mode, the *non*-blank counterpart is the
+      #      one that's skipped (the blank variant takes the slot).
+      def skip_in_mode?(rel, blank, skeleton_root)
+        if blank && BLANK_MODE_SKIP.any? { |p| rel == p || rel.start_with?("#{p}/") }
+          return true
+        end
+
+        blank_variant = rel.include?('.blank.')
+        return true if !blank && blank_variant
+
+        if blank && rel.end_with?('.tt') && !blank_variant
+          # Non-blank `.tt` is shadowed when a `.blank.<ext>.tt` sibling
+          # exists. Compute the sibling path (`foo.md.tt` →
+          # `foo.blank.md.tt`) and skip the regular file when present.
+          # The regex only matches paths with at least two dots
+          # (extension + .tt) — single-dot files like `Gemfile.tt`
+          # have no blank variant by construction; guard against the
+          # no-match case where `sub` returns the input unchanged and
+          # we'd otherwise mistake the file for its own sibling.
+          sibling = rel.sub(/(\.[^.]+)\.tt\z/, '.blank\1.tt')
+          if sibling != rel && File.exist?(File.join(skeleton_root, sibling))
+            return true
+          end
+        end
+        false
+      end
+
+      # Map a skeleton-relative path to its destination path inside
+      # the target site:
+      #   * `.tt` suffix is stripped (`config/site.yml.tt` → `config/site.yml`)
+      #   * `.blank.` segment collapses to `.` so a blank variant renders
+      #     at the same destination as the full one (`index.blank.md.tt`
+      #     → `index.md`).
+      def destination_for(rel)
+        rel.sub('.blank.', '.').sub(/\.tt\z/, '')
+      end
+
+      # ERB with `trim_mode: '-'` so `<%- -%>` strips its surrounding
+      # whitespace cleanly. Vars are bound via a small struct so the
+      # template can reference them as locals (`title`, `description`,
+      # etc.) without ceremony.
+      def render_erb(src, vars)
+        ERB.new(src, trim_mode: '-').result_with_hash(vars)
+      end
+
+      # --- `bundle install` after scaffolding -----------------------------
+
+      def run_bundle_install!(target_dir)
+        puts ''
+        puts 'Running bundle install...'
+        Dir.chdir(target_dir) do
+          success = system('bundle', 'install')
+          unless success
+            warn '[warn] `bundle install` failed. Run it manually inside the project, or check the Gemfile.'
+          end
+        end
+      end
+
+      def print_next_steps(projectname, _target_dir)
+        puts ''
+        puts 'Next:'
+        puts "  cd #{projectname}"
+        puts '  bin/serve            # dev server on http://localhost:4000'
+        puts ''
+        puts 'Then:'
+        puts '  - Edit config/site.yml — set `url:`, social handles, etc.'
+        puts '  - Edit content/index.md — your home page.'
+        puts '  - `bin/new post "Title"` to scaffold a new post.'
+        puts '  - `bin/build` for a production build.'
+      end
+    end
+  end
+end

@@ -1,0 +1,87 @@
+<!--
+  Related books — sister-publications block on a single publication
+  detail page. Reads from `site.collection('publications')` so it
+  works equally with manual content files, externally-sourced
+  entries, or any mix.
+
+  "Related" today = other publications in the same series, sorted by
+  `in_series.position`. Future enhancements (tag / category overlap
+  when there's no series) plug into this same lookup.
+
+  Adaptive heading: "Ready for the sequel?" / "Continue the series" /
+  "Earlier in the series" / "Other books in the series" — depending
+  on where the current book sits in the sequence.
+
+  Renders nothing when the book isn't in a series OR when the series
+  has no other published books.
+-->
+<%
+  current_series   = page.frontmatter.dig('in_series', 'slug')
+  current_position = page.frontmatter.dig('in_series', 'position').to_i
+
+  related = if current_series
+              site.collection('publications')
+                  .reject { |b| b.slug == page.slug }
+                  .select { |b| b.frontmatter.dig('in_series', 'slug') == current_series }
+                  .sort_by { |b| b.frontmatter.dig('in_series', 'position') || Float::INFINITY }
+            else
+              []
+            end
+
+  heading = if related.size == 1
+              rel_pos = related.first.frontmatter.dig('in_series', 'position').to_i
+              if rel_pos == current_position + 1
+                'Ready for the sequel?'
+              elsif rel_pos > current_position
+                'Continue the series'
+              elsif rel_pos == 1
+                "Haven't read the first book?"
+              else
+                'Earlier in the series'
+              end
+            else
+              'Other books in the series'
+            end
+
+  # URL prefix for individual publication pages — honors `slug:` aliasing.
+  pubs_cfg = site.collection_config('publications')
+  pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+    pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{pubs_cfg['slug']}/"
+  pubs_prefix = '/publications/' if pubs_prefix.empty?
+%>
+<% if related.any? %>
+<section class="book-related" aria-label="Related books">
+  <h2 class="book-related__heading"><%= heading %></h2>
+
+  <% related.each do |b| %>
+    <% fm = b.frontmatter %>
+    <% has_buy = fm['buy_now_url'] || fm['add_to_cart_url'] %>
+    <article class="book-related__item">
+      <a href="<%= pubs_prefix %><%= b.slug %>/" class="book-related__cover">
+        <% if (cover = fm['cover_url']) %>
+          <div class="book-cover">
+            <img src="<%= sanitized_url(cover) %>"
+                 alt="<%= b.title %> cover"
+                 loading="lazy">
+          </div>
+        <% end %>
+      </a>
+
+      <div class="book-related__body">
+        <h3 class="book-related__title">
+          <a href="<%= pubs_prefix %><%= b.slug %>/"><%= b.title %></a>
+        </h3>
+
+        <% if (tagline = fm['tagline']) %>
+          <p class="book-related__tagline"><%= tagline %></p>
+        <% end %>
+
+        <a href="<%= pubs_prefix %><%= b.slug %>/" class="book-related__cta">
+          <%= has_buy ? 'Read more' : 'Coming soon' %> &rarr;
+        </a>
+      </div>
+    </article>
+  <% end %>
+</section>
+<% end %>

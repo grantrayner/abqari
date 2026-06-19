@@ -1,0 +1,64 @@
+<!--
+  Image gallery driven by frontmatter. Render from any layout:
+
+    <%%= render 'partials/image_gallery' %>
+
+  And declare the images in the page's front matter:
+
+    images:
+      - path: /assets/img/photo-01.jpg
+        alt: View from the workshop                # optional
+      - path: /assets/img/photo-02.jpg
+        alt: Late-night writing session
+
+  Optional knobs:
+
+    gallery:
+      columns: 3            # 2, 3, or 4 images per row (default: responsive auto-fill)
+      randomize: true       # shuffle the order on each build
+      limit: 6              # show only the first N (after shuffle, if any)
+      class: photo-grid     # wrapper class for your CSS
+
+  Render-on-build only — there's no runtime JS. The randomize flag
+  re-shuffles per build, so a deploy after `bin/build` shows a new
+  order; visitors don't see images flicker between page views.
+
+  Inline width/height in front matter are honoured so the browser
+  reserves space (CLS-safe). Images are lazy-loaded by default so
+  off-screen photos defer.
+-->
+<%
+  images = Array(page.frontmatter['images'])
+  cfg = page.frontmatter['gallery'] || {}
+  images = images.shuffle if cfg['randomize']
+  images = images.first(cfg['limit'].to_i) if cfg['limit']
+  wrapper_class = cfg['class'] || 'image-gallery'
+  cols = cfg['columns']
+  # Only honour 2, 3, or 4 — any other value falls back to the
+  # responsive auto-fill default. CSS classes for these are in each
+  # theme's app.css; nothing needs to change at the partial level.
+  cols_class = [2, 3, 4].include?(cols) ? " image-gallery--cols-#{cols}" : ''
+%>
+<% if images.any? %>
+  <div class="<%= wrapper_class %><%= cols_class %>">
+    <% images.each_with_index do |img, idx| %>
+      <% src = img['path'] || img.to_s %>
+      <% alt = img['alt'].to_s %>
+      <% w = img['width'] || 1200 %>
+      <% h = img['height'] || 1200 %>
+      <%# Cycle through 4 soft-tint classes so the placeholder colour
+          shows immediately while image bytes are still in flight. With
+          width + height attrs on the <img>, the browser reserves the
+          right box from first paint — no layout shift on load. %>
+      <% tint = "image-gallery__placeholder--tint-#{(idx % 4) + 1}" %>
+      <div class="image-gallery__placeholder <%= tint %>">
+        <img src="<%= src %>"
+             alt="<%= alt %>"
+             width="<%= w %>"
+             height="<%= h %>"
+             loading="lazy"
+             decoding="async">
+      </div>
+    <% end %>
+  </div>
+<% end %>

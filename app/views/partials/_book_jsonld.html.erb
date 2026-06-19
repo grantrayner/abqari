@@ -1,0 +1,72 @@
+<!--
+  Schema.org Book JSON-LD for publication detail pages. Reads
+  canonical fields from `page.frontmatter` directly — whether the
+  publication is a manual content file or Folio-sourced, the field
+  names are the same (see docs/publications.md).
+
+  Renders for every publication that has a title (i.e. always).
+  Missing fields are omitted from the emitted JSON-LD rather than
+  emitted as nulls.
+-->
+<%
+  fm       = page.frontmatter || {}
+  site_url = site.config['url'].to_s.sub(%r{/\z}, '')
+  title    = page.title
+%>
+<% if title %>
+<%
+  jsonld = {
+    "@context"   => "https://schema.org",
+    "@type"      => "Book",
+    "name"       => title,
+    "bookFormat" => "https://schema.org/EBook"
+  }
+  jsonld["url"] = "#{site_url}#{page.url}" unless site_url.empty?
+  jsonld["mainEntityOfPage"] = { "@type" => "WebPage", "@id" => "#{site_url}#{page.url}" } unless site_url.empty?
+
+  # Author — page-level `author:` (Folio shape: { slug, name } Hash,
+  # or a plain string) wins over site-wide.
+  author_raw = fm['author'] || site.config['author']
+  if author_raw
+    author_name = author_raw.is_a?(Hash) ? author_raw['name'] : author_raw.to_s
+    jsonld["author"] = { "@type" => "Person", "name" => author_name } unless author_name.to_s.empty?
+  end
+
+  jsonld["isbn"]          = fm['isbn']            if fm['isbn']
+  jsonld["inLanguage"]    = fm['language']        if fm['language']
+  jsonld["numberOfPages"] = fm['pages'].to_i      if fm['pages']
+  jsonld["description"]   = fm['tagline'] || fm['excerpt'] || page.description
+
+  # Image — canonical `cover_url`. Absolute URL or site-relative path.
+  if (cover = fm['cover_url'])
+    jsonld["image"] = if cover.start_with?('http://', 'https://')
+                        cover
+                      elsif cover.start_with?('/')
+                        "#{site_url}#{cover}"
+                      else
+                        "#{site_url}#{bundle_asset_url_for(page, cover)}"
+                      end
+  end
+
+  # Date published — Folio carries ISO timestamps; frontmatter may
+  # carry plain dates. Normalise to ISO when possible.
+  if (raw_date = fm['published_at'])
+    jsonld["datePublished"] = raw_date.respond_to?(:iso8601) ? raw_date.iso8601 : raw_date.to_s
+  end
+
+  # Offers — canonical price is a Hash { cents, currency, formatted }
+  # (the publication normaliser expands string shorthands at parse
+  # time, so this is the only shape we need to read).
+  if (price = fm['price']).is_a?(Hash) && price['cents']
+    available = fm.key?('available_for_purchase') ? fm['available_for_purchase'] : true
+    jsonld["offers"] = {
+      "@type"         => "Offer",
+      "price"         => (price['cents'].to_f / 100).round(2),
+      "priceCurrency" => price['currency'] || 'USD',
+      "availability"  => available ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
+      "url"           => fm['buy_now_url'] || fm['shop_url']
+    }.compact
+  end
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
+<% end %>

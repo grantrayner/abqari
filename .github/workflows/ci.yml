@@ -1,0 +1,154 @@
+# PR / push CI checks. Runs on every push and pull request; gates merges
+# on a clean test suite, a strict site audit, and a clean bundle-audit.
+#
+# Separate from `deploy.yml` on purpose: deploys should be resilient (a
+# flaky external link shouldn't block a release), but PRs should fail
+# loudly so problems are caught at review time.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # The gemspec declares `required_ruby_version: '>= 3.3'`. The
+    # matrix tests against the floor (3.3 — anyone on the oldest
+    # supported release) and the latest stable Ruby so regressions
+    # against either end are caught at PR time. Add new minors as
+    # they reach stable; drop a row when bumping the floor in the
+    # gemspec.
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.3', '3.4']
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
+
+      - name: Set up Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run test suite with coverage
+        env:
+          COVERAGE: '1'
+        run: bundle exec bin/test
+
+      - name: Upload coverage report
+        # Only upload from one Ruby version — uploading from every
+        # matrix entry produces duplicate artifacts under the same
+        # name, which the upload-artifact action rejects.
+        if: always() && matrix.ruby == '3.3'
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install Pagefind (optional — for static search)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run site audit (strict)
+        env:
+          ABQARI_ENV: production
+        # --strict exits non-zero when any error-severity finding is
+        # present. To also gate on warnings, change to `--strict=warn`.
+        run: bundle exec bin/audit --strict
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: audit-report
+          path: audit/*.md
+          retention-days: 30
+
+  bundle-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 the apt
+        # package `libvips42` doesn't include HEIF/AVIF support out of
+        # the box — that's split into libheif1 + per-codec plugins.
+        # Without them, `heifsave` raises "Unsupported compression" the
+        # first time the pipeline tries to emit an AVIF variant.
+        # - libheif1: HEIF/HEIC/AVIF container
+        # - libheif-plugin-aomenc: AV1 encoder → AVIF output
+        # - libheif-plugin-libde265: HEVC decoder → reading HEIC sources
+        # - libheif-plugin-dav1d: AV1 decoder → reading AVIF sources
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install bundler-audit
+        run: gem install bundler-audit
+
+      - name: Run bundle-audit
+        # `check --update` refreshes the advisory database before scanning
+        # so the runner picks up CVEs published since the last cache build.
+        run: bundle-audit check --update

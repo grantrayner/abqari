@@ -1,0 +1,68 @@
+<!--
+  Single related-style card. Cover-on-top, title and date below.
+
+  Used by:
+    - `_related_items` — the grid below show views (posts, photos,
+      publications, workshops).
+    - `_next_item` and `_next_in_series` — single emphasized card
+      with the same look, so the show-view tail reads as one
+      coherent run of related-style cards rather than a "different
+      card shape per section" jumble.
+
+  Locals (all optional unless noted):
+    item              — the page to render (required)
+    show_image        — bool, default true
+    is_workshop       — bool, default false; flips workshop-specific
+                        meta (date_from/date_to or duration; location)
+                        instead of the generic `item.date` line
+    ws_show_dates     — bool, default true (only when is_workshop)
+    ws_show_location  — bool, default true (only when is_workshop)
+-->
+<%
+  _show_image       = defined?(show_image)       ? show_image       : true
+  _is_workshop      = defined?(is_workshop)      ? is_workshop      : false
+  _ws_show_dates    = defined?(ws_show_dates)    ? ws_show_dates    : true
+  _ws_show_location = defined?(ws_show_location) ? ws_show_location : true
+%>
+<li class="related__item">
+  <a href="<%= item.url %>">
+    <% if _show_image %>
+      <%# Cover key varies by collection — `image:` is the bundle-
+          relative hero used by posts / photos / workshops;
+          `cover_url:` is the canonical key for publications,
+          bundles, and series (per docs/publications.md). Try
+          `image` first so the bundle convention wins when both
+          happen to be set, then fall through to `cover_url`. %>
+      <% cover = item.frontmatter['image'] || item.frontmatter['cover_url'] %>
+      <div class="related__cover<%= ' related__cover--placeholder' unless cover %>">
+        <% if cover %>
+          <img src="<%= sanitized_url(bundle_asset_url_for(item, cover)) %>"
+               alt="<%= item.frontmatter['caption'] || item.title %>"
+               loading="lazy"
+               decoding="async">
+        <% end %>
+      </div>
+    <% end %>
+    <span class="related__title"><%= item.title %></span>
+    <% if _is_workshop %>
+      <% fm = item.frontmatter %>
+      <% if _ws_show_dates && (df = fm['date_from']) %>
+        <span class="related__date">
+          <time datetime="<%= to_time(df).iso8601 %>"><%= local_time(df) %></time>
+          <% if (dt = fm['date_to']) && dt != df %>
+            &ndash; <time datetime="<%= to_time(dt).iso8601 %>"><%= local_time(dt) %></time>
+          <% end %>
+        </span>
+      <% elsif _ws_show_dates && fm['duration'] %>
+        <span class="related__date"><%= fm['duration'] %></span>
+      <% end %>
+      <% if _ws_show_location && fm['location'] %>
+        <span class="related__location"><%= fm['location'] %></span>
+      <% end %>
+    <% elsif item.respond_to?(:date) && item.date %>
+      <span class="related__date">
+        <time datetime="<%= item.date.iso8601 %>"><%= local_time(item.date) %></time>
+      </span>
+    <% end %>
+  </a>
+</li>

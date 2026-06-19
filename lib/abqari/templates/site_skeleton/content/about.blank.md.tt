@@ -1,0 +1,12 @@
+---
+title: About
+published: true
+description: About <%= title %>.
+nav:
+  order: 99
+  label: About
+---
+
+# About
+
+A short bio.

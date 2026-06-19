@@ -1,0 +1,110 @@
+---
+layout: application
+---
+<!--
+  Single-series detail page. Reads canonical fields from
+  `page.frontmatter` (see docs/publications.md). Whether the page is
+  a manual `content/series/<slug>/index.md` or auto-generated from
+  an external publisher with `kind: 'series'`, the field names are
+  the same.
+
+  Note on commerce: a publisher integration may or may not attach
+  buy URLs to a series (Folio currently doesn't). A native author
+  CAN set `buy_now_url:` here to point at e.g. a series bundle; the
+  engine renders the button whenever the field is set, regardless
+  of source.
+
+  Frontmatter shape:
+
+      ---
+      layout: series
+      name: Light Notebooks
+      description: A two-volume set on the edges of the working day.
+      tagline: Beginnings and endings.            # optional
+      price: $28.00                               # optional (native only)
+      buy_now_url: https://...                    # optional (native only)
+      publications:
+        - slug: first-light
+          position: 1
+        - slug: last-light
+          position: 2
+      ---
+-->
+<article class="series">
+  <% fm = page.frontmatter %>
+
+  <header>
+    <h1><%= page.title %></h1>
+    <% if (tagline = fm['tagline']) %>
+      <p class="lede series__tagline"><%= tagline %></p>
+    <% end %>
+
+    <% if (price = fm.dig('price', 'formatted')) %>
+      <p class="series__price"><%= price %></p>
+    <% end %>
+
+    <%# Buy button — renders whenever a commerce URL is present. %>
+    <% if fm['buy_now_url'] || fm['add_to_cart_url'] %>
+      <p class="series__buttons">
+        <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
+        <%== cart_button(fm) %>
+      </p>
+    <% end %>
+  </header>
+
+  <%# Description — pre-rendered `description_html` when present,
+      otherwise the markdown `description` source rendered through
+      Commonmarker so inline emphasis, links, and paragraph breaks
+      come through. Canonical shape per docs/publications.md. %>
+  <%
+    description_source, description_content =
+      if (html = fm['description_html']) && !html.to_s.strip.empty?
+        [:description_html, html]
+      elsif (text = fm['description']) && !text.to_s.strip.empty?
+        [:description, markdown(text)]
+      else
+        [nil, nil]
+      end
+  %>
+  <% if description_source %>
+    <div class="series__description" data-source="<%= description_source %>">
+      <%== description_content %>
+    </div>
+  <% end %>
+
+  <%== page.content %>
+
+  <%# Books in this series. `publications:` is an array of slugs or
+      `{slug, position}` Hashes. Cards render with `:position` set so
+      each card shows its series position as a small "#N" prefix. %>
+  <%
+    source_pubs = Array(fm['publications'])
+    pubs_cfg = site.collection_config('publications')
+    pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+      pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+      "/#{pubs_cfg['slug']}/"
+    pubs_prefix = '/publications/' if pubs_prefix.empty?
+  %>
+  <% if source_pubs.any? %>
+    <section class="series__contents">
+      <h2 class="series__contents-heading">Books in this series</h2>
+      <ul class="publications-index">
+        <% source_pubs.each_with_index do |entry, idx| %>
+          <%
+            entry    = { 'slug' => entry } if entry.is_a?(String)
+            slug     = entry['slug']
+            card_pub = publication_card_data(slug)
+            card_pub[:title]    = entry['title']     if entry['title']
+            card_pub[:cover]    = entry['cover_url'] if entry['cover_url']
+            card_pub[:position] = entry['position']
+          %>
+          <%== render 'partials/publication_card',
+                     pub: card_pub,
+                     idx: idx,
+                     pubs_prefix: pubs_prefix,
+                     heading_level: 3 %>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</article>

@@ -1,0 +1,61 @@
+<%#
+  Publication detail header — cover image (left) + title/metadata /
+  buy buttons (right), on a single 2-column grid on tablet and up.
+
+  Reads canonical fields from `page.frontmatter` directly (see
+  docs/publications.md). Whether the page is a manual content file
+  or an externally-sourced entry, the field names are the same —
+  no source-aware branching here.
+
+  Toggles come from `collections.publications.show.*` in config.
+%>
+<%
+  fm   = page.frontmatter
+  show = (site.collection_config('publications')['show'] || {})
+%>
+<header class="publication__header">
+  <% if (cover = fm['cover_url']) %>
+    <img class="publication__cover" src="<%= sanitized_url(cover) %>" alt="<%= fm['cover_alt'] || "#{page.title} cover" %>">
+  <% end %>
+
+  <div class="publication__intro">
+    <h1><%= page.title %></h1>
+
+    <% if show.fetch('show_tagline', true) && (tagline = fm['tagline']) %>
+      <p class="publication__tagline"><%= tagline %></p>
+    <% end %>
+
+    <%# Optional metadata fields — ISBN, pages, published date —
+        rendered as a small muted block of detail lines. %>
+    <% if show.fetch('show_isbn', true) && (isbn = fm['isbn']) %>
+      <p class="publication__isbn">ISBN <%= isbn %></p>
+    <% end %>
+
+    <% if show.fetch('show_pages', true) && (pages = fm['pages']) %>
+      <p class="publication__pages"><%= pluralize(pages, 'page') %></p>
+    <% end %>
+
+    <% if show.fetch('show_published', true) && (published = fm['published_at']) %>
+      <p class="publication__published">First published <time datetime="<%= published %>"><%= local_time(published) %></time></p>
+    <% end %>
+
+    <%# Pre-order / availability banner — optional fields, harmless
+        when absent. %>
+    <% if fm['preorder'] && fm['release_date'] %>
+      <p class="publication__preorder">Pre-order — releases <time datetime="<%= fm['release_date'] %>"><%= local_time(fm['release_date']) %></time></p>
+    <% end %>
+
+    <%# Purchase area — price sits adjacent to the buy buttons so
+        they read as a single unit (e-commerce convention). %>
+    <% if show.fetch('show_price', true) && (price = fm.dig('price', 'formatted')) %>
+      <p class="publication__price"><%= price %></p>
+    <% end %>
+
+    <%# Buy / cart buttons. Generic — render whenever the
+        corresponding URL field is set, regardless of source. %>
+    <p class="publication__buttons">
+      <%== buy_button(fm, label: fm['buy_label'] || 'Buy now') %>
+      <%== cart_button(fm) %>
+    </p>
+  </div>
+</header>

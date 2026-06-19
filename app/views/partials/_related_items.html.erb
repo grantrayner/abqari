@@ -1,0 +1,105 @@
+<!--
+  Related items — renders below a show view (post, photo, publication)
+  with up to N pages from the same collection that share tags / series
+  / countries / etc. with the current page.
+
+  Usage from any layout:
+
+      <%%= render 'partials/related_items' %>
+
+  Optional locals:
+      <%%= render 'partials/related_items', limit: 6, match_by: %w[tags] %>
+
+  Wired into post.html.erb, photo.html.erb, publication.html.erb by
+  default. Renders nothing when there are no related items — never
+  pads with unrelated content.
+
+  Config (per collection in config/site.yml). Lives under `show:`
+  alongside the other show-page knobs — every show-view section
+  groups there for symmetry with `index:`.
+
+      collections:
+        posts:
+          show:
+            related:
+              enabled: true     # set false to disable for this collection
+              limit: 3          # max items to show
+              match_by: tags    # field name or list of names
+              show_image: true  # when true, always render a cover box —
+                                #   a placeholder tile (no <img>) for items
+                                #   that don't have `image:` / `cover:` in
+                                #   frontmatter. Keeps the grid visually
+                                #   consistent when some items have heroes
+                                #   and others don't. Set false to render
+                                #   text-only cards regardless.
+
+  Workshops-specific extras — workshops carry richer meta than the
+  generic `date:` field, so the related card below the title can
+  show dates and/or location. Both default true; flip false to hide:
+
+      collections:
+        workshops:
+          show:
+            related:
+              show_dates: true     # date_from – date_to (or duration fallback)
+              show_location: true  # city / country / "Remote"
+-->
+<%
+  # Resolve effective limit/match_by — explicit local override > collection
+  # config default. Always fetch the full ranked list, then slice for the
+  # visible block. Total count drives the "Show all N" CTA.
+  source_collection = page.respond_to?(:collection) ? page.collection : nil
+  cfg                = (source_collection ? site.collection_config(source_collection).dig('show', 'related') : nil) || {}
+  override_limit     = defined?(limit)    && limit    ? limit    : nil
+  override_match_by  = defined?(match_by) && match_by ? match_by : nil
+  effective_limit    = override_limit || cfg.fetch('limit', 3)
+  show_image         = cfg.fetch('show_image', true)
+
+  # Workshop-specific meta toggles. For other collections these are
+  # ignored (the partial falls back to the simpler `item.date` line).
+  is_workshop        = source_collection == 'workshops'
+  ws_show_dates      = is_workshop && cfg.fetch('show_dates',    true)
+  ws_show_location   = is_workshop && cfg.fetch('show_location', true)
+
+  all_related = site.related(page, match_by: override_match_by)
+
+  # Workshops: hide past entries from the related list — recommending
+  # an event that's already happened is noise. A workshop is "past"
+  # when its end-date (`date_to` ‖ `date_from`) is strictly before
+  # today; dateless evergreen workshops always count as upcoming.
+  if is_workshop
+    today = Date.today
+    all_related = all_related.reject do |item|
+      end_date = item.frontmatter['date_to'] || item.frontmatter['date_from']
+      end_date && to_time(end_date).to_date < today
+    end
+  end
+
+  visible = all_related.first(effective_limit)
+  total   = all_related.size
+%>
+<% if visible.any? %>
+<%# `related--book` modifier when the source collection is publications,
+    so the thumbnail uses a 2:3 book-cover aspect (instead of the
+    landscape 4:3 default that crops book covers top/bottom). %>
+<section class="related<%= ' related--book' if source_collection == 'publications' %>" aria-labelledby="related-heading">
+  <h2 id="related-heading" class="related__heading">Related</h2>
+  <ul class="related__list">
+    <% visible.each do |item| %>
+      <%== render 'partials/related_item',
+                 item:             item,
+                 show_image:       show_image,
+                 is_workshop:      is_workshop,
+                 ws_show_dates:    ws_show_dates,
+                 ws_show_location: ws_show_location %>
+    <% end %>
+  </ul>
+  <% if total > effective_limit %>
+    <p class="related__more">
+      <a href="<%= page.url.chomp('/') %>/related/">
+        Show all <%= total %> related items
+      </a>
+    </p>
+  <% end %>
+</section>
+<% end %>

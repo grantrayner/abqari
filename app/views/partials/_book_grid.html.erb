@@ -1,0 +1,76 @@
+<!--
+  Book grid — a card grid of every publication, ordered by
+  `in_series.position` then alphabetically by title. Reads from
+  `site.collection('publications')`, which includes both manual
+  pages and any externally-sourced publications a publisher
+  integration (e.g. Folio) has added.
+
+  Renders nothing when the publications collection is empty, so it's
+  safe to drop into any layout regardless of whether the site has
+  any books yet.
+
+  Usage from a layout or markdown body (with `erb: true` in
+  frontmatter):
+      <%%= render 'partials/book_grid' %>
+      <%%= render 'partials/book_grid', heading: 'The Novels' %>
+
+  URL prefix follows `publications.slug` aliasing — sites that set
+  `publications.slug: books` get `/books/<slug>/` links here
+  automatically.
+
+  Note on indentation: when this partial is called from a markdown
+  body (with erb: true), commonmark interprets a blank line in the
+  partial output as the end of an HTML block, then treats subsequent
+  indented lines as a code block. So we keep all HTML at column 0
+  and use `-%>` on control tags to avoid emitting blank/whitespace-
+  only lines.
+-->
+<%
+  books = site.collection('publications').sort_by do |p|
+    pos = p.frontmatter.dig('in_series', 'position') || p.frontmatter['order'] || 999
+    [pos, p.title.to_s]
+  end
+
+  pubs_cfg = site.collection_config('publications')
+  pubs_prefix = pubs_cfg['slug'].to_s.empty? ?
+    pubs_cfg['permalink'].to_s.sub(':slug/', '').sub(':slug', '') :
+    "/#{pubs_cfg['slug']}/"
+  pubs_prefix = '/publications/' if pubs_prefix.empty?
+
+  _heading = defined?(heading) ? heading : nil
+-%>
+<% if books.any? -%>
+<section class="folio-book-grid" aria-label="<%= _heading || 'Books' %>">
+<% if _heading -%>
+<h2 class="folio-book-grid__heading"><%= _heading %></h2>
+<% end -%>
+<div class="folio-book-grid__list">
+<% books.each do |book| -%>
+<%
+  fm        = book.frontmatter
+  cover_url = fm['cover_url']
+  tagline   = fm['tagline']
+  has_buy   = fm['buy_now_url'] || fm['add_to_cart_url']
+-%>
+<article class="folio-book-grid__item">
+<a href="<%= pubs_prefix %><%= book.slug %>/" class="folio-book-grid__cover-link">
+<% if cover_url -%>
+<div class="book-cover">
+<img src="<%= sanitized_url(cover_url) %>" alt="<%= book.title %> cover" loading="lazy">
+</div>
+<% end -%>
+</a>
+<h3 class="folio-book-grid__title">
+<a href="<%= pubs_prefix %><%= book.slug %>/"><%= book.title %></a>
+</h3>
+<% if tagline -%>
+<p class="folio-book-grid__tagline"><%= tagline %></p>
+<% end -%>
+<p class="folio-book-grid__cta">
+<a href="<%= pubs_prefix %><%= book.slug %>/" class="btn btn-outline-secondary"><%= has_buy ? 'Read more' : 'Coming soon' %> &rarr;</a>
+</p>
+</article>
+<% end -%>
+</div>
+</section>
+<% end -%>

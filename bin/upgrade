@@ -1,0 +1,152 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Pull engine updates from your upstream Abqari repo.
+#
+# Usage:
+#   bin/upgrade --check              Show what would change; make no edits
+#   bin/upgrade --engine-only        Overwrite engine paths from upstream
+#                                    (lib/, bin/, Gemfile). Templates, themes,
+#                                    content, and config are left alone.
+#   bin/upgrade                      Full `git merge upstream/<target>` —
+#                                    you'll resolve any conflicts in templates
+#                                    or themes manually.
+#   bin/upgrade --to v0.2.0          Target a specific tag instead of latest.
+#
+# One-time setup:
+#   git remote add upstream https://github.com/your-handle/abqari.git
+#
+# Then push your own work to a different remote:
+#   git remote add origin git@github.com:you/your-site.git
+#   git push -u origin main
+#
+# After upgrade, always run:
+#   bundle install
+#   bundle exec bin/test
+#   bundle exec bin/audit
+
+require 'optparse'
+
+# Engine paths — files Abqari ships and maintains. The user is expected NOT to
+# modify these in place; --engine-only overwrites them from upstream.
+ENGINE_PATHS = %w[lib bin Gemfile].freeze
+
+mode = :interactive
+target = nil
+
+OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/upgrade [options]'
+  opts.separator ''
+  opts.separator 'Modes (pick one; default is --interactive):'
+  opts.on('--check',       'Show what would change; do not modify anything') { mode = :check }
+  opts.on('--engine-only', 'Overwrite lib/, bin/, Gemfile from upstream')    { mode = :engine_only }
+  opts.on('--interactive', 'Run a full `git merge` (default)')               { mode = :interactive }
+  opts.separator ''
+  opts.separator 'Other:'
+  opts.on('--to TAG', 'Target a specific tag (e.g. v0.2.0)') { |t| target = t }
+  opts.on('-h', '--help', 'Show this message') { puts opts; exit }
+end.parse!
+
+# --- Sanity checks ---------------------------------------------------------
+
+def run!(cmd, *args)
+  ok = system(cmd, *args)
+  ok || abort("Command failed: #{cmd} #{args.join(' ')}")
+end
+
+def silent_run?(cmd, *args)
+  system(cmd, *args, out: File::NULL, err: File::NULL)
+end
+
+abort('Run from the root of your Abqari site (no .git directory found).') unless Dir.exist?('.git')
+
+unless silent_run?('git', 'diff-index', '--quiet', 'HEAD', '--')
+  abort('Working tree has uncommitted changes. Commit or stash before upgrading.')
+end
+
+unless silent_run?('git', 'remote', 'get-url', 'upstream')
+  abort(<<~MSG)
+    No `upstream` remote configured. Add it once:
+      git remote add upstream <abqari-repo-url>
+    Then re-run `bin/upgrade`.
+  MSG
+end
+
+# --- Fetch and resolve target ----------------------------------------------
+
+puts 'Fetching upstream…'
+run!('git', 'fetch', 'upstream', '--tags', '--quiet')
+
+if target.nil?
+  latest_tag = `git tag --sort=-v:refname --merged upstream/main 2>/dev/null`.lines.first&.strip
+  target = latest_tag && !latest_tag.empty? ? latest_tag : 'upstream/main'
+end
+
+current_ref = `git rev-parse HEAD`.strip[0, 7]
+target_ref = `git rev-parse #{target} 2>/dev/null`.strip[0, 7]
+
+if target_ref.empty?
+  abort("Couldn't resolve target #{target}. Try `git fetch upstream --tags` and check available tags.")
+end
+
+if current_ref == target_ref
+  puts "Already at #{target} (#{target_ref}). Nothing to do."
+  exit
+end
+
+# --- Show what's changing --------------------------------------------------
+
+puts ''
+puts "Engine changes from #{current_ref} → #{target} (#{target_ref}):"
+puts ''
+system('git', 'log', '--oneline', "HEAD..#{target}", '--', *ENGINE_PATHS)
+puts ''
+
+# --- Apply -----------------------------------------------------------------
+
+case mode
+when :check
+  puts 'Run again with --engine-only to overwrite engine paths,'
+  puts 'or without flags to perform a full merge.'
+
+when :engine_only
+  puts "Overwriting #{ENGINE_PATHS.join(', ')} from #{target}…"
+  ENGINE_PATHS.each do |path|
+    next unless silent_run?('git', 'cat-file', '-e', "#{target}:#{path}")
+
+    run!('git', 'checkout', target, '--', path)
+  end
+  puts ''
+  puts 'Engine paths updated. Run:'
+  puts '  bundle install'
+  puts '  bundle exec bin/test'
+  puts '  bundle exec bin/audit'
+  puts 'Then commit:'
+  puts "  git commit -am \"Update Abqari engine to #{target}\""
+
+when :interactive
+  print "Run `git merge #{target}`? [y/N] "
+  answer = $stdin.gets&.strip&.downcase
+  if answer == 'y'
+    if silent_run?('git', 'merge', '--no-edit', target)
+      puts ''
+      puts 'Merge clean. Run:'
+      puts '  bundle install'
+      puts '  bundle exec bin/test'
+      puts '  bundle exec bin/audit'
+    else
+      puts ''
+      puts 'Merge has conflicts. Resolve, then:'
+      puts '  bundle install'
+      puts '  bundle exec bin/test'
+      puts '  bundle exec bin/audit'
+      puts '  git commit'
+      puts ''
+      puts 'For engine files (lib/, bin/) you almost always want upstream:'
+      puts "  git checkout --theirs lib/ bin/ Gemfile"
+      puts '  git add lib/ bin/ Gemfile'
+    end
+  else
+    puts 'No changes applied.'
+  end
+end

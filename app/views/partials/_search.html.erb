@@ -1,0 +1,23 @@
+<!--
+  Static search box powered by Pagefind. Requires `search: true` in
+  config/site.yml — when off, this partial renders nothing.
+
+  Pagefind walks _site/ at build time (or when `bin/index` is run) and
+  emits its CSS/JS runtime + chunked search index into _site/pagefind/.
+  The runtime is loaded from /pagefind/ which is on the same origin, so
+  the strict CSP doesn't need relaxing.
+
+  Drop this into a layout or another partial wherever you want a search box:
+    <%%= render 'partials/search' %>
+
+  Requires Pagefind on PATH at build time. See lib/abqari/search.rb for
+  install instructions.
+-->
+<% if site.config['search'] == true %>
+<div class="abqari-search">
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css">
+  <script src="/pagefind/pagefind-ui.js"></script>
+  <div id="abqari-search"></div>
+  <script src="<%= asset_path('js/search-init.js') %>" defer></script>
+</div>
+<% end %>

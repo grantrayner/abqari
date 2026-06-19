@@ -1,0 +1,50 @@
+# Testimonials for the engine fixture site.
+#
+# Each entry is a single quote with attribution. Tag it with the
+# collection + slug of the item it's about, and the matching show
+# view (`post.html.erb`, `publication.html.erb`, `workshop.html.erb`,
+# etc.) will pick it up when rendering testimonials for that item.
+#
+# Fields:
+#   quote       The testimonial text.
+#   name        Attribution.
+#   date        Optional date string.
+#   featured    Set true to surface in featured-mode renders (home /
+#               about pages that call the partial without a subject
+#               filter). Show-view renders include featured + non-
+#               featured testimonials for the matching subject.
+#
+# Subject (what the testimonial is about) — two equivalent forms:
+#
+#   Generic (works for any collection):
+#     collection: workshops
+#     slug:       crisis-response-foundations
+#
+#   Legacy shorthand (publications only):
+#     book: my-book-slug        # equivalent to collection: publications,
+#                               # slug: my-book-slug
+
+- quote: "Crisis Response Foundations changed how our exec team thinks about the first 30 minutes of any incident. The exercises felt real — not theatrical — and the debriefs were where the lessons landed."
+  name: "Maya O."
+  date: "March 2026"
+  featured: true
+  collection: workshops
+  slug: crisis-response-foundations
+
+- quote: "A practical, no-nonsense workshop. Two days, three exercises, and a stack of decision frameworks we still use. Grant runs the room without dominating it, which is rare."
+  name: "Daniel P."
+  date: "March 2026"
+  featured: false
+  collection: workshops
+  slug: crisis-response-foundations
+
+- quote: "Building with Abqari was exactly the introduction I needed — concise enough to skim before lunch, deep enough that I was confidently editing layouts that afternoon."
+  name: "Priya R."
+  featured: true
+  collection: posts
+  slug: building-with-abqari
+
+- quote: "An Atlas of Small Things sits on the table by the door, the way good books do. I keep picking it up. I keep finding new things in it."
+  name: "Tomás L."
+  featured: true
+  book: atlas-of-small-things        # legacy form — same as collection: publications, slug: atlas-of-small-things

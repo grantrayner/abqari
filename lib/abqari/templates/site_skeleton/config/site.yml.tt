@@ -1,0 +1,197 @@
+# Abqari site configuration.
+#
+# Top-level keys are shared across environments. Per-environment
+# overrides go under `environments:` and deep-merge over the shared
+# keys based on $ABQARI_ENV (default: development).
+#
+# This starter ships with sensible defaults — edit `title`, `description`,
+# `author`, and `environments.production.url` immediately; the rest can
+# wait until you have a feel for what you want.
+
+# Site identity ──────────────────────────────────────────────────────────
+title: <%= title %>
+description: <%= description %>
+author: <%= author %>
+
+# Locale ─────────────────────────────────────────────────────────────────
+# ISO 639-1 code. Sets <html lang>, RSS <language>, and Preferred-
+# Languages in security.txt. Single-locale only.
+locale: <%= locale %>
+
+# Theme ──────────────────────────────────────────────────────────────────
+# Visual styling. Each theme is one CSS file in themes/<name>/ inside
+# the engine gem. Switch freely — none of the theme files are in this
+# repo (they live in the gem). Built-ins: minimal / magazine / notebook /
+# bootstrap / sand / custom / none.
+theme: <%= theme %>
+
+# Collections ────────────────────────────────────────────────────────────
+# Four collections ship as built-in defaults. Flip enabled to false on
+# any your site doesn't use. Per-collection toggles for index / show /
+# archive / feeds / next / related / toc are scaffolded with sensible
+# defaults; consult the engine's reference config (or
+# docs/publications.md) for the full surface.
+collections:
+  posts:
+    enabled: true
+
+    index:
+      cover: photo                 # photo / photo_or_svg / svg / none
+      show_date: true
+      show_description: true
+      description_truncate: 160
+      show_reading_time: true
+      show_tags: false
+      latest_count: 8
+
+    show:
+      cover: photo                 # hero at the top of the post body
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]             # h2 + h3 in the TOC
+      next:
+        enabled: true              # "Up next" card below the post body
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+        show_image: true
+
+    archive:
+      enabled: false               # turn on + create content/posts-archive.md
+                                   # to enable the long-tail archive page
+
+    feeds:
+      enabled: true                # RSS + JSON Feed at /posts/feed.xml + .json
+
+  photos:
+    enabled: false                 # flip to true to enable photo galleries
+
+  publications:
+    enabled: false                 # flip to true if you ship books / atlases
+
+  workshops:
+    enabled: false                 # flip to true if you run workshops / courses
+
+# Home modules ──────────────────────────────────────────────────────────
+# Optional cards rendered below content/index.md's markdown body.
+# Off by default — your home page renders just the markdown until you
+# flip these on.
+home:
+  latest_post:          false
+  random_post:          false
+  featured_publication: false
+  latest_publication:   false
+  next_workshop:        false
+  latest_photo:         false
+  random_photo:         false
+  photo_gallery:        false      # 'latest' / 'random' / false
+  contact:              false      # needs `contact.email` below
+
+# Navigation ────────────────────────────────────────────────────────────
+# Nav links come from per-page frontmatter — drop a `nav:` block on a
+# page (see `content/index.md`, `content/about.md`) and the page joins
+# the top nav at `nav.order`. To override globally, create `data/nav.yml`
+# with a `links:` list; the engine prefers that over the frontmatter
+# cascade when present. The `nav:` key here is reserved for site-wide
+# nav SETTINGS (e.g. a `brand:` block), NOT a list of links.
+#
+# nav:
+#   brand: My Site                # text shown on the left of the nav
+#                                 # (defaults to site title)
+
+# Footer ────────────────────────────────────────────────────────────────
+footer:
+  signature: "Built with Abqari · <%= year %>"
+
+# Social handles (footer icons + meta tags) — uncomment what applies.
+# social_links:
+#   github:    your-handle
+#   mastodon:  https://mastodon.social/@your-handle
+#   bluesky:   your-handle.bsky.social
+#   x:         your-handle
+#   linkedin:  your-handle
+#   rss:       /posts/feed.xml
+#   mail:      hello@example.com
+
+# Contact button ────────────────────────────────────────────────────────
+# Spam-resistant mailto button. Off by default; populate `email` to opt in.
+# contact:
+#   email: hello@example.com
+
+# IndieWeb / federation ────────────────────────────────────────────────
+# Off by default. Once enabled, the build:
+#   * Adds <link rel="webmention"> so other sites can notify yours.
+#   * Renders received mentions ("Replies & mentions") below each post,
+#     pulled from webmention.io at build time.
+#   * Optionally advertises the site as a Bridgy Fed ActivityPub actor
+#     so Mastodon users can follow `@<domain>` directly.
+#   * Optionally POSTs outbound webmentions to sites your posts link to.
+#
+# Setup (one-time):
+#   1. Sign in at https://webmention.io with your domain (uses rel=me
+#      verification — your social_links above must carry at least one
+#      profile that links back to your domain).
+#   2. Copy the API token from your webmention.io account page.
+#   3. For Bridgy Fed: visit https://fed.brid.gy/, follow its setup
+#      (same rel=me pattern). Then flip `bridgy_fed: true` below.
+#
+# indieweb:
+#   enabled: true
+#   domain: example.com               # bare host, no scheme
+#   webmention_io_token: "..."        # from webmention.io account page
+#   bridgy_fed: false                 # true once Bridgy Fed setup complete
+#   send_webmentions: false           # POST to sites your posts link to
+#   send_window_days: 30              # only send for posts published this
+#                                     #   recently — historical posts have
+#                                     #   already been notified in earlier
+#                                     #   builds; replaying is wasteful
+
+# Syndication (POSSE) ─────────────────────────────────────────────────
+# "Publish on your Own Site, Syndicate Elsewhere" — on each build, the
+# engine POSTs a short summary + canonical URL of each new post to
+# the configured networks. The originating post on your site stays the
+# source of truth; readers on Mastodon/Bluesky discover new work in
+# their feed; replies on those networks come back as webmentions (via
+# Bridgy Fed) and render below the post.
+#
+# Idempotent: every successful crosspost is logged to
+# `vendor/syndication/sent.yml` so re-builds never double-post.
+#
+# Per-post override: set `syndicate: false` in a post's frontmatter to
+# skip syndication for that post; set `syndication_text: "..."` to
+# supply a custom snippet.
+#
+# Setup steps:
+#   * Mastodon — in your instance UI: Preferences → Development →
+#     New Application, scope `write:statuses`. Copy the access token.
+#   * Bluesky  — in the app: Settings → App Passwords → Add. Use the
+#     app password (NOT your account password) below.
+#
+# syndication:
+#   enabled: true
+#   window_days: 14                   # only syndicate posts from the last
+#                                     #   N days — older posts predate
+#                                     #   syndication setup; replaying
+#                                     #   would look like spam
+#   mastodon:
+#     enabled: true
+#     instance: https://mastodon.social
+#     access_token: "..."
+#     visibility: public              # public | unlisted | private
+#   bluesky:
+#     enabled: true
+#     handle: yourname.bsky.social
+#     app_password: "..."             # app password, NOT account password
+
+# Environment overrides ────────────────────────────────────────────────
+# These deep-merge over the shared keys based on $ABQARI_ENV. Set your
+# production URL here so canonical links, sitemap, and OG cards all
+# resolve correctly when deployed.
+environments:
+  development:
+    url: http://localhost:4000
+
+  production:
+    url: https://www.example.com   # ← edit me before deploying

@@ -1,0 +1,93 @@
+<!--
+  Post series previews — stacked-image row showing each series in the
+  posts collection. Visual mirrors the publications index's series
+  preview block: overlapping covers fanned at slight angles, with the
+  series name + post count below.
+
+  Driven by the `posts_series` taxonomy (config/site.yml). Renders
+  nothing when no post has `series:` in its frontmatter.
+
+  Required locals (passed by `posts_index.html.erb`):
+    heading       — section heading text (default: "Series")
+    limit         — max tiles to show; nil = show all
+    all_url       — optional destination for the "View all →" link
+    cover_cap     — max overlapping covers per tile (default 3)
+
+  Each post in a series contributes its hero image (`image:` frontmatter,
+  resolved via `bundle_asset_url_for`). Posts without an image are
+  skipped from the stack; the tile still renders if at least one
+  cover is available.
+
+  Items are sorted by post-count desc (largest series first), then
+  by series name. Tile links to `/posts/series/<slug>/`.
+
+  Shares the `.series-preview*` CSS family with the publications
+  series previews — the `--posts` modifier overrides the cover's
+  aspect-ratio from 2:3 (book cover) to 16:9 (post hero).
+-->
+<%
+  cover_cap = (defined?(cover_cap) && cover_cap) || 3
+  limit     = defined?(limit) ? limit : nil
+  all_url   = defined?(all_url) ? all_url : nil
+  heading   = defined?(heading) && heading ? heading : 'Series'
+
+  series_map = site.posts_by_term('posts_series')
+                   .reject { |_term, posts| posts.empty? }
+                   .sort_by { |term, posts| [-posts.size, term.to_s] }
+
+  previews = series_map.map do |term, posts|
+    sorted = posts.sort_by do |p|
+      pos = p.frontmatter['series_position']
+      [pos.nil? ? Float::INFINITY : pos.to_i,
+       -(p.date&.to_i || 0)]
+    end
+    covers = sorted
+             .map { |p| { post: p, image: p.frontmatter['image'] } }
+             .select { |c| c[:image] }
+             .first(cover_cap)
+
+    {
+      term:   term,
+      url:    taxonomy_url('posts_series', term),
+      count:  posts.size,
+      covers: covers
+    }
+  end
+
+  previews = previews.first(limit) if limit && limit.to_i.positive?
+%>
+<% if previews.any? %>
+<section class="post-series-previews" aria-label="<%= h(heading) %>">
+  <header class="home-module__header">
+    <h2 class="home-module__heading"><%= heading %></h2>
+    <% if all_url && !all_url.to_s.empty? %>
+      <a class="home-module__see-all" href="<%= sanitized_url(all_url) %>">View all &rarr;</a>
+    <% end %>
+  </header>
+  <ul class="series-previews">
+    <% previews.each do |s| %>
+      <li class="series-preview series-preview--posts">
+        <a class="series-preview__link" href="<%= sanitized_url(s[:url]) %>">
+          <% if s[:covers].any? %>
+            <span class="series-preview__row" aria-hidden="true">
+              <% s[:covers].each_with_index do |c, i| %>
+                <img class="series-preview__cover"
+                     style="--i:<%= i %>;--n:<%= s[:covers].size %>"
+                     src="<%= sanitized_url(bundle_asset_url_for(c[:post], c[:image])) %>"
+                     alt=""
+                     loading="lazy">
+              <% end %>
+            </span>
+          <% end %>
+          <span class="series-preview__body">
+            <span class="series-preview__title"><%= s[:term] %></span>
+            <span class="series-preview__meta">
+              <%= pluralize(s[:count], 'post') %>
+            </span>
+          </span>
+        </a>
+      </li>
+    <% end %>
+  </ul>
+</section>
+<% end %>

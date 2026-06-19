@@ -1,0 +1,27 @@
+<!--
+  "← Back" link primitive — used at the top or bottom of detail pages
+  to give readers an explicit way back to the parent index. Optional
+  pattern; layouts opt in by rendering this partial where they want
+  the link.
+
+  Locals:
+    url:    target URL (default "/")
+    label:  link text  (default "Back")
+
+  Usage:
+      <%%= render 'partials/back_link' %%>                                    <!-- "← Back" to "/" -->
+      <%%= render 'partials/back_link', label: 'Back to all books' %%>
+      <%%= render 'partials/back_link', url: '/books/', label: 'Back to books' %%>
+
+  Themes style `.back-link__wrapper` and `.back-link` — adjust spacing
+  and color to taste. Sites on Bootstrap or another component framework
+  can override this partial with framework-flavored markup (drop a copy
+  in the site's app/views/partials/_back_link.html.erb).
+-->
+<% _label = defined?(label) ? label : 'Back' %>
+<% _url   = defined?(url)   ? url   : '/' %>
+<p class="back-link__wrapper">
+  <a class="back-link" href="<%= sanitized_url(_url) %>">
+    &larr; <%= _label %>
+  </a>
+</p>

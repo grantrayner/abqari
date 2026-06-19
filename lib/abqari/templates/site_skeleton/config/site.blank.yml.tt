@@ -1,0 +1,65 @@
+# Abqari site configuration.
+# See the engine's reference config (or run `abqari new <other>` without
+# --blank) for the full surface with documentation.
+
+title: <%= title %>
+description: <%= description %>
+author: <%= author %>
+locale: <%= locale %>
+theme: <%= theme %>
+
+collections:
+  posts:
+    enabled: true
+    index:
+      cover: photo
+      show_date: true
+      show_description: true
+      description_truncate: 160
+      show_reading_time: true
+      show_tags: false
+      latest_count: 8
+    show:
+      cover: photo
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]
+      next:
+        enabled: true
+      related:
+        enabled: true
+        limit: 3
+        match_by: tags
+        show_image: true
+    archive:
+      enabled: false
+    feeds:
+      enabled: true
+
+  photos:
+    enabled: false
+  publications:
+    enabled: false
+  workshops:
+    enabled: false
+
+home:
+  latest_post:          false
+  random_post:          false
+  featured_publication: false
+  latest_publication:   false
+  next_workshop:        false
+  latest_photo:         false
+  random_photo:         false
+  photo_gallery:        false
+  contact:              false
+
+footer:
+  signature: "Built with Abqari · <%= year %>"
+
+environments:
+  development:
+    url: http://localhost:4000
+  production:
+    url: https://www.example.com

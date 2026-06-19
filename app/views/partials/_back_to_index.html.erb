@@ -1,0 +1,25 @@
+<!--
+  Slug-aware "← Back to <collection>" link, used at the top of show
+  views (post, photo, publication, etc.). The label and URL both follow
+  the collection's `slug:` aliasing automatically:
+
+    posts (no slug)             → "Back to posts" → /posts/
+    posts with slug: stories    → "Back to stories" → /stories/
+    posts with slug: articles   → "Back to articles" → /articles/
+    publications, slug: books   → "Back to books" → /books/
+
+  Renders nothing for pages outside any collection (top-level pages,
+  Folio bundle/series pages where the destination isn't obvious).
+
+  Override either side at the call site:
+      <%%= render 'partials/back_to_index' %>
+      <%%= render 'partials/back_to_index', label: 'All posts' %>
+      <%%= render 'partials/back_to_index', url: '/archive/', label: 'Archive' %>
+-->
+<% _url   = defined?(url)   ? url   : collection_index_url %>
+<% _label = defined?(label) ? label : (collection_index_label && "Back to #{collection_index_label}") %>
+<% if _url && _label %>
+<p class="back-link">
+  <a href="<%= sanitized_url(_url) %>">&larr; <%= _label %></a>
+</p>
+<% end %>

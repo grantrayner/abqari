@@ -1,0 +1,81 @@
+<!--
+  Schema.org CollectionPage JSON-LD for a collection index page
+  (/posts/, /photos/, /publications/, /workshops/, /posts/archive/).
+
+  Picks a more-specific @type based on the collection:
+    posts        → Blog          (with `blogPosts`)
+    photos       → ImageGallery  (with `image` items)
+    publications → ItemList      (no Books on the index per Google guidance)
+    workshops    → ItemList      (no Events on the index — too noisy)
+    default      → CollectionPage
+
+  Helps Google Discover / news surfaces categorise the page and pick
+  the right rich-result template. Skipped when the page isn't a
+  collection index (the partial guards via `collection_index_name`).
+-->
+<%
+  site_url  = site.config['url'].to_s.sub(%r{/\z}, '')
+  coll_name = site.collection_index_name(page) if page.respond_to?(:source_path)
+%>
+<% if !site_url.empty? && coll_name %>
+<%
+  jsonld_type = case coll_name
+                when 'posts'        then 'Blog'
+                when 'photos'       then 'ImageGallery'
+                when 'publications', 'workshops', 'bundles', 'series'
+                                    then 'CollectionPage'
+                else                     'CollectionPage'
+                end
+
+  jsonld = {
+    "@context"   => "https://schema.org",
+    "@type"      => jsonld_type,
+    "name"       => page.title,
+    "url"        => "#{site_url}#{page.url}",
+    "inLanguage" => site.config['locale'] || 'en'
+  }
+  jsonld["description"] = page.description if page.description
+
+  # Item listing — capped at 20 to keep JSON-LD payload modest.
+  # Google parses the first ~20 anyway and ignores the rest.
+  items = (site.collection(coll_name) rescue []) || []
+  items_to_emit = items.first(20)
+  if items_to_emit.any?
+    list_items = items_to_emit.each_with_index.map do |item, idx|
+      entry = { "@type" => "ListItem",
+                "position" => idx + 1,
+                "url" => "#{site_url}#{item.url}",
+                "name" => item.title.to_s }
+      entry
+    end
+
+    # For Blog, use `blogPost` instead of generic ItemList.
+    if jsonld_type == 'Blog'
+      jsonld["blogPost"] = items_to_emit.map do |item|
+        {
+          "@type"         => "BlogPosting",
+          "headline"      => item.title.to_s,
+          "url"           => "#{site_url}#{item.url}",
+          "datePublished" => (item.respond_to?(:date) && item.date ? item.date.iso8601 : nil)
+        }.compact
+      end
+    elsif jsonld_type == 'ImageGallery'
+      jsonld["image"] = items_to_emit.map do |item|
+        img = item.frontmatter['image']
+        next nil unless img
+        url = img.to_s.start_with?('http') ? img :
+              img.to_s.start_with?('/') ? "#{site_url}#{img}" :
+              "#{site_url}#{bundle_asset_url_for(item, img)}"
+        { "@type" => "ImageObject", "contentUrl" => url, "name" => item.title.to_s }
+      end.compact
+    else
+      jsonld["mainEntity"] = {
+        "@type"           => "ItemList",
+        "numberOfItems"   => items.size,
+        "itemListElement" => list_items
+      }
+    end
+  end
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
+<% end %>

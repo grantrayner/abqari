@@ -1,0 +1,32 @@
+---
+layout: application
+---
+<!--
+  Visualization layout — D3 chart with a tooltip overlay. Static-style
+  scaffolding (positioning, sizing, tooltip chrome) lives in CSS via
+  the `.viz-container`, `.viz-loading`, `.viz-tooltip` classes in
+  `_common.css` rather than inline `style=` attributes, so the rendered
+  HTML stays clean under a strict CSP.
+-->
+<article class="viz-article">
+  <header>
+    <h1><%= page.title %></h1>
+    <p class="lede"><%= page.description %></p>
+  </header>
+
+  <div id="viz-container" class="viz-container">
+    <div id="viz-loading" class="viz-loading">Loading&hellip;</div>
+  </div>
+
+  <div id="viz-tooltip" class="viz-tooltip"></div>
+
+  <p class="viz-note">
+    <small>Generated at build time from <code>site.posts</code>. Data file: <a href="/visualizations/<%= page.viz_name %>.json"><code>/visualizations/<%= page.viz_name %>.json</code></a>.</small>
+  </p>
+</article>
+<%# d3 ships in the gem's `vendor/d3/`; Site#copy_d3 copies it to
+    `_site/assets/d3/d3.v7.min.js` so it can be referenced by an
+    absolute path. Not fingerprinted: the file is a frozen vendored
+    dependency that changes only on a deliberate engine update. %>
+<script src="/assets/d3/d3.v7.min.js"></script>
+<script src="<%= asset_path("js/viz-#{page.viz_name}.js") %>"></script>

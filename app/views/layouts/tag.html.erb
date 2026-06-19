@@ -1,0 +1,16 @@
+---
+layout: application
+---
+<!--
+  Tag taxonomy page — auto-generated for every tag found in posts'
+  frontmatter. Layout mirrors `posts_index.html.erb`: <article> wrapper
+  with a <header> containing the H1 and a `.lede` count line, then the
+  shared `_post_list` partial.
+-->
+<article>
+  <header>
+    <h1>Posts tagged <em><%= page.term %></em></h1>
+    <p class="lede"><%= pluralize(page.posts.size, 'post') %></p>
+  </header>
+  <%== render 'partials/post_list', posts: page.posts %>
+</article>

@@ -1,0 +1,46 @@
+<!--
+  Schema.org Person JSON-LD for an About page. Establishes the
+  site's primary author as an entity in Google's knowledge graph,
+  with `sameAs` linking to every claimed social profile.
+
+  This is THE E-E-A-T signal — Google uses the entity graph to
+  decide "is this author trustworthy / authoritative on this topic?"
+  when ranking individual pages. Wiring an About page with proper
+  Person markup is one of the highest-leverage SEO additions a
+  personal site can make.
+
+  Optional About-page frontmatter (overrides config defaults):
+      person_name:      Grant Rayner       # defaults to site.author
+      person_job_title: Author              # optional
+      person_description: One-line bio      # defaults to page.description
+      person_image:     /portrait.jpg       # optional headshot
+
+  Wire it into the About layout:
+      <%%= render 'partials/person_jsonld' %>
+-->
+<%
+  site_url = site.config['url'].to_s.sub(%r{/\z}, '')
+  fm       = page.frontmatter || {}
+  name     = fm['person_name'] || site.config['author']
+%>
+<% if !site_url.empty? && name %>
+<%
+  social_urls = site.social_links.map { |entry| entry['url'] }.compact
+                                  .reject { |u| u.start_with?('mailto:') || u.start_with?('/') }
+
+  jsonld = {
+    "@context" => "https://schema.org",
+    "@type"    => "Person",
+    "name"     => name,
+    "url"      => "#{site_url}#{page.url}"
+  }
+  jsonld["jobTitle"]    = fm['person_job_title']                   if fm['person_job_title']
+  jsonld["description"] = fm['person_description'] || page.description
+  jsonld["sameAs"]      = social_urls                              if social_urls.any?
+
+  if (img = fm['person_image'])
+    jsonld["image"] = img.start_with?('http') ? img : "#{site_url}#{img}"
+  end
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld.compact) %></script>
+<% end %>

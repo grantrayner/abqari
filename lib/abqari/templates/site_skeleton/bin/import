@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Content importer — pulls content from another platform's export
+# into this site's content/<collection>/ directory.
+#
+# Usage:
+#   bin/import substack ~/Downloads/substack-export.zip
+#   bin/import ghost ~/Downloads/export.json --into notes
+#   bin/import jekyll ~/old-site/ --dry-run
+#
+# Run `bin/import --help` for the full list of platforms and flags.
+# The script writes a markdown report to `_import_report.md` (gitignored)
+# summarising what was imported, skipped, and warned about.
+
+ENV['ABQARI_ENV']       ||= 'development'
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+require 'bundler/setup'
+require 'abqari'
+require 'abqari/importers'
+require 'abqari/importers/cli'
+
+ok = Abqari::Importers::CLI.run(ARGV, site_root: ENV['ABQARI_SITE_ROOT'])
+exit(ok ? 0 : 1)

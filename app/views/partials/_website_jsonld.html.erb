@@ -1,0 +1,39 @@
+<!--
+  Schema.org WebSite JSON-LD — the canonical entity declaration for
+  the site as a whole. Rendered on the home page only. Establishes:
+
+    - the site's identity (name, URL, description, language)
+    - the publisher (Person or Organization, derived from config)
+    - sameAs links to social profiles (the same `social:` config the
+      footer uses), giving Google an entity graph to connect to
+
+  This is the table-stakes E-E-A-T signal — search engines use it to
+  identify "who is this site about" before they rank individual pages.
+
+  Renders nothing when `site.config['url']` is unset.
+-->
+<% site_url = site.config['url'].to_s.sub(%r{/\z}, '') %>
+<% if !site_url.empty? %>
+<%
+  social_urls = site.social_links.map { |entry| entry['url'] }.compact
+                                  .reject { |u| u.start_with?('mailto:') || u.start_with?('/') }
+
+  publisher = {
+    "@type" => "Person",
+    "name"  => site.config['author'] || site.config['title'],
+    "url"   => "#{site_url}/"
+  }
+  publisher["sameAs"] = social_urls if social_urls.any?
+
+  jsonld = {
+    "@context"   => "https://schema.org",
+    "@type"      => "WebSite",
+    "name"       => site.config['title'],
+    "url"        => "#{site_url}/",
+    "inLanguage" => site.config['locale'] || 'en',
+    "publisher"  => publisher
+  }
+  jsonld["description"] = site.config['description'] if site.config['description']
+%>
+<script type="application/ld+json"><%== script_safe_json(jsonld) %></script>
+<% end %>

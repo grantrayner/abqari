@@ -1,0 +1,18 @@
+---
+title: About
+published: true
+description: About <%= title %>.
+nav:
+  order: 99
+  label: About
+---
+
+# About
+
+A short bio, your story, what you write about — whatever makes sense
+for your site. This page sits at `/about/`. Edit `content/about.md`
+to change the content.
+
+The `nav:` block in the frontmatter pins this page at the end of the
+top nav (order: 99 — last). Drop the block, or set `nav: ~`, to hide
+it from the nav entirely.

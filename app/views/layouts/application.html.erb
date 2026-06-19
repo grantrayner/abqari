@@ -1,0 +1,65 @@
+<!--
+  Master layout — the shell every other layout chains into. Holds the
+  full HTML scaffold (head, skip-link, nav, main, footer) so child
+  layouts only need to declare their content-specific markup.
+
+  Child layouts opt in by putting `layout: application` at the top of
+  their own file:
+
+      ---
+      layout: application
+      ---
+      <article>
+        <header><h1><%%= h(page.title) %%></h1></header>
+        <%%= page.content %%>
+      </article>
+
+  The `<%%= yield_content %%>` slot below is filled with the rendered
+  output of whichever child layout extends this one. Layouts without a
+  `layout:` frontmatter render as standalone full HTML pages and
+  bypass this scaffold entirely (full back-compat).
+-->
+<!DOCTYPE html>
+<html lang="<%= site.config['locale'] || 'en' %>">
+<%== render 'partials/head' %>
+<body>
+  <%# `<header>`, `<main>`, and `<footer>` stay full-width so any
+      background, border, or rule extends edge-to-edge. The
+      `.container` wrapper inside each one is what's centred at
+      `--content-max-width` — this is the single place width is
+      constrained, replacing the old `header/main/footer > *`
+      scaffold and removing the need for components to use
+      `margin-block` to preserve `margin-inline: auto`. %>
+  <%== render 'partials/skip_link' %>
+  <header class="site-header">
+    <div class="container">
+      <%== render 'partials/nav' %>
+    </div>
+  </header>
+  <main id="main-content" tabindex="-1">
+    <div class="container">
+      <% if yield_content.empty? %>
+        <%# Direct render with no child layout — fall back to the default
+            rendering of the page's markdown body. %>
+        <article>
+          <%== page.content %>
+        </article>
+      <% else %>
+        <%== yield_content %>
+      <% end %>
+    </div>
+  </main>
+  <%== render 'partials/footer' %>
+  <%# Schema.org BreadcrumbList for any page in a collection (or that
+      acts as a collection index). Renders nothing on top-level pages
+      like home / About where the trail isn't meaningful. JSON-LD is
+      invisible in rendered output — search engines use it for SERP
+      breadcrumb display. %>
+  <%== render 'partials/breadcrumb_jsonld' %>
+  <%# Schema.org CollectionPage / Blog / ImageGallery / ItemList for
+      collection index pages (/posts/, /photos/, /publications/,
+      /workshops/, etc.). The partial picks the most-specific @type
+      based on the collection. Renders nothing on non-index pages. %>
+  <%== render 'partials/collection_page_jsonld' %>
+</body>
+</html>

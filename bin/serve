@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+ENV['ABQARI_ENV']        ||= 'development'
+ENV['ABQARI_SITE_ROOT']  ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+
+site = Abqari::Site.new
+site.build
+Abqari::Server.new(site).start

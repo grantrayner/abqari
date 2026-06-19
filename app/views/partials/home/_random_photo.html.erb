@@ -1,0 +1,106 @@
+<!--
+  Home module — random photo. Same pool-of-candidates + pick-on-page-
+  load pattern as `_random_post.html.erb`. See that file's head
+  comment for the rationale (static sites can't roll randomness at
+  request time; `random-pool.js` handles it client-side).
+
+  Config (`home.random_photo` in config/site.yml). Accepts two
+  shapes — same field set as `home.latest_photo`, applied uniformly
+  to every card in the pool so the JS-swapped variant looks
+  consistent with the initially-visible one:
+
+      # Simple — module on with all defaults
+      random_photo: true
+
+      # Granular — opt-in field controls
+      random_photo:
+        enabled: true              # `enabled: false` disables; absent = true
+        show_caption: true         # default true   — the descriptive prose
+        show_date:    true         # default true   — capture date
+        show_city:    true         # default true   — city (combined with country)
+        show_country: true         # default true   — country
+        show_camera:  false        # default false  — camera body
+        show_type:    false        # default false  — digital / film / etc.
+        show_series:  false        # default false  — series this photo belongs to
+        show_tags:    false        # default false  — tag pills
+
+  Hero image and photo title are always rendered when present.
+
+  Style via `.home-module*` class hooks in your theme.
+-->
+<%
+  pool_cap = 12
+  candidates = site.collection('photos').first(pool_cap)
+  # Same as `_random_post`: only the i=0 card is initially visible,
+  # so only it gets the eager hint when this module is priority. The
+  # hidden cards fetch lazily on JS-swap.
+  _priority = defined?(priority_image) && priority_image
+
+  mod_cfg      = site.config.dig('home', 'random_photo')
+  mod_cfg      = {} unless mod_cfg.is_a?(Hash)
+  show_caption = mod_cfg.fetch('show_caption', true)
+  show_date    = mod_cfg.fetch('show_date',    true)
+  show_city    = mod_cfg.fetch('show_city',    true)
+  show_country = mod_cfg.fetch('show_country', true)
+  show_camera  = mod_cfg.fetch('show_camera',  false)
+  show_type    = mod_cfg.fetch('show_type',    false)
+  show_series  = mod_cfg.fetch('show_series',  false)
+  show_tags    = mod_cfg.fetch('show_tags',    false)
+%>
+<% if candidates.any? %>
+<section class="home-module home-module--random-photo" aria-label="From the gallery">
+  <header class="home-module__header">
+    <h2 class="home-module__heading">From the gallery</h2>
+    <a class="home-module__see-all" href="<%= sanitized_url(collection_index_url('photos')) %>">All <%= collection_index_label('photos') %> &rarr;</a>
+  </header>
+  <div class="home-module__pool" data-random-pool>
+    <% candidates.each_with_index do |photo, i| %>
+      <% _eager = _priority && i.zero? %>
+      <%
+        fm    = photo.frontmatter
+        parts = []
+        if show_date && photo.date
+          parts << %(<time datetime="#{photo.date.iso8601}">#{local_time(photo.date)}</time>)
+        end
+        city    = show_city    ? fm['city']    : nil
+        country = show_country ? fm['country'] : nil
+        location = [city, country].compact.reject { |s| s.to_s.strip.empty? }.join(', ')
+        parts << h(location)        unless location.empty?
+        parts << h(fm['camera'])    if show_camera && fm['camera']
+        parts << h(fm['type'])      if show_type   && fm['type']
+        parts << h(fm['series'])    if show_series && fm['series']
+      %>
+      <article class="home-module__item"<%= ' hidden' if i.positive? %>>
+        <% if (img = fm['image']) %>
+          <a class="home-module__cover" href="<%= sanitized_url(photo.url) %>">
+            <img src="<%= sanitized_url(img) %>"
+                 alt="<%= fm['caption'] || photo.title %>"
+                 loading="<%= _eager ? 'eager' : 'lazy' %>"
+                 <% if _eager %>fetchpriority="high"<% end %>
+                 decoding="async">
+          </a>
+        <% end %>
+        <div class="home-module__body">
+          <h3 class="home-module__title">
+            <a href="<%= sanitized_url(photo.url) %>"><%= photo.title %></a>
+          </h3>
+          <% if parts.any? %>
+            <p class="home-module__meta"><%== parts.join(' &middot; ') %></p>
+          <% end %>
+          <% if show_caption && (caption = fm['caption']) %>
+            <p class="home-module__description"><%= truncate(caption.to_s, length: 200) %></p>
+          <% end %>
+          <% if show_tags && Array(fm['tags']).any? %>
+            <p class="home-module__tags">
+              <% Array(fm['tags']).each do |tag| %>
+                <a class="home-module__tag" href="/tags/<%= slugify(tag) %>/"><%= tag %></a>
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      </article>
+    <% end %>
+  </div>
+  <script src="<%= asset_path('js/random-pool.js') %>" defer></script>
+</section>
+<% end %>

@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Content importer — `bin/import <platform> <source> [options]`.
+#
+# Pulls content from another platform's export into this site's
+# `content/<collection>/` directory. Each platform is implemented
+# under `lib/abqari/importers/`; see `bin/import --help` for the
+# full list of platforms and options.
+#
+# This script is a thin wrapper — all the work happens in
+# `Abqari::Importers::CLI`. The wrapper sets ABQARI_SITE_ROOT
+# from the script's location so the importer writes into the
+# right tree regardless of where the script is invoked from.
+
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+require 'abqari/importers'
+require 'abqari/importers/cli'
+
+ok = Abqari::Importers::CLI.run(ARGV, site_root: ENV['ABQARI_SITE_ROOT'])
+exit(ok ? 0 : 1)

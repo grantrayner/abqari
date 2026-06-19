@@ -1,0 +1,107 @@
+---
+layout: application
+---
+<!--
+  Home page. Same shape as the other top-level layouts (about,
+  posts_index, publications_index): the h1 and visible lede come
+  from the frontmatter of `content/index.md`, and the markdown body
+  renders below.
+
+      ---
+      title: Hello from Abqari
+      description: A short lede shown under the title…
+      ---
+
+  Below the markdown body, the layout dispatches a set of optional
+  "home modules" — small content cards driven by config:
+
+      home:
+        latest_post: true
+        random_post: false
+        featured_publication: false # showcase-flagged publication, latest_publication design
+        latest_publication: true
+        next_workshop: false        # soonest upcoming workshop card
+        latest_photo: false
+        random_photo: false
+        photo_gallery: latest       # 'latest' / 'random' / false — single-
+                                    #   row gallery of four photos
+        contact: false
+
+  Each module renders nothing when the underlying collection is empty
+  or its config flag is off. Add featured-content sections (book
+  grids, hero treatments, etc.) to `content/index.md` and they'll
+  render in the markdown body above the modules.
+
+  The `home__lede` and `home-module*` classes are CSS hooks — see
+  `themes/<name>/css/app.css` to style them.
+-->
+<%
+  description = page.frontmatter['description']
+  home_cfg    = site.config['home'] || {}
+
+  # Module render order — fixed in the layout; toggle individual
+  # modules in config/site.yml under the `home:` block. The first
+  # *three* enabled modules receive `priority_image: true` so their
+  # hero is fetched eagerly with `fetchpriority="high"` — they're
+  # the home page's LCP candidates, and `loading="lazy"` on an
+  # above-the-fold image is a known anti-pattern (the browser delays
+  # the fetch until viewport visibility is computed, costing 300-500ms
+  # on cold loads).
+  #
+  # Why three: three modules is a realistic above-the-fold count on
+  # typical desktop viewports, and the first enabled module isn't
+  # guaranteed to actually render an image (e.g. `latest_post`
+  # shows the newest post, which may have no `image:` set, in which
+  # case the hint is silently wasted). Hinting three covers the
+  # fallback chain. Cost when all three render: 2-3 extra eager
+  # fetches — cheap insurance for a much faster LCP on the home
+  # page's actual image candidate.
+  module_order = %w[
+    latest_post random_post featured_publication latest_publication
+    next_workshop latest_photo random_photo photo_gallery contact
+  ]
+
+  # Per-module enabled check. Each module's config value may be:
+  #   true / false  — simple toggle (the historical shape)
+  #   Hash          — granular config, e.g.
+  #                     featured_publication:
+  #                       enabled: true
+  #                       show_excerpt: true
+  #                       show_price: false
+  #                   The hash is treated as enabled unless
+  #                   `enabled: false` is set explicitly (so a hash
+  #                   that omits the `enabled` key turns the module
+  #                   on by default — matching the simple `true`
+  #                   spelling). Booleans short-circuit; truthy
+  #                   strings (`photo_gallery: 'latest'`) stay
+  #                   enabled.
+  home_enabled = ->(value) do
+    return value             if value == true || value == false
+    return value['enabled'] != false if value.is_a?(Hash)
+    !value.nil? && value != ''
+  end
+
+  priority_modules = module_order.select { |m| home_enabled.call(home_cfg[m]) }.first(3)
+%>
+<article>
+  <header>
+    <h1><%= page.title %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <%== page.content %>
+</article>
+
+<%# Home modules — each is a self-contained section that renders nothing
+    when its config flag is false. %>
+<% module_order.each do |m| %>
+  <% next unless home_enabled.call(home_cfg[m]) %>
+  <%== render "partials/home/#{m}", priority_image: priority_modules.include?(m) %>
+<% end %>
+
+<%# Schema.org WebSite — the site-wide entity declaration. Identifies
+    the publisher (Person or Organization) and links out to all social
+    profiles for entity-graph discovery. Rendered on the home page
+    only because the entity it describes is the site, not the page. %>
+<%== render 'partials/website_jsonld' %>

@@ -1,0 +1,11 @@
+---
+title: <%= title %>
+published: true
+description: <%= description %>
+layout: home
+nav:
+  order: 1
+  label: Home
+---
+
+Welcome.

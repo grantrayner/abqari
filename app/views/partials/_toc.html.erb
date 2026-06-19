@@ -1,0 +1,127 @@
+<!--
+  Auto-generated table of contents. Parses headings from the page's
+  rendered body and emits a flat `<nav>` of anchor links. Commonmarker
+  emits markdown headings as:
+
+      <h2><a href="#slug" id="slug" class="anchor"></a>Heading text</h2>
+
+  We pluck level + id + text from that, skipping the auxiliary
+  headings the layouts add (their h2s have direct `id` attributes
+  rather than the anchor-with-id pattern — easy to filter out).
+
+  Wire from any show layout (post, publication, photo, workshop):
+      <%%= render 'partials/toc' %>
+
+  Optional locals (override the collection config for this call site):
+      min_headings: 3       # quality floor
+      levels: [2, 3]        # heading levels to include in the TOC
+
+  Gating — three layers, frontmatter wins:
+
+    1. Frontmatter `toc: true` / `toc: false` on the page itself.
+       Explicit boolean overrides every other source. Use `toc: false`
+       to suppress for a long post that doesn't read well with one,
+       or `toc: true` to force the section even on a page where the
+       collection has TOCs turned off (still gated by min_headings).
+
+    2. Per-collection config in config/site.yml:
+
+         collections:
+           posts:
+             show:
+               toc:
+                 enabled: true          # default — set false to suppress
+                 min_headings: 3        # quality floor; short posts get nothing
+                 levels: [2, 3]         # heading levels to include
+                                        #   [2]       → h2 only
+                                        #   [2, 3]    → h2 + h3 (default)
+                                        #   [2, 3, 4] → include h4 sub-headings
+
+       Sits under `show:` alongside `next` and `related` — every knob
+       that affects the show page lives there. (Mirrors `index:`
+       grouping for listing-page knobs.)
+
+    3. Engine defaults — `enabled: true`, `min_headings: 3`,
+       `levels: [2, 3]`.
+
+  The min_headings floor applies even when toc is explicitly `true`
+  — forcing a TOC on a 2-heading page reads as noise, not content.
+  If you genuinely want a 1-heading TOC, set `min_headings: 1` in
+  config or pass it as a local; the two knobs stay independent.
+
+  h1 never appears in the TOC (it's the page title, rendered by the
+  layout, not part of the body markdown). h2–h6 are eligible via
+  `levels:`; the engine ships visible CSS indent steps for h2–h4
+  (deeper levels render but visually flatten to the h4 indent —
+  almost no one needs h5/h6 in a TOC).
+-->
+<%
+  # --- Resolve gating from frontmatter / collection / engine defaults ---
+  toc_cfg = if page.respond_to?(:collection) && page.collection
+              (site.collection_config(page.collection) || {}).dig('show', 'toc') || {}
+            else
+              {}
+            end
+
+  # Frontmatter `toc:` accepts explicit boolean. Any other value
+  # (missing, nil, non-bool) falls through to the collection default.
+  fm_toc  = page.frontmatter['toc']
+  enabled = if fm_toc == true || fm_toc == false
+              fm_toc
+            else
+              toc_cfg.fetch('enabled', true)
+            end
+
+  # `min_headings:` resolution: explicit local > collection config > 3.
+  min_count = if defined?(min_headings) && min_headings
+                min_headings.to_i
+              else
+                toc_cfg.fetch('min_headings', 3).to_i
+              end
+
+  # `levels:` resolution: explicit local > collection config >
+  # default [2, 3]. Clamped to the 2..6 range — h1 is the layout's
+  # page title, h7+ doesn't exist in HTML. Sorted + deduped so the
+  # regex below is deterministic regardless of how the operator
+  # ordered the array.
+  raw_levels = (defined?(levels) && levels) || toc_cfg['levels'] || [2, 3]
+  toc_levels = Array(raw_levels).map(&:to_i).select { |n| (2..6).cover?(n) }.uniq.sort
+  toc_levels = [2, 3] if toc_levels.empty?
+%>
+<% if enabled
+     body         = page.respond_to?(:content) ? page.content.to_s : ''
+     level_chars  = toc_levels.join              # e.g. "23" → matches h2 + h3
+     heading_re   = %r{<(h[#{level_chars}])><a[^>]*\sid="([^"]+)"[^>]*></a>([^<]+)</\1>}m
+     # The id-on-anchor pattern is commonmarker's anchor convention;
+     # layout-added headings (next-item, related, …) have the id on
+     # the heading tag itself and won't match, so they're excluded
+     # automatically.
+     matches = body.scan(heading_re)
+   else
+     matches = []
+   end %>
+<% if matches.size >= min_count %>
+<nav class="toc" aria-labelledby="toc-heading">
+  <%# Native `<details>` for collapse — zero JS, full keyboard +
+      screen-reader support out of the box. `open` makes the
+      expanded state the default; the user can collapse with a
+      click or with Enter/Space on the focused summary. %>
+  <details class="toc__details" open>
+    <summary class="toc__summary">
+      <h2 id="toc-heading" class="toc__heading">Contents</h2>
+      <%# Chevron — points down when expanded, rotates to point
+          right when collapsed. `aria-hidden` because the summary
+          itself already exposes the expanded/collapsed state to
+          assistive tech via the native details semantics. %>
+      <svg class="toc__chevron" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </summary>
+    <ol class="toc__list">
+      <% matches.each do |tag, id, text| %>
+        <li class="toc__item toc__item--<%= tag %>"><a href="#<%= id %>"><%= text %></a></li>
+      <% end %>
+    </ol>
+  </details>
+</nav>
+<% end %>

@@ -1,0 +1,70 @@
+---
+layout: application
+---
+<!--
+  About page. Extends application.html.erb (the master shell). Reads
+  title and the visible lede directly from the page's frontmatter:
+
+      ---
+      title: About the Author
+      description: A short lede shown under the title…
+      ---
+
+  The frontmatter `description:` doubles as the SEO meta description
+  AND the visible lede on the page. Omit it to hide the lede; the
+  page falls back to the site-wide description for the meta tag.
+  The markdown body of `content/about.md` renders below.
+
+  A spam-resistant contact button is appended below the body when
+  `contact:` is set in config/site.yml — see partials/_contact_button.
+  To remove the button entirely, switch the page's `layout:` to
+  `application`, or delete this layout file.
+-->
+<%
+  description = page.frontmatter['description']
+  author_url  = site.config['url'] || '/'
+  author_name = page.frontmatter['person_name'] || site.config['author']
+  author_img  = page.frontmatter['person_image'] || site.config['share_image']
+%>
+<%# `h-card` is the IndieWeb microformats2 representation of a person
+    or organisation. Bound to the about page because that's where the
+    canonical author identity lives. The visible markup is unchanged
+    — the `p-name` / `u-url` / `u-photo` properties are emitted as
+    invisible metadata blocks so the page's existing `<h1>About</h1>`
+    heading stays as authored, while microformats2 parsers still get
+    the structured identity they need to attribute received webmentions
+    correctly. See indieweb.org/h-card. %>
+<article class="h-card">
+  <header>
+    <h1><%= page.title %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+
+  <%# Invisible identity block for microformats2 parsers. Renders only
+      when at least one of name / URL / photo is configured. %>
+  <% if author_name || author_url || author_img %>
+    <div class="h-card-identity" hidden aria-hidden="true">
+      <% if author_name %><span class="p-name"><%= author_name %></span><% end %>
+      <% if author_url %><a class="u-url" href="<%= author_url %>"><%= author_url %></a><% end %>
+      <% if author_img && !author_img.to_s.empty? %>
+        <img class="u-photo" src="<%= sanitized_url(asset_path(author_img.to_s)) %>"
+             alt="<%= author_name || page.title %>">
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="e-content">
+    <%== page.content %>
+  </div>
+  <%== render 'partials/contact_button' %>
+</article>
+
+<%# Schema.org Person — entity declaration for the site's author,
+    used for E-E-A-T. `sameAs` links connect to verified social
+    profiles for the entity graph. Optional frontmatter fields
+    (`person_name:`, `person_job_title:`, `person_description:`,
+    `person_image:`) override site defaults. %>
+<%== render 'partials/person_jsonld' %>
+

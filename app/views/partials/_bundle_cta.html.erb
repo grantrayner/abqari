@@ -1,0 +1,26 @@
+<!--
+  CTA box on a publication page nudging the reader toward a bundle
+  that contains this book. Required local: `bundle_slug`. Looks the
+  bundle up in `site.collection('bundles')` so the partial works
+  whether the bundle is manual content or Folio-sourced (after the
+  canonical-schema migration both are in the same collection).
+
+  Emits nothing if the bundle isn't found.
+-->
+<% bundle = site.collection('bundles').find { |b| b.slug == bundle_slug } %>
+<% if bundle %>
+  <% fm = bundle.frontmatter %>
+  <aside class="folio-bundle-cta">
+    <h3>Save with the bundle</h3>
+    <p>
+      <a href="<%= bundle.url %>"><%= bundle.title %></a>
+      <% if (price = fm.dig('price', 'formatted')) %>
+        — <%= price %>
+      <% end %>
+    </p>
+    <p class="folio-bundle-cta__buttons">
+      <%== buy_button(fm, label: fm['buy_label'] || 'Buy bundle') %>
+      <%== cart_button(fm) %>
+    </p>
+  </aside>
+<% end %>

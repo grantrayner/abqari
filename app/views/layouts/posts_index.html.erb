@@ -1,0 +1,80 @@
+---
+layout: application
+---
+<!--
+  Posts index — listing of all posts. Theme-neutral structure; themes
+  style via `themes/<name>/css/app.css`.
+
+  Title and description both come from the page's frontmatter:
+
+      ---
+      title: Stories
+      description: Standalone glimpses into the assassin's world…
+      ---
+
+  The frontmatter `description:` doubles as the SEO meta description
+  AND the visible lede shown below the h1. Omit to hide the lede;
+  the page falls back to the site-wide description for the meta tag.
+  The page's markdown body (if any) renders below the lede.
+
+  Per-card display in the listing is controlled by
+  `collections.posts.index.show_*` toggles; see
+  partials/_post_list.html.erb for the full list.
+-->
+<%
+  description = page.frontmatter['description']
+
+  cfg          = site.collection_config('posts')
+  index_cfg    = cfg['index']    || {}
+  archive_cfg  = cfg['archive']  || {}
+  series_cfg   = index_cfg['series'] || {}
+  archive_on   = archive_cfg.fetch('enabled', true)
+  latest_count = index_cfg.fetch('latest_count', 8).to_i
+
+  if archive_on
+    # Archive mode — finite front index, no pagination. Show the latest
+    # N posts as full cards, link out to the archive for the rest.
+    all_posts     = site.collection('posts')
+    visible_posts = all_posts.first(latest_count)
+    total_posts   = all_posts.size
+    archive_url   = "#{collection_index_url('posts')}archive/"
+  else
+    # Classic paginated mode — page.paginator handles slicing.
+    visible_posts = page.paginator&.posts || site.collection('posts')
+  end
+%>
+<article>
+  <header>
+    <h1><%= page.title %></h1>
+    <% if description && !description.to_s.empty? %>
+      <p class="lede"><%= description %></p>
+    <% end %>
+  </header>
+  <% if page.content && !page.content.to_s.strip.empty? %>
+    <div class="index-intro"><%== page.content %></div>
+  <% end %>
+
+  <%== render 'partials/post_list', posts: visible_posts %>
+
+  <%# Post-series previews — stacked-cover row showing each series
+      with its post-hero images fanned out. Toggle with
+      `collections.posts.index.series.enabled`. Renders nothing when
+      no post in the collection has `series:` set, regardless of
+      the toggle. %>
+  <% if series_cfg.fetch('enabled', true) %>
+    <%== render 'partials/post_series_previews',
+                heading: 'Series',
+                limit:   series_cfg['limit'],
+                all_url: series_cfg['all_url'] %>
+  <% end %>
+
+  <% if archive_on %>
+    <% if total_posts > latest_count %>
+      <p class="posts-index__more">
+        <a href="<%= sanitized_url(archive_url) %>">View all <%= total_posts %> posts &rarr;</a>
+      </p>
+    <% end %>
+  <% else %>
+    <%== render 'partials/pagination', paginator: page.paginator %>
+  <% end %>
+</article>

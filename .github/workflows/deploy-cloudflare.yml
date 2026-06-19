@@ -1,0 +1,95 @@
+# Deploy to Cloudflare Pages on every push to main.
+#
+# OPT IN — this workflow is GATED. Until you enable it, it runs as a
+# no-op even on push. To enable:
+#
+#   1. Create a Cloudflare Pages project (Direct Upload, no Git integration).
+#   2. Generate an API token with the "Cloudflare Pages: Edit" scope:
+#      https://dash.cloudflare.com/profile/api-tokens
+#   3. GitHub repo → Settings → Secrets and variables → Actions:
+#      - Secrets (tab): add `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+#      - Variables (tab): add `ENABLE_CLOUDFLARE = true`
+#                          add `CLOUDFLARE_PROJECT_NAME = your-project-name`
+#
+# Three deploy options ship in this repo — Cloudflare Pages (this file),
+# Render (`deploy-render.yml`), and GitHub Pages (`deploy-github-pages.yml`).
+# Each one is independently gated on its own `ENABLE_*` repo variable so
+# you can enable multiple, none, or any subset.
+#
+# What this does:
+#   - Installs Ruby + libvips, restores bundle cache
+#   - Installs Pagefind (used only if `search: true` in site.yml)
+#   - Builds the site in production mode
+#   - Runs the audit, uploads report as artifact (audit failures don't block deploy)
+#   - Deploys _site/ to Cloudflare Pages via Wrangler
+
+name: Deploy → Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build-and-deploy:
+    if: vars.ENABLE_CLOUDFLARE == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libvips with AVIF support
+        # libvips powers the image pipeline. On Ubuntu 24.04 (the
+        # `ubuntu-latest` runner) the apt package `libvips42` doesn't
+        # include HEIF/AVIF — that's split into libheif1 + per-codec
+        # plugins. Without them, the pipeline raises "Unsupported
+        # compression" the first time it tries to emit an AVIF variant.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 \
+                                   libheif-plugin-aomenc \
+                                   libheif-plugin-libde265 \
+                                   libheif-plugin-dav1d
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true   # caches Gemfile.lock-pinned gems between runs
+
+      - name: Install Pagefind (optional — for static search)
+        run: |
+          curl -LSf https://pagefind.app/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        # Skips silently if pagefind is unused; bin/build only runs it when
+        # `search: true` is set in config/site.yml.
+
+      - name: Build site
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/build
+
+      - name: Run audit
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/audit
+        continue-on-error: true
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: audit-report
+          path: audit/*.md
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME }}

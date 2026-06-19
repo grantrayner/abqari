@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Deploy _site/ to a static host. Reads target config from config/site.yml
+# under `deploy:`, then shells out to the right CLI for the chosen target.
+#
+# Usage:
+#   bin/deploy                # uses deploy.default
+#   bin/deploy cloudflare     # explicit target
+#   bin/deploy netlify
+#
+# Example config/site.yml:
+#   deploy:
+#     default: cloudflare
+#     cloudflare:
+#       project: my-blog
+#     netlify:
+#       site_id: 12345678-1234-1234-1234-123456789abc
+#
+# Targets:
+#   cloudflare  — uses `wrangler` (npm install -g wrangler, then `wrangler login`)
+#   netlify     — uses `netlify-cli` (npm install -g netlify-cli, then `netlify login`)
+#
+# Builds in production mode first, then deploys.
+
+ENV['ABQARI_ENV']        ||= 'production'
+ENV['ABQARI_SITE_ROOT']  ||= File.expand_path('..', __dir__)
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'abqari'
+
+site = Abqari::Site.new
+
+target = ARGV.first || site.config.dig('deploy', 'default')
+abort('No deploy target. Pass an argument or set `deploy.default` in site.yml.') unless target
+
+target_config = site.config.dig('deploy', target) || {}
+
+def command_available?(cmd)
+  ENV['PATH'].split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, cmd)) }
+end
+
+def deploy_to_cloudflare(config, output_dir)
+  unless command_available?('wrangler') || command_available?('npx')
+    abort <<~MSG
+      Cloudflare deploy needs `wrangler` or `npx` on PATH.
+      Install: npm install -g wrangler
+      Then:    wrangler login
+    MSG
+  end
+
+  project = config['project'] || abort('Missing deploy.cloudflare.project in site.yml')
+  cmd = if command_available?('wrangler')
+          ['wrangler', 'pages', 'deploy', output_dir, "--project-name=#{project}"]
+        else
+          ['npx', 'wrangler', 'pages', 'deploy', output_dir, "--project-name=#{project}"]
+        end
+
+  puts "Deploying to Cloudflare Pages (#{project})…"
+  exec(*cmd)
+end
+
+def deploy_to_netlify(config, output_dir)
+  unless command_available?('netlify') || command_available?('npx')
+    abort <<~MSG
+      Netlify deploy needs `netlify-cli` or `npx` on PATH.
+      Install: npm install -g netlify-cli
+      Then:    netlify login
+    MSG
+  end
+
+  site_id = config['site_id'] || abort('Missing deploy.netlify.site_id in site.yml')
+  cmd = if command_available?('netlify')
+          ['netlify', 'deploy', '--dir', output_dir, '--prod', '--site', site_id]
+        else
+          ['npx', 'netlify-cli', 'deploy', '--dir', output_dir, '--prod', '--site', site_id]
+        end
+
+  puts "Deploying to Netlify (#{site_id})…"
+  exec(*cmd)
+end
+
+# Build first.
+puts 'Building site for deploy…'
+unless system($PROGRAM_NAME.sub(/deploy\z/, 'build'), out: $stdout, err: $stderr)
+  abort 'Build failed; not deploying.'
+end
+
+# Defence-in-depth: the build script propagates non-zero exit on
+# render failure (Ruby's default on an unhandled exception), so the
+# `system(...)` check above SHOULD be sufficient. The sentinel below
+# closes the gap when bin/deploy is invoked from a pipeline that
+# `set +e`s the build, or when something else (a rogue rm, an
+# interrupted external rsync) has touched _site/ between the build
+# and now. `_site/.abqari-build-ok` is written by `Site#build` on
+# its success path only; if it's missing, we refuse to ship.
+sentinel = File.join(site.output_dir, Abqari::BUILD_OK_SENTINEL)
+unless File.exist?(sentinel)
+  abort "Missing #{sentinel} — build did not complete successfully. Not deploying."
+end
+
+case target
+when 'cloudflare' then deploy_to_cloudflare(target_config, site.output_dir)
+when 'netlify'    then deploy_to_netlify(target_config, site.output_dir)
+else
+  abort "Unknown deploy target: #{target}. Supported: cloudflare, netlify"
+end
