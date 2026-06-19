@@ -180,15 +180,21 @@ fonts:
 collections:
   posts:
     enabled: true
-    # `slug:` is the URL-prefix alias for a built-in collection. Leave
-    # it unset to use the canonical `/posts/` URL prefix (the default).
-    # Set to something like `stories` to put posts at `/stories/`
-    # without forking the layout — the on-disk source dir stays
-    # `content/posts/` and the layout is still `post.html.erb`. The
-    # documentation block above this `collections:` map covers the
-    # full slug-aliasing details.
+    # `slug:` is the URL-prefix alias for a built-in collection. The
+    # on-disk source dir stays `content/posts/` and the layout is
+    # still `post.html.erb` — only the public URL prefix changes.
+    # The full slug-aliasing reference is in the doc block above
+    # this `collections:` map.
     #
-    # slug: stories                # → URLs at /stories/, feed at /stories/feed.xml
+    # We alias to `/guides/` because this site treats the posts
+    # collection as the canonical engine-documentation feed —
+    # quickstart, templating, themes, collections, audit, deploy,
+    # etc. The companion `cookbook` collection (below) is a second
+    # posts-style collection for shorter, more recipe-style entries.
+    slug: guides
+    # Slug-derived layout would be `guide` (singularized) but no
+    # `guide.html.erb` exists — pin to the canonical post layout.
+    layout: post
 
     # Per-collection pagination. Applies to pages that paginate the
     # `posts` collection with `paginate: true` — primarily the
@@ -624,6 +630,52 @@ collections:
     feeds:
       enabled: false
 
+  # Cookbook — a second posts-style collection for short, recipe-
+  # style entries (one task per page: "how do I X?"). Uses the
+  # `post` layout (same machinery: tags, related, next, RSS) but
+  # lives at its own URL prefix and source dir, separate from the
+  # narrative `posts` collection above. Sites that don't want a
+  # cookbook can set `enabled: false`.
+  cookbook:
+    enabled: true
+    source: content/cookbook
+    permalink: /cookbook/:slug/
+    layout: post
+    bundle: false              # flat single-file recipes; no colocated assets
+    pagination:
+      per_page: 20             # cookbooks are short — more per page is fine
+    index:
+      cover: none              # text-first listings; no per-recipe hero
+      show_date: false         # recipes are timeless, not dated
+      show_description: true
+      description_truncate: 160
+      show_reading_time: false
+      show_tags: true
+      latest_count: 8
+      series:
+        enabled: false
+    archive:
+      enabled: false
+    show:
+      cover: none
+      toc:
+        enabled: true
+        min_headings: 3
+        levels: [2, 3]
+      next:
+        enabled: true
+      related:
+        enabled: true
+        limit: 4
+        match_by: tags
+        show_image: false
+    # Feeds: off for cookbook. Cookbook entries are timeless
+    # reference content — no dates means no chronological feed
+    # ordering, and Feed#write skips dateless items anyway. If
+    # you want a cookbook feed, give each entry a date.
+    feeds:
+      enabled: false
+
   # Custom collections — to add your own (recipes, talks, case
   # studies, etc.), extend this block. Set `bundle: false` for flat
   # single-file collections (no colocated assets directory).
@@ -764,7 +816,7 @@ taxonomies:
   posts_series:
     field: series                  # `series:` in a post's frontmatter
     collection: posts              # scope: only posts
-    permalink: /posts/series/:slug/
+    permalink: /guides/series/:slug/   # follow posts.slug aliasing
     layout: series_index
 
   photos_series:
@@ -1061,7 +1113,10 @@ social:
   # bluesky:  https://bsky.app/profile/your-handle.bsky.social
   # x:        https://x.com/your-handle
   # linkedin: https://linkedin.com/in/your-handle
-  rss: /feed.xml
+  # The posts collection is slug-aliased to /guides/ on this site,
+  # so the RSS feed lives at /guides/feed.xml. Default sites without
+  # the alias would use /feed.xml.
+  rss: /guides/feed.xml
   # mail: mailto:you@example.com
 
 # Nav ────────────────────────────────────────────────────────────────────

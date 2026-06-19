@@ -8,25 +8,29 @@ nav:
   label: Home
 ---
 
-This is the Abqari project site, rendered from `content/index.md` via
-the `home` layout and written to disk as plain HTML. Every section
-below is a real working example of the corresponding feature, and the
-configurable home modules at the foot of the page pull live entries
-from the four sample collections.
+This is the Abqari project site, rendered from `content/index.md`
+via the `home` layout and written to disk as plain HTML. Every
+section below is a real working example of the corresponding
+feature, and the configurable home modules at the foot of the
+page pull live entries from the sample collections.
 
-The source is open on
-[GitHub](https://github.com/grantrayner/abqari) — including the
-content of this very page. Clone it, run `bin/new`, and you have
-the same engine to build your own.
+Distributed as a RubyGem — install with `gem install abqari`
+and scaffold a new site with `abqari new mysite`. The source is
+open on [GitHub](https://github.com/grantrayner/abqari) and
+[every guide on this site](/guides/) is the same documentation
+that ships with the gem.
 
 ## Four pillars
 
-**Writing.** The [posts](/posts/) listing is the prose-blog example.
-Dated posts, tags, RSS feed, JSON-LD `Article` schema, drafts and
+**Writing.** The [guides](/guides/) listing is the prose-blog example
+— this site uses it as the engine-documentation feed. Posts ship with
+dated entries, tags, RSS feed, JSON-LD `Article` schema, drafts and
 scheduling, paginated index when the post count grows past
-`pagination.per_page`. Set `posts.slug: stories` in `config/site.yml`
-to put them at `/stories/` instead — the layout and source-dir stay
-the same.
+`pagination.per_page`. The `slug:` knob in `config/site.yml`
+controls the URL prefix (this site uses `guides`; defaults to
+`posts`; pick whatever fits) — the layout and source-dir stay the
+same. A companion [cookbook](/cookbook/) collection is a second
+posts-style listing for shorter, recipe-style entries.
 
 **Photos and galleries.** [Photos](/photos/) is a separate collection
 (`content/photos/`) of image-centric posts. Auto-generated `/country/<name>/`

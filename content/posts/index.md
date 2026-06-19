@@ -1,17 +1,17 @@
 ---
-title: Posts
+title: Guides
 published: true
-description: The latest posts on the site, newest first. See the archive for the full history.
+description: Walkthroughs, references, and feature deep-dives for Abqari, newest first. See the archive for the full history.
 layout: posts_index
+permalink: /guides/
 paginate: false
 nav:
   order: 2
+  label: Guides
 ---
 
-The blog index — newest first, with the full archive linked below.
-Drop a markdown file or bundle directory into `content/posts/` to
-add a new post; tags, series, and the archive page are all
-generated from each post's frontmatter.
-
-*This intro lives in `content/posts/index.md` — delete it if you'd
-prefer the listing to stand on its own.*
+Long-form walkthroughs of every Abqari feature — quickstart and
+templating at the front, deeper references and one-off feature
+introductions further in. Pair with the
+[cookbook](/cookbook/) for short, recipe-style entries when you
+just need to look up "how do I X?".

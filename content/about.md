@@ -32,8 +32,8 @@ same code you'd use to build your own.
 - **Static search via Pagefind**, JSON Feed, sitemap with image extension, JSON-LD Article schema, Open Graph + Twitter cards, per-environment robots.
 
 See the [README](https://github.com/grantrayner/abqari#readme) for the
-full surface — or browse the [posts](/posts/) for hands-on examples of
-each feature.
+full surface — or browse the [guides](/guides/) and [cookbook](/cookbook/)
+for hands-on walkthroughs of each feature.
 
 ## Design principles
 
@@ -51,9 +51,9 @@ each feature.
 
 ## Project status
 
-Abqari is on `v0.3.x` — the engine is stable enough to run this
-site and several others. It's distributed via git source today; a
-RubyGems release is on the near-term roadmap. See the
+Abqari is on `v0.4.x` — the engine is stable enough to run this
+site and several others. Distributed via RubyGems
+(`gem install abqari`) and as a git source. See the
 [CHANGELOG](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md)
 for every shipped feature with dates and rationale.
 

@@ -12,7 +12,7 @@ class IndiewebLayoutsTest < Minitest::Test
   end
 
   def post_url
-    post = @site.posts.find { |p| p.respond_to?(:url) && p.url.start_with?('/posts/') }
+    post = @site.posts.find { |p| p.respond_to?(:url) && p.url.start_with?('/guides/') }
     refute_nil post, 'fixture must contain at least one post'
     post.url
   end
@@ -40,7 +40,7 @@ class IndiewebLayoutsTest < Minitest::Test
   end
 
   def test_post_list_uses_h_feed_and_h_entry
-    html = TestHelpers.read_output('posts/index.html')
+    html = TestHelpers.read_output('guides/index.html')
     assert_match(/<ul[^>]*class="[^"]*\bh-feed\b/,  html, 'h-feed on the list container')
     assert_match(/<li[^>]*class="[^"]*\bh-entry\b/, html, 'h-entry on each card')
     assert_match(/<a[^>]*class="[^"]*\bu-url\b/,    html, 'u-url on card link')

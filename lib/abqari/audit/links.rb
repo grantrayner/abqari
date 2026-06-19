@@ -17,7 +17,17 @@ module Abqari
           url  = page_url(file)
           html = File.read(file, encoding: 'UTF-8')
 
-          html.scan(/href="([^"#?]+)/).each do |(link)|
+          # Strip `<pre>…</pre>` and inline `<code>…</code>` blocks
+          # before scanning. Rouge's HTML-lexer highlighting of an
+          # ERB or HTML example wraps the attribute value in
+          # `<span class="s">...</span>`, which a naive `href="…"`
+          # regex picks up as a "broken link" pointing at
+          # `</span><span class=` and similar fragments. Code
+          # samples aren't navigation — skip them.
+          scan_html = html.gsub(%r{<pre\b[^>]*>.*?</pre>}m, '')
+                          .gsub(%r{<code\b[^>]*>.*?</code>}m, '')
+
+          scan_html.scan(/href="([^"#?]+)/).each do |(link)|
             next if link.empty?
             next if link.start_with?('mailto:', 'tel:', 'data:', 'javascript:', '#')
 

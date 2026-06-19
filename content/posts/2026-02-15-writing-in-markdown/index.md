@@ -2,7 +2,7 @@
 title: Writing in Markdown
 published: true
 description: A tour of the Markdown features supported by Abqari — headings, lists, links, code, tables, footnotes, and a few extras you'll only need now and again.
-date: 2026-05-08
+date: 2026-02-15
 tags: [markdown, writing, tutorials]
 ---
 

@@ -15,7 +15,7 @@ class SeriesTest < Minitest::Test
   # --- Page generation -------------------------------------------------
 
   def test_post_series_page_renders
-    assert TestHelpers.output_exists?('posts/series/inside-abqari/index.html')
+    assert TestHelpers.output_exists?('guides/series/inside-abqari/index.html')
   end
 
   def test_photo_series_pages_use_new_url_scheme
@@ -40,21 +40,21 @@ class SeriesTest < Minitest::Test
   # --- Per-collection isolation ---------------------------------------
 
   def test_post_series_page_only_contains_posts
-    html = TestHelpers.read_output('posts/series/inside-abqari/index.html')
-    # Every item link should be a /posts/ URL (or relative within
+    html = TestHelpers.read_output('guides/series/inside-abqari/index.html')
+    # Every item link should be a /guides/ URL (or relative within
     # posts), never /photos/ or /workshops/. The regex tolerates
     # optional class attributes before `href=` — post-list cards now
     # carry `class="u-url"` on their post-link anchors for IndieWeb
     # microformats2 parsing.
     links = html.scan(/<a\s[^>]*?href="(\/[^"]+\/)"/).flatten
-    item_links = links.reject { |l| l == '/posts/series/inside-abqari/' }
-    item_links = item_links.reject { |l| l.start_with?('/tags/', '/country/', '/posts/series/', '/photos/series/', '/publications/series/', '/workshops/series/') }
+    item_links = links.reject { |l| l == '/guides/series/inside-abqari/' }
+    item_links = item_links.reject { |l| l.start_with?('/tags/', '/country/', '/guides/series/', '/photos/series/', '/publications/series/', '/workshops/series/') }
     # Filter to the link patterns we expect for post-list items
-    post_links = item_links.select { |l| l.start_with?('/posts/') }
+    post_links = item_links.select { |l| l.start_with?('/guides/') }
 
-    refute_empty post_links, 'expected at least one /posts/ link inside the series page'
+    refute_empty post_links, 'expected at least one /guides/ link inside the series page'
     item_links.each do |link|
-      next if link.start_with?('/', '/posts/', '/about/', '/photos/', '/publications/', '/workshops/', '/tags/', '/country/')
+      next if link.start_with?('/', '/guides/', '/about/', '/photos/', '/publications/', '/workshops/', '/tags/', '/country/')
       flunk "unexpected non-collection link in post series: #{link.inspect}"
     end
   end
@@ -66,20 +66,20 @@ class SeriesTest < Minitest::Test
     # can prove isolation by checking the workshop series page
     # doesn't accidentally include posts.
     #
-    # Scope to the items block — the site nav contains a `/posts/`
+    # Scope to the items block — the site nav contains a `/guides/`
     # link on every page, which would false-positive a page-wide
     # regex.
     html = TestHelpers.read_output('workshops/series/crisis-programme/index.html')
     items_block = html[/<ul class="workshops-series">[\s\S]*?<\/ul>/]
     refute_nil items_block, 'expected to find the workshops-series items block'
-    refute_match(%r{href="/posts/}, items_block,
+    refute_match(%r{href="/guides/}, items_block,
                  'workshop series items block must not contain post links')
   end
 
   # --- Position sort ---------------------------------------------------
 
   def test_post_series_items_sort_by_position
-    html = TestHelpers.read_output('posts/series/inside-abqari/index.html')
+    html = TestHelpers.read_output('guides/series/inside-abqari/index.html')
     positions = html.scan(/class="series-position">#(\d+)/).flatten.map(&:to_i)
     assert_equal positions.sort, positions,
                  "post series should be sorted ascending by position, got #{positions.inspect}"
@@ -95,7 +95,7 @@ class SeriesTest < Minitest::Test
   # --- Title / lede ---------------------------------------------------
 
   def test_series_page_h1_is_the_term_not_posts_tagged
-    html = TestHelpers.read_output('posts/series/inside-abqari/index.html')
+    html = TestHelpers.read_output('guides/series/inside-abqari/index.html')
     assert_match(%r{<h1>Inside Abqari</h1>}, html)
     # The legacy "Posts tagged 'foo'" wording should NOT appear for
     # series taxonomies.
@@ -103,7 +103,7 @@ class SeriesTest < Minitest::Test
   end
 
   def test_series_page_lede_uses_collection_label
-    posts_html     = TestHelpers.read_output('posts/series/inside-abqari/index.html')
+    posts_html     = TestHelpers.read_output('guides/series/inside-abqari/index.html')
     workshops_html = TestHelpers.read_output('workshops/series/crisis-programme/index.html')
     assert_match(/3 posts/,     posts_html[/<p class="lede">[^<]+<\/p>/])
     assert_match(/3 workshops/, workshops_html[/<p class="lede">[^<]+<\/p>/])

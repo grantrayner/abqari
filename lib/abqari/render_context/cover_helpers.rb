@@ -176,13 +176,20 @@ module Abqari
       #
       # Single-word titles return as-is — long single words just
       # shrink via the font-size fallback.
+      #
+      # Thresholds are tuned so the rendered text block sits well
+      # inside the 400-wide viewBox — roughly 16% horizontal padding
+      # at the largest font tier, more at smaller tiers. Tighter
+      # thresholds than these and the text crowds the decorative
+      # corner squares; looser and the title looks small in a
+      # mostly-blank tile.
       def svg_wrap_title(title)
         words = title.split(/\s+/).reject(&:empty?)
         return [title] if words.size <= 1
 
-        max_lines = if title.length <= 14
+        max_lines = if title.length <= 11
                       1
-                    elsif title.length <= 32
+                    elsif title.length <= 26
                       2
                     else
                       3
@@ -247,16 +254,18 @@ module Abqari
 
       # Pick a font size that fits the longest wrapped line into the
       # 400-wide viewBox with margins. Calibrated against the
-      # sans-serif stack declared in `cover_svg_for` — at 56px,
-      # roughly 12 characters fit; the steps below halve the
-      # tolerance roughly geometrically.
+      # sans-serif stack declared in `cover_svg_for`. The largest
+      # tier is deliberately modest (36pt) so short titles like
+      # "Upgrading Abqari" or "Quickstart" read as a comfortable
+      # label rather than dominating the tile — title-card SVGs
+      # are decoration, not a billboard.
       def svg_title_font_size(lines)
         longest = lines.map(&:length).max.to_i
         case longest
-        when 0..12  then 56
-        when 13..18 then 44
-        when 19..24 then 34
-        else             28
+        when 0..10  then 36
+        when 11..15 then 32
+        when 16..22 then 28
+        else             24
         end
       end
     end

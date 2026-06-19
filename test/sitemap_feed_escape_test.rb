@@ -71,7 +71,7 @@ class SitemapFeedEscapeTest < Minitest::Test
     site = make_feed_site
     post = OpenStruct.new(
       title: 'Post & Co',
-      url: '/posts/post-co/',
+      url: '/guides/post-co/',
       date: Time.utc(2026, 5, 16),
       description: 'A & B'
     )
@@ -96,7 +96,7 @@ class SitemapFeedEscapeTest < Minitest::Test
     # carry one if the permalink template is ever loosened).
     post = OpenStruct.new(
       title: 'X',
-      url: '/posts/x?ref=feed&utm_source=rss/',
+      url: '/guides/x?ref=feed&utm_source=rss/',
       date: Time.utc(2026, 5, 16),
       description: 'd'
     )

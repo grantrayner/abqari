@@ -15,7 +15,7 @@ require_relative 'test_helper'
 # from config/site.yml.)
 class TocTest < Minitest::Test
   def html_for(slug)
-    TestHelpers.read_output("posts/#{slug}/index.html")
+    TestHelpers.read_output("guides/#{slug}/index.html")
   end
 
   # --- Default behaviour ----------------------------------------------

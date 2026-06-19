@@ -21,7 +21,7 @@ class NextInSeriesTest < Minitest::Test
   # blog" is a fixture post NOT in any series.
 
   def html_for(slug)
-    TestHelpers.read_output("posts/#{slug}/index.html")
+    TestHelpers.read_output("guides/#{slug}/index.html")
   end
 
   # --- Meta line breadcrumb -------------------------------------------
@@ -31,7 +31,7 @@ class NextInSeriesTest < Minitest::Test
     meta = html[/<p class="post__meta">[\s\S]*?<\/p>/]
     assert_match(/#1 in the/, meta)
     # Series name links to the per-collection series taxonomy page.
-    assert_match(%r{<a href="/posts/series/inside-abqari/">Inside Abqari</a>}, meta)
+    assert_match(%r{<a href="/guides/series/inside-abqari/">Inside Abqari</a>}, meta)
     assert_match(/series\s*<\/p>/, meta, 'meta line should end with "series"')
   end
 
@@ -49,7 +49,7 @@ class NextInSeriesTest < Minitest::Test
     # The next-in-series card points at the pos-2 post.
     next_section = html[/<section class="next-item next-item--series"[\s\S]*?<\/section>/]
     refute_nil next_section, 'expected next-item--series section'
-    assert_match(%r{href="/posts/photos-and-galleries/"}, next_section)
+    assert_match(%r{href="/guides/photos-and-galleries/"}, next_section)
   end
 
   def test_next_in_series_replaces_chronological_up_next_for_non_last_posts
@@ -67,7 +67,7 @@ class NextInSeriesTest < Minitest::Test
     refute_nil note, 'expected series-end aside on the final post'
     assert_match(/last post in the/, note)
     # The series name in the note links to the series page.
-    assert_match(%r{href="/posts/series/inside-abqari/"}, note)
+    assert_match(%r{href="/guides/series/inside-abqari/"}, note)
   end
 
   def test_last_post_in_series_falls_through_to_chronological_up_next

@@ -12,16 +12,16 @@ class SiteBuildTest < Minitest::Test
   end
 
   def test_posts_index_built
-    assert TestHelpers.output_exists?('posts/index.html')
+    assert TestHelpers.output_exists?('guides/index.html')
   end
 
   def test_post_uses_default_permalink
-    assert TestHelpers.output_exists?('posts/hello-from-the-blog/index.html')
-    assert TestHelpers.output_exists?('posts/building-with-abqari/index.html')
+    assert TestHelpers.output_exists?('guides/hello-from-the-blog/index.html')
+    assert TestHelpers.output_exists?('guides/building-with-abqari/index.html')
   end
 
   def test_post_html_includes_title
-    html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
+    html = TestHelpers.read_output('guides/hello-from-the-blog/index.html')
     assert_includes html, 'Hello from the blog'
   end
 
@@ -32,9 +32,9 @@ class SiteBuildTest < Minitest::Test
   # is the behaviour users want: pagination doesn't appear until it's
   # needed.
   def test_pagination_suppressed_when_only_one_page_needed
-    refute TestHelpers.output_exists?('posts/page/2/index.html'),
+    refute TestHelpers.output_exists?('guides/page/2/index.html'),
            'Pagination overflow page should not exist when posts fit on one page'
-    html = TestHelpers.read_output('posts/index.html')
+    html = TestHelpers.read_output('guides/index.html')
     refute_match(/<nav[^>]*class="pagination"/, html,
                  'Pagination nav element should not render when only one page exists')
   end
@@ -92,18 +92,18 @@ class SiteBuildTest < Minitest::Test
   # SEO meta
 
   def test_canonical_link_in_head
-    html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
-    assert_match(%r{<link rel="canonical" href="https://www\.abqari\.dev/posts/hello-from-the-blog/">}, html)
+    html = TestHelpers.read_output('guides/hello-from-the-blog/index.html')
+    assert_match(%r{<link rel="canonical" href="https://www\.abqari\.dev/guides/hello-from-the-blog/">}, html)
   end
 
   def test_post_emits_jsonld_article
-    html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
+    html = TestHelpers.read_output('guides/hello-from-the-blog/index.html')
     assert_includes html, '"@type": "Article"'
     assert_includes html, '"datePublished":'
   end
 
   def test_open_graph_tags_present
-    html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
+    html = TestHelpers.read_output('guides/hello-from-the-blog/index.html')
     assert_match %r{<meta property="og:title"}, html
     assert_match %r{<meta property="og:type" content="article">}, html
   end
@@ -112,7 +112,7 @@ class SiteBuildTest < Minitest::Test
 
   def test_sitemap_includes_post_url
     sitemap = TestHelpers.read_output('sitemap.xml')
-    assert_includes sitemap, 'https://www.abqari.dev/posts/hello-from-the-blog/'
+    assert_includes sitemap, 'https://www.abqari.dev/guides/hello-from-the-blog/'
   end
 
   def test_sitemap_declares_image_extension_namespace
@@ -122,13 +122,13 @@ class SiteBuildTest < Minitest::Test
 
   def test_sitemap_emits_image_entry_for_post_with_bundle_image
     sitemap = TestHelpers.read_output('sitemap.xml')
-    assert_includes sitemap, '<image:loc>https://www.abqari.dev/posts/building-with-abqari/hero.svg</image:loc>'
+    assert_includes sitemap, '<image:loc>https://www.abqari.dev/guides/building-with-abqari/hero.svg</image:loc>'
   end
 
   def test_sitemap_omits_image_entry_for_post_without_bundle_images
     sitemap = TestHelpers.read_output('sitemap.xml')
     # The writing-in-markdown post has no images; its <url> block should not contain <image:image>.
-    block = sitemap[%r{<url>\s*<loc>https://www\.abqari\.dev/posts/writing-in-markdown/</loc>.*?</url>}m]
+    block = sitemap[%r{<url>\s*<loc>https://www\.abqari\.dev/guides/writing-in-markdown/</loc>.*?</url>}m]
     refute_nil block
     refute_includes block, '<image:image>'
   end
@@ -144,9 +144,8 @@ class SiteBuildTest < Minitest::Test
   end
 
   def test_rss_feed_built
-    # Posts is un-aliased in the engine fixture, so the feed lives at
-    # the root /feed.xml + /feed.json (the back-compat default).
-    feed = TestHelpers.read_output('feed.xml')
+    # Posts slug-aliased to /guides/ — feed lives at /guides/feed.xml.
+    feed = TestHelpers.read_output('guides/feed.xml')
     assert_includes feed, '<rss version="2.0"'
     assert_includes feed, 'Hello from the blog'
   end
@@ -158,13 +157,14 @@ class SiteBuildTest < Minitest::Test
   end
 
   def test_rss_language_reflects_locale_config
-    feed = TestHelpers.read_output('feed.xml')
+    # Posts slug-aliased to /guides/ → feed lives at /guides/feed.xml.
+    feed = TestHelpers.read_output('guides/feed.xml')
     locale = TestHelpers.built_site.config['locale'] || 'en'
     assert_includes feed, "<language>#{locale}</language>"
   end
 
   def test_json_feed_built
-    feed = TestHelpers.read_output('feed.json')
+    feed = TestHelpers.read_output('guides/feed.json')
     assert_includes feed, '"version": "https://jsonfeed.org/version/1.1"'
   end
 
@@ -183,10 +183,11 @@ class SiteBuildTest < Minitest::Test
 
   def test_head_advertises_only_enabled_collection_feeds
     home = TestHelpers.read_output('index.html')
-    # Posts is un-aliased, so feeds advertise at root /feed.xml + /feed.json.
-    assert_includes home, 'href="/feed.xml"',  'posts feed always advertised'
-    assert_includes home, 'href="/feed.json"', 'posts JSON Feed always advertised'
-    refute_includes home, '/photos/feed.xml',          'photos feed must not appear when disabled'
+    # Posts is slug-aliased to /guides/, so the feed URLs live
+    # under /guides/ rather than at the root.
+    assert_includes home, 'href="/guides/feed.xml"',  'posts feed always advertised'
+    assert_includes home, 'href="/guides/feed.json"', 'posts JSON Feed always advertised'
+    refute_includes home, '/photos/feed.xml',         'photos feed must not appear when disabled'
     refute_includes home, '/publications/feed.xml'
   end
 
@@ -206,12 +207,12 @@ class SiteBuildTest < Minitest::Test
   def test_redirect_stub_generated
     stub = TestHelpers.read_output('old-tutorial/index.html')
     assert_includes stub, 'http-equiv="refresh"'
-    assert_includes stub, '/posts/building-with-abqari/'
+    assert_includes stub, '/guides/building-with-abqari/'
   end
 
   def test_redirects_file_lists_mapping
     redirects = TestHelpers.read_output('_redirects')
-    assert_includes redirects, '/old-tutorial/ /posts/building-with-abqari/ 301'
+    assert_includes redirects, '/old-tutorial/ /guides/building-with-abqari/ 301'
   end
 
   # Helpers
@@ -224,11 +225,13 @@ end
 class CollectionConfigTest < Minitest::Test
   def test_default_posts_collection
     config = TestHelpers.built_site.collection_config('posts')
-    # Engine fixture uses defaults — no slug aliasing.
-    assert_equal 'content/posts',  config['source']
-    assert_equal '/posts/:slug/',  config['permalink']
-    assert_equal 'post',           config['layout']
-    assert_nil   config['slug']
+    # Engine fixture aliases posts to `/guides/` — see
+    # `config/site.yml`. Source dir and layout stay canonical;
+    # only the URL prefix flips.
+    assert_equal 'content/posts',    config['source']
+    assert_equal '/guides/:slug/',   config['permalink']
+    assert_equal 'post',             config['layout']
+    assert_equal 'guides',           config['slug']
   end
 
   def test_unknown_collection_returns_empty_hash
@@ -273,11 +276,11 @@ class RelatedTest < Minitest::Test
   # `tutorials`) but not directly to hello-from-the-blog (no shared tags).
   def test_related_finds_posts_with_shared_tags
     site = TestHelpers.built_site
-    source = site.posts.find { |p| p.url == '/posts/writing-in-markdown/' }
+    source = site.posts.find { |p| p.url == '/guides/writing-in-markdown/' }
     related = site.related(source)
 
     refute_empty related, 'expected at least one related post'
-    assert_includes related.map(&:url), '/posts/building-with-abqari/'
+    assert_includes related.map(&:url), '/guides/building-with-abqari/'
     refute_includes related.map(&:url), source.url, 'must not include the source page'
   end
 
@@ -294,7 +297,7 @@ class RelatedTest < Minitest::Test
 
   def test_related_respects_limit
     site = TestHelpers.built_site
-    source = site.posts.find { |p| p.url == '/posts/writing-in-markdown/' }
+    source = site.posts.find { |p| p.url == '/guides/writing-in-markdown/' }
     assert_equal 1, site.related(source, limit: 1).size
   end
 
@@ -311,7 +314,7 @@ class RelatedTest < Minitest::Test
   # index page). With `limit:`, slices.
   def test_related_returns_all_when_no_limit
     site = TestHelpers.built_site
-    source = site.posts.find { |p| p.url == '/posts/writing-in-markdown/' }
+    source = site.posts.find { |p| p.url == '/guides/writing-in-markdown/' }
     full   = site.related(source)
     sliced = site.related(source, limit: 1)
 
@@ -332,10 +335,10 @@ class RelatedTest < Minitest::Test
   # writing-in-markdown, building-with-abqari, hello-from-the-blog.
   def test_next_in_collection_returns_newer
     site = TestHelpers.built_site
-    middle = site.posts.find { |p| p.url == '/posts/building-with-abqari/' }
+    middle = site.posts.find { |p| p.url == '/guides/building-with-abqari/' }
     nxt = site.next_in_collection(middle)
     refute_nil nxt
-    assert_equal '/posts/writing-in-markdown/', nxt.url, 'newer post is "next"'
+    assert_equal '/guides/writing-in-markdown/', nxt.url, 'newer post is "next"'
   end
 
   def test_next_in_collection_nil_at_newest
@@ -504,6 +507,10 @@ class CollectionSlugAliasTest < Minitest::Test
 
     assert_nil   cfg['slug']
     assert_equal 'content/posts',     cfg['source']
+    # Unaliased posts keep the canonical /posts/ URL — this test
+    # explicitly stubs `collections.posts: {}` to verify the default.
+    # The fixture site uses `slug: guides`, so its permalink is
+    # /guides/:slug/ — see `test_default_posts_collection` above.
     assert_equal '/posts/:slug/',     cfg['permalink']
     assert_equal 'post',              cfg['layout']
   end
@@ -592,7 +599,9 @@ class TaxonomyTest < Minitest::Test
   def test_posts_by_term_groups_by_tag
     grouped = TestHelpers.built_site.posts_by_term('tags')
     assert grouped.key?('ruby'), 'expected ruby tag to be present'
-    assert_equal 2, grouped['ruby'].size
+    # Fixture has four ruby-tagged posts: hello-from-the-blog,
+    # building-with-abqari, quickstart, templating.
+    assert_equal 4, grouped['ruby'].size
   end
 
   def test_unknown_term_returns_empty
@@ -613,8 +622,8 @@ class DraftAndFutureTest < Minitest::Test
   end
 
   def test_published_posts_present
-    assert TestHelpers.output_exists?('posts/hello-from-the-blog/index.html')
-    assert TestHelpers.output_exists?('posts/building-with-abqari/index.html')
+    assert TestHelpers.output_exists?('guides/hello-from-the-blog/index.html')
+    assert TestHelpers.output_exists?('guides/building-with-abqari/index.html')
   end
 end
 
@@ -766,24 +775,24 @@ class NavCascadeTest < Minitest::Test
     links = TestHelpers.built_site.nav_links
     assert links.any? { |l| l['url'] == '/' && l['label'] == 'Home' },
            'expected Home link from content/index.md frontmatter'
-    assert links.any? { |l| l['url'] == '/posts/' && l['label'] == 'Posts' },
-           'expected Posts link from content/posts/index.md frontmatter'
+    assert links.any? { |l| l['url'] == '/guides/' && l['label'] == 'Guides' },
+           'expected Guides link from content/posts/index.md frontmatter'
   end
 
   def test_nav_links_sorted_by_order_field
     links = TestHelpers.built_site.nav_links
-    home_idx  = links.index { |l| l['label'] == 'Home' }
-    posts_idx = links.index { |l| l['label'] == 'Posts' }
+    home_idx   = links.index { |l| l['label'] == 'Home' }
+    guides_idx = links.index { |l| l['label'] == 'Guides' }
     refute_nil home_idx
-    refute_nil posts_idx
-    assert home_idx < posts_idx, 'Home (order 1) should come before Posts (order 2)'
+    refute_nil guides_idx
+    assert home_idx < guides_idx, 'Home (order 1) should come before Guides (order 2)'
   end
 
   def test_nav_renders_in_layout
     html = TestHelpers.read_output('index.html')
     # Lenient on extra attributes between `href="…"` and `>` so the
     # active-link `aria-current="page"` doesn't break the assertion.
-    assert_match %r{<nav[^>]*>.*<a href="/"[^>]*>Home</a>.*<a href="/posts/"[^>]*>Posts</a>.*<a href="/about/"[^>]*>About</a>.*</nav>}m, html
+    assert_match %r{<nav[^>]*>.*<a href="/"[^>]*>Home</a>.*<a href="/guides/"[^>]*>Guides</a>.*<a href="/about/"[^>]*>About</a>.*</nav>}m, html
   end
 
   # Active-link state — the link matching the current page (or its
@@ -793,7 +802,7 @@ class NavCascadeTest < Minitest::Test
     # The home link (matching `/`) is active on the home page.
     assert_match %r{<a href="/" aria-current="page">Home</a>}, html
     # Other links are NOT marked.
-    refute_match %r{<a href="/posts/" aria-current}, html
+    refute_match %r{<a href="/guides/" aria-current}, html
     refute_match %r{<a href="/about/" aria-current}, html
   end
 
@@ -801,16 +810,16 @@ class NavCascadeTest < Minitest::Test
     # `/about/` is active on the about page itself.
     html = TestHelpers.read_output('about/index.html')
     assert_match %r{<a href="/about/" aria-current="page">About</a>}, html
-    refute_match %r{<a href="/posts/" aria-current}, html
+    refute_match %r{<a href="/guides/" aria-current}, html
     # The home link is NOT active on /about/.
     refute_match %r{<a href="/" aria-current="page">Home</a>}, html
   end
 
   def test_nav_active_link_marked_on_section_subpage
-    # `/posts/` link is active on individual stories because the
-    # story URL starts with `/posts/` (slug-aliased from posts).
-    html = TestHelpers.read_output('posts/hello-from-the-blog/index.html')
-    assert_match %r{<a href="/posts/" aria-current="page">Posts</a>}, html
+    # `/guides/` link is active on individual guides because the
+    # guide URL starts with `/guides/` (slug-aliased from posts).
+    html = TestHelpers.read_output('guides/hello-from-the-blog/index.html')
+    assert_match %r{<a href="/guides/" aria-current="page">Guides</a>}, html
   end
 
   # Accessibility — these checks lock in the a11y baseline. Removing or
@@ -844,11 +853,11 @@ class NavCascadeTest < Minitest::Test
   end
 
   def test_about_page_links_to_both_feeds
-    # Feed URLs follow `posts.slug` aliasing: with `slug: stories` set in
-    # the starter, both feeds live under /posts/.
+    # Feed URLs follow `posts.slug` aliasing: with `slug: guides`
+    # in the fixture, both feeds live under /guides/.
     html = TestHelpers.read_output('about/index.html')
-    assert_includes html, 'href="/feed.xml"'
-    assert_includes html, 'href="/feed.json"'
+    assert_includes html, 'href="/guides/feed.xml"'
+    assert_includes html, 'href="/guides/feed.json"'
   end
 
   def test_footer_links_empty_when_no_frontmatter_or_data
@@ -870,29 +879,29 @@ end
 
 class BundleTest < Minitest::Test
   def test_bundle_asset_copied_alongside_post
-    assert TestHelpers.output_exists?('posts/building-with-abqari/hero.svg'),
+    assert TestHelpers.output_exists?('guides/building-with-abqari/hero.svg'),
            'expected hero.svg from the post bundle to be copied to its output directory'
   end
 
   def test_bundle_relative_image_url_rewritten
-    html = TestHelpers.read_output('posts/building-with-abqari/index.html')
-    assert_includes html, 'src="/posts/building-with-abqari/hero.svg"',
+    html = TestHelpers.read_output('guides/building-with-abqari/index.html')
+    assert_includes html, 'src="/guides/building-with-abqari/hero.svg"',
                     'relative bundle-asset src should be rewritten to absolute URL under the post'
   end
 
   def test_bundle_preserves_absolute_and_external_urls
-    html = TestHelpers.read_output('posts/building-with-abqari/index.html')
-    refute_match %r{src="/posts/building-with-abqari/https?://}, html
-    refute_match %r{href="/posts/building-with-abqari//}, html
+    html = TestHelpers.read_output('guides/building-with-abqari/index.html')
+    refute_match %r{src="/guides/building-with-abqari/https?://}, html
+    refute_match %r{href="/guides/building-with-abqari//}, html
   end
 
   def test_bundle_slug_derived_from_directory_name
-    post = TestHelpers.built_site.posts.find { |p| p.url == '/posts/building-with-abqari/' }
+    post = TestHelpers.built_site.posts.find { |p| p.url == '/guides/building-with-abqari/' }
     refute_nil post, 'expected post URL slug to match its bundle directory name'
   end
 
   def test_bundle_date_from_directory_prefix
-    post = TestHelpers.built_site.posts.find { |p| p.url == '/posts/hello-from-the-blog/' }
+    post = TestHelpers.built_site.posts.find { |p| p.url == '/guides/hello-from-the-blog/' }
     assert_equal 2026, post.date.year
     assert_equal 4,    post.date.month
     assert_equal 15,   post.date.day
@@ -905,7 +914,7 @@ class SyntaxHighlightingTest < Minitest::Test
   end
 
   def test_code_block_gets_rouge_classes
-    html = TestHelpers.read_output('posts/building-with-abqari/index.html')
+    html = TestHelpers.read_output('guides/building-with-abqari/index.html')
     assert_includes html, 'class="highlight"'
     assert_includes html, 'class="k">def'  # 'k' is Rouge's keyword class
   end

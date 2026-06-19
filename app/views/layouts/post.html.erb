@@ -51,8 +51,14 @@ layout: application
     <h1 class="p-name"><%= page.title %></h1>
     <a class="u-url" href="<%= sanitized_url(page.url) %>" hidden></a>
     <p class="post__meta">
-      <time class="dt-published" datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
-      · <%= reading_time(page.content) %>
+      <%# Date is conditional so dateless collections that share the
+          `post` layout (cookbook, glossary, anything reference-y)
+          still render. Reading time renders either way. %>
+      <% if page.date %>
+        <time class="dt-published" datetime="<%= page.date.iso8601 %>"><%= local_time(page.date) %></time>
+        ·
+      <% end %>
+      <%= reading_time(page.content) %>
       <%# Series breadcrumb — only when the post carries both `series:`
           and `series_position:` in frontmatter. Position renders as a
           plain "#N" prefix; the series name links back to the per-

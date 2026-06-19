@@ -2,7 +2,7 @@
 
 require_relative 'test_helper'
 
-# Post series previews — the stacked-image row on /posts/ that
+# Post series previews — the stacked-image row on /guides/ that
 # surfaces each series with overlapping hero images, mirroring the
 # visual of the publications index's series block.
 #
@@ -11,7 +11,7 @@ require_relative 'test_helper'
 # that have `image:` frontmatter set.
 class PostSeriesPreviewsTest < Minitest::Test
   def html
-    @html ||= TestHelpers.read_output('posts/index.html')
+    @html ||= TestHelpers.read_output('guides/index.html')
   end
 
   def block
@@ -40,7 +40,7 @@ class PostSeriesPreviewsTest < Minitest::Test
   end
 
   def test_tile_links_to_per_collection_series_url
-    assert_match(%r{href="/posts/series/inside-abqari/"}, block)
+    assert_match(%r{href="/guides/series/inside-abqari/"}, block)
   end
 
   def test_post_count_label_uses_pluralize

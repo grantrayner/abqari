@@ -96,12 +96,12 @@ class SlowPageTest < Minitest::Test
 
   def test_slow_page_emits_warning_with_url_and_time
     # 250 ms cost, 100 ms threshold → fires.
-    pages = [FakePage.new('slow-one', cost_ms: 250, url: '/posts/slow-one/')]
+    pages = [FakePage.new('slow-one', cost_ms: 250, url: '/guides/slow-one/')]
     _, err = with_threshold(100) do
       capture_log { Abqari::Renderer.new(FakeSite.new(pages)).render_pages }
     end
 
-    assert_match(%r{Slow page: /posts/slow-one/ took \d+ms}, err)
+    assert_match(%r{Slow page: /guides/slow-one/ took \d+ms}, err)
   ensure
     pages.each(&:cleanup)
   end
