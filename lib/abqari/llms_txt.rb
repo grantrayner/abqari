@@ -71,7 +71,12 @@ module Abqari
       coll_cfg = @site.collection_config(coll_name) || {}
       return [] unless coll_cfg.fetch('enabled', true)
 
-      items = (@site.collection(coll_name) rescue []) || []
+      items = begin
+        @site.collection(coll_name) || []
+      rescue StandardError => e
+        Log.warn "llms.txt: skipping collection #{coll_name.inspect} — #{e.class}: #{e.message}"
+        []
+      end
       return [] if items.empty?
 
       heading = coll_name.capitalize

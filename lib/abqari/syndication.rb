@@ -108,6 +108,15 @@ module Abqari
 
       def run
         return unless enabled?
+        # Hard production gate. POSSE is an irreversible outbound side
+        # effect (public posts to Mastodon/Bluesky). `Site#build` runs
+        # in every environment — including `bin/serve`'s dev rebuilds,
+        # which include drafts and future-dated posts and resolve URLs
+        # against the dev `url` (e.g. http://localhost:4000). Broadcasting
+        # from anywhere but production would leak unpublished content and
+        # ship localhost links. No env override — this must not fire by
+        # accident.
+        return unless @site.respond_to?(:env) && @site.env == :production
         return if networks.empty?
 
         FileUtils.mkdir_p(File.dirname(log_path))
@@ -182,6 +191,12 @@ module Abqari
         posts = @site.respond_to?(:posts) ? @site.posts : Array(@site.collection('posts'))
         posts.select do |p|
           next false unless p.respond_to?(:date) && p.date && p.date.to_date >= cutoff
+          # Defence in depth: never syndicate a draft or a future-dated
+          # post even if one slips into `posts` (production filters them
+          # at load time, but the production gate in `run` is the only
+          # thing standing between a dev build and a broadcast).
+          next false if p.respond_to?(:draft?) && p.draft?
+          next false if p.respond_to?(:future?) && p.future?
           # Per-post opt-out: `syndicate: false` in frontmatter excludes
           # this post from POSSE entirely. Useful for personal/private
           # posts where the operator wants the canonical URL but no
@@ -198,8 +213,11 @@ module Abqari
       end
 
       def canonical_site_url
-        env_url = @site.config.dig('environments', @site.env.to_s, 'url') if @site.respond_to?(:env)
-        env_url || @site.config['url']
+        # `config['url']` is already the env-resolved value — SiteLoader
+        # deep-merges `environments.<env>` over the base and DELETES the
+        # `environments` key before returning, so there's nothing left to
+        # dig for.
+        @site.config['url']
       end
     end
 
@@ -332,7 +350,10 @@ module Abqari
         end
 
         def token
-          @cfg['access_token'].to_s
+          # ENV fallback so the secret can live in a CI secret / env var
+          # instead of committed site.yml. Config value wins when set.
+          value = @cfg['access_token'].to_s
+          value.empty? ? ENV['ABQARI_MASTODON_TOKEN'].to_s : value
         end
 
         def visibility
@@ -397,7 +418,10 @@ module Abqari
         end
 
         def app_password
-          @cfg['app_password'].to_s
+          # ENV fallback — keep the app password out of committed
+          # site.yml. Config value wins when set.
+          value = @cfg['app_password'].to_s
+          value.empty? ? ENV['ABQARI_BLUESKY_APP_PASSWORD'].to_s : value
         end
 
         def create_session

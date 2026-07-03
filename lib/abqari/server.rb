@@ -98,6 +98,21 @@ module Abqari
       server.start
     end
 
+    # Stop the file watcher (Listen listener or the polling thread).
+    # In the CLI the process just exits so this is unused, but it lets
+    # embedders — and the test suite — shut a server down cleanly
+    # instead of leaking a background thread that keeps calling
+    # `rebuild` (→ `site.build`) after the server is otherwise done.
+    def stop_watcher
+      @listener&.stop
+      @listener = nil
+      if @watcher_thread
+        @watcher_thread.kill
+        @watcher_thread.join(1)
+        @watcher_thread = nil
+      end
+    end
+
     # SSE endpoint at /__reload__. Browsers open one EventSource per
     # tab and stay connected for the lifetime of the dev session;
     # each rebuild fans an event out to every connected stream,
@@ -191,7 +206,7 @@ module Abqari
       pending_mutex = Mutex.new
       debounce_thread = nil
 
-      listener = Listen.to(*roots) do |modified, added, removed|
+      @listener = Listen.to(*roots) do |modified, added, removed|
         pending_mutex.synchronize { pending.concat(modified + added + removed) }
 
         debounce_thread&.kill
@@ -212,7 +227,7 @@ module Abqari
         e.backtrace&.first(5)&.each { |line| Log.error "  #{line}" }
       end
 
-      listener.start
+      @listener.start
     end
 
     # Fallback: 500ms mtime polling. Used when Listen isn't installed.
@@ -225,7 +240,7 @@ module Abqari
     # cause. The same supervision wraps the Listen-based watcher
     # below.
     def start_poll_watcher
-      supervise(:poll) do
+      @watcher_thread = supervise(:poll) do
         snapshot = file_snapshot
         loop do
           sleep POLL_INTERVAL

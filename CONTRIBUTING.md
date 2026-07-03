@@ -17,10 +17,13 @@ README has the bigger picture.
 git clone https://github.com/your-handle/abqari
 cd abqari
 bundle install
-bin/test          # should report ~140 runs, 0 failures
+bin/test          # should report 600+ runs, 0 failures
 bin/build         # should produce _site/
 bin/audit         # should report 0 errors, 0 warnings
 ```
+
+Running the suite needs the libvips C library (`brew install vips` /
+`sudo apt install libvips42`) — the image-pipeline tests require it.
 
 ## Making changes
 
@@ -37,7 +40,8 @@ bin/audit         # should report 0 errors, 0 warnings
    ```
 5. **Update the README** if your change affects behaviour, config, or
    the project structure.
-6. **Update CHANGELOG.md** under `[Unreleased]`.
+6. **Update CHANGELOG.md** — add an entry under the current release
+   heading (create a new dated version section when cutting a release).
 
 ## Style
 

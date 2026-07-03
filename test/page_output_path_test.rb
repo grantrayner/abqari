@@ -87,4 +87,33 @@ class PageOutputPathTest < Minitest::Test
     page = build_page('permalink' => '/about?evil=1')
     assert_raises(Abqari::PathSafe::Error) { page.output_path }
   end
+
+  # Frontmatter `layout:` is resolved to a file path and ERB-eval'd, so
+  # a traversing value is a file-read + code-execution vector — not just
+  # a bad URL. It's reachable from an untrusted platform export (the
+  # Jekyll importer preserves `layout:`). `layout_name` allow-lists it.
+  def test_legal_layout_name_passes_through
+    page = build_page('layout' => 'post')
+    assert_equal 'post', page.layout_name
+  end
+
+  def test_nested_layout_name_allowed
+    page = build_page('layout' => 'home/hero')
+    assert_equal 'home/hero', page.layout_name
+  end
+
+  def test_traversing_layout_is_blocked
+    page = build_page('layout' => '../../../../etc/passwd')
+    assert_raises(Abqari::PathSafe::Error) { page.layout_name }
+  end
+
+  def test_absolute_layout_is_blocked
+    page = build_page('layout' => '/etc/hosts')
+    assert_raises(Abqari::PathSafe::Error) { page.layout_name }
+  end
+
+  def test_dotted_layout_is_blocked
+    page = build_page('layout' => '..')
+    assert_raises(Abqari::PathSafe::Error) { page.layout_name }
+  end
 end

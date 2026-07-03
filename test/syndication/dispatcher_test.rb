@@ -86,6 +86,19 @@ class SyndicationDispatcherTest < Minitest::Test
     assert_empty net.calls
   end
 
+  def test_never_posts_outside_production
+    # Hard production gate: POSSE is an irreversible public broadcast and
+    # dev builds include drafts + localhost URLs, so it must not fire in
+    # any env but production — even when enabled.
+    %i[development staging test].each do |env|
+      @site.env = env
+      add_post(slug: "in-#{env}")
+      net = FakeNetwork.new(name: 'mastodon')
+      dispatcher_with([net]).run
+      assert_empty net.calls, "must not syndicate in #{env}"
+    end
+  end
+
   def test_runs_each_configured_network_for_each_recent_post
     add_post(slug: 'a')
     add_post(slug: 'b')

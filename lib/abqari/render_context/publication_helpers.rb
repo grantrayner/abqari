@@ -84,7 +84,7 @@ module Abqari
         url = sanitized_url(fm['buy_now_url'])
         return '' unless url
 
-        %(<a class="#{h(class_)}" href="#{url}" rel="noopener noreferrer">#{h(label)}</a>)
+        %(<a class="#{h(class_)}" href="#{h(url)}" rel="noopener noreferrer">#{h(label)}</a>)
       end
 
       def cart_button(subject, label: 'Add to cart', class_: 'folio-button folio-button--cart')
@@ -94,7 +94,7 @@ module Abqari
         url = sanitized_url(fm['add_to_cart_url'])
         return '' unless url
 
-        %(<a class="#{h(class_)}" href="#{url}" rel="noopener noreferrer">#{h(label)}</a>)
+        %(<a class="#{h(class_)}" href="#{h(url)}" rel="noopener noreferrer">#{h(label)}</a>)
       end
 
       private

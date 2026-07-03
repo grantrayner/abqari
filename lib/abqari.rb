@@ -57,13 +57,18 @@ module Abqari
   #   [2] = everything after the closing `---\n` (page body / layout
   #         markup / whatever follows)
   #
+  # The YAML group is OPTIONAL (`(?:.*?\n)?`) so an EMPTY frontmatter
+  # block (`---\n---\n`) still matches — group [1] is "" (→ `{}` after
+  # safe_load), not treated as "no frontmatter" (which rendered the two
+  # `---` lines as visible body text).
+  #
   # Used in three places — Page (content files), RenderContext (layout
   # files chaining via `layout:`), and Renderer (parent-layout lookup
   # for the dep-mtime walker). Centralised here so the three callers
   # stay in lockstep; previously the regex was duplicated and one copy
   # had drifted (no body capture group), which made consolidation
   # easy to put off.
-  FRONTMATTER_RE = /\A---\s*\n(.*?\n)---\s*\n(.*)/m.freeze
+  FRONTMATTER_RE = /\A---\s*\n((?:.*?\n)?)---\s*\n(.*)/m.freeze
 end
 
 require_relative 'abqari/log'

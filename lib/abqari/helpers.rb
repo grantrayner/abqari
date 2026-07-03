@@ -10,12 +10,12 @@ module Abqari
   module Helpers
     extend self
 
-    # HTML-escape a value for safe interpolation in markup. Abqari uses
-    # plain `ERB.new` (no auto-escaping), so any value that originates
-    # outside the author's own frontmatter — Folio publications, fetched
-    # data, anything user-submitted — should pass through `h()` before
-    # rendering. Author-controlled frontmatter follows Jekyll/Hugo
-    # convention (trusted), but applying `h()` defensively never hurts.
+    # HTML-escape a value for safe interpolation in markup. Templates
+    # render through Erubi with `escape: true`, so `<%= value %>` already
+    # escapes via this function automatically; call `h()` explicitly only
+    # when building raw HTML strings emitted via `<%==` (e.g. `link_to`,
+    # `buy_button`, `bundle_picture_tag`), or inside a `<%==` block that
+    # interpolates an untrusted value directly.
     def h(text)
       CGI.escapeHTML(text.to_s)
     end
@@ -51,11 +51,19 @@ def script_safe_json(value)
 end
 
     # Validate a URL for use in href / src attributes. Returns the
-    # HTML-escaped URL when it's a same-origin path or an http(s) URL;
-    # returns nil otherwise. Blocks `javascript:`, `data:` (HTML),
-    # `vbscript:` and other scheme-based XSS vectors. Use whenever a
-    # URL comes from outside author-controlled content (Folio buy_url,
-    # fetched data, etc.).
+    # RAW (un-escaped) URL when it's a same-origin path or an http(s)/
+    # mailto URL; returns nil otherwise. Blocks `javascript:`, `data:`
+    # (HTML), `vbscript:` and other scheme-based XSS vectors. Use
+    # whenever a URL comes from outside author-controlled content
+    # (Folio buy_url, fetched data, etc.).
+    #
+    # HTML-escaping is the CALLER's job. In a template, `<%= sanitized_url(u) %>`
+    # escapes once via Erubi's auto-escaping — correct. Do NOT escape
+    # here as well: returning pre-escaped output double-escapes any URL
+    # with a query string (`?a=1&b=2` → `&amp;amp;`) in every `<%=`
+    # context. Helpers that build raw HTML strings emitted via `<%==`
+    # (`link_to`, `buy_button`, `bundle_picture_tag`) wrap the result in
+    # `h(...)` themselves.
     #
     # Protocol-relative URLs (`//evil.com/x`) are rejected. Browsers
     # treat them as `<current-scheme>://evil.com/x`, so they're a
@@ -68,7 +76,7 @@ end
       s = url.to_s.strip
       return nil if s.empty?
       return nil if s.start_with?('//')
-      return h(s) if s.start_with?('/', '#')
+      return s if s.start_with?('/', '#')
 
       begin
         uri = URI.parse(s)
@@ -79,7 +87,7 @@ end
       return nil unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS) || uri.is_a?(URI::MailTo)
       return nil if uri.is_a?(URI::HTTP) && uri.host.to_s.empty?
 
-      h(uri.to_s)
+      uri.to_s
     end
 
     # Truncate `text` so the visible result (kept content + omission)
@@ -162,7 +170,10 @@ end
     end
 
     def link_to(text, url, **attrs)
-      safe_url = sanitized_url(url) || '#'
+      # `sanitized_url` now returns a raw URL, so escape it here — this
+      # method returns a full <a> tag emitted via `<%==` (raw), so no
+      # auto-escaping downstream will do it for us.
+      safe_url = h(sanitized_url(url) || '#')
       attrs_str = attrs.map { |k, v| %(#{h(k.to_s)}="#{h(v.to_s)}") }.join(' ')
       attrs_str = " #{attrs_str}" unless attrs_str.empty?
       %(<a href="#{safe_url}"#{attrs_str}>#{h(text)}</a>)
@@ -179,7 +190,9 @@ end
     def reading_time(text, wpm: 200)
       stripped = text.to_s.gsub(/<[^>]+>/, '')
       word_count = stripped.split(/\s+/).length
-      minutes = (word_count / wpm.to_f).ceil
+      # Clamp wpm to ≥1 (a `wpm: 0` would divide to Infinity → FloatDomainError)
+      # and the result to ≥1 minute (empty text shouldn't read "0 min read").
+      minutes = [(word_count / [wpm.to_f, 1.0].max).ceil, 1].max
       "#{minutes} min read"
     end
 

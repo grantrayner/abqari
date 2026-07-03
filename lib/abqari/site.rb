@@ -79,7 +79,7 @@ module Abqari
       @env = (ENV['ABQARI_ENV'] || 'development').to_sym
       @loader = SiteLoader.new(self)
       raw     = @loader.load_config
-      SiteConfig.validate!(raw)
+      SiteConfig.validate!(raw, env: @env)
       # Fold static defaults under the user's config so call sites can
       # do `config['indexable']` instead of `config.fetch(..., true)`.
       # Dynamic defaults (minify, env-based) stay in their callers.
@@ -116,7 +116,12 @@ module Abqari
     # watchers calling `build` repeatedly, applications embedding the
     # gem) get TZ back at the value they had before the build, not
     # `'UTC'` (or whatever the site configured).
-    def build(incremental: false)
+    # `side_effects: false` skips the outbound network steps (POSSE
+    # syndication, webmention sending). `bin/audit` builds in production
+    # to exercise the real CSP/minify/fingerprint paths, but it must not
+    # broadcast the posts it's auditing — an audit is a dry run, not a
+    # publish.
+    def build(incremental: false, side_effects: true)
       @incremental = incremental
       prev_tz = ENV['TZ']
       apply_timezone!
@@ -145,8 +150,10 @@ module Abqari
       @artifacts.write_deploy_artifacts
       visualizations.write_data
       Search.new(self).run
-      Indieweb::Sender.new(self).send_all   # POST webmentions for new outbound links (opt-in)
-      Syndication::Dispatcher.new(self).run # POSSE: crosspost to Mastodon/Bluesky (opt-in)
+      if side_effects
+        Indieweb::Sender.new(self).send_all   # POST webmentions for new outbound links (opt-in)
+        Syndication::Dispatcher.new(self).run # POSSE: crosspost to Mastodon/Bluesky (opt-in)
+      end
 
       # Build-complete sentinel (`Abqari::BUILD_OK_SENTINEL`). Written
       # ONLY on the success path — if any step above raises, this line
@@ -565,7 +572,11 @@ module Abqari
     # latest-post module, and several JSON-LD partials. Recomputing
     # on each call is O(N); cache once per build.
     def posts
-      memo(:posts) { @pages.select(&:post?).sort_by(&:date).reverse }
+      # Guard the sort against a date-less post (no `date:` frontmatter
+      # and no `YYYY-MM-DD-` dir prefix): `sort_by(&:date)` on a nil
+      # raises `comparison of NilClass with Time failed`. Undated posts
+      # sort to the end, matching `taxonomy_pages`.
+      memo(:posts) { @pages.select(&:post?).sort_by { |p| p.date || Time.at(0) }.reverse }
     end
 
     def posts_by_tag

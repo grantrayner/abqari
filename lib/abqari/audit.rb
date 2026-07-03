@@ -53,7 +53,9 @@ module Abqari
     end
 
     def run
-      @site.build
+      # No syndication / webmention sending during an audit — auditing a
+      # not-yet-deployed post must not broadcast it. See Site#build.
+      @site.build(side_effects: false)
       RULES.each { |klass| klass.new(@site, @findings).run }
       write_report
       self

@@ -2,6 +2,8 @@
 
 require 'net/http'
 require 'uri'
+require 'resolv'
+require 'ipaddr'
 
 module Abqari
   # Bounded HTTP GET helper for build-time fetches.
@@ -47,12 +49,14 @@ module Abqari
             headers: {},
             max_bytes: DEFAULT_MAX_BYTES,
             open_timeout: DEFAULT_OPEN_TIMEOUT,
-            read_timeout: DEFAULT_READ_TIMEOUT)
+            read_timeout: DEFAULT_READ_TIMEOUT,
+            block_private: false)
       request(:get, uri,
               headers: headers,
               max_bytes: max_bytes,
               open_timeout: open_timeout,
-              read_timeout: read_timeout)
+              read_timeout: read_timeout,
+              block_private: block_private)
     end
 
     # General-purpose bounded request — same streaming + cap +
@@ -69,8 +73,26 @@ module Abqari
                 body: nil,
                 max_bytes: DEFAULT_MAX_BYTES,
                 open_timeout: DEFAULT_OPEN_TIMEOUT,
-                read_timeout: DEFAULT_READ_TIMEOUT)
+                read_timeout: DEFAULT_READ_TIMEOUT,
+                block_private: false)
       uri = URI(uri) unless uri.is_a?(URI)
+
+      # Never transmit a bearer token in cleartext. Callers that attach
+      # an Authorization header (webmention.io, POSSE adapters) must use
+      # https — an http:// endpoint would leak the token to any on-path
+      # observer / proxy log.
+      if headers.keys.any? { |k| k.to_s.casecmp?('authorization') } && uri.scheme != 'https'
+        raise ArgumentError, "refusing to send an Authorization header over #{uri.scheme}:// (cleartext) to #{uri.host}"
+      end
+
+      # SSRF guard for untrusted destinations (importer image URLs from a
+      # third-party export). Best-effort: resolve the host and refuse
+      # private / loopback / link-local addresses so a hostile export
+      # can't make the build fetch `http://169.254.169.254/…` or an
+      # internal service. (DNS-rebinding TOCTOU remains — acceptable for
+      # a local build tool.)
+      assert_public_host!(uri) if block_private
+
       req = build_request(method, uri, body)
       headers.each { |k, v| req[k] = v.to_s }
 
@@ -114,6 +136,33 @@ module Abqari
       headers = {}
       res.each_header { |name, value| headers[name.downcase] = value }
       headers
+    end
+
+    class BlockedHostError < StandardError; end
+
+    # Raise unless every address `uri.host` resolves to is public.
+    def assert_public_host!(uri)
+      host = uri.host.to_s
+      addresses =
+        begin
+          Resolv.getaddresses(host)
+        rescue StandardError
+          []
+        end
+      # If the host is itself an IP literal, check it directly.
+      addresses = [host] if addresses.empty?
+
+      addresses.each do |addr|
+        ip = begin
+          IPAddr.new(addr)
+        rescue IPAddr::Error
+          next # not an IP (unresolvable name) — let the request fail normally
+        end
+        next unless ip.loopback? || ip.private? || ip.link_local?
+
+        raise BlockedHostError,
+              "refusing to fetch #{host}: resolves to non-public address #{addr}"
+      end
     end
   end
 end

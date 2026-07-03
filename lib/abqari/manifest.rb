@@ -16,12 +16,13 @@ module Abqari
       'display'          => 'standalone',
       'start_url'        => '/',
       'theme_color'      => '#ffffff',
-      'background_color' => '#ffffff',
-      'icons'            => [
-        { 'src' => '/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png' },
-        { 'src' => '/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png' }
-      ]
+      'background_color' => '#ffffff'
     }.freeze
+
+    DEFAULT_ICONS = [
+      { 'src' => '/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png' },
+      { 'src' => '/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png' }
+    ].freeze
 
     def initialize(site)
       @site = site
@@ -38,8 +39,20 @@ module Abqari
       DEFAULTS.merge(
         'name'       => @cfg['name']       || @site.config['title'],
         'short_name' => @cfg['short_name'] || @site.config['title'],
-        'lang'       => @cfg['lang']       || @site.config['locale'] || 'en'
+        'lang'       => @cfg['lang']       || @site.config['locale'] || 'en',
+        'icons'      => default_icons
       ).merge(@cfg).reject { |_, v| v.nil? }
+    end
+
+    # Only advertise the default icons that actually exist in the site's
+    # public/ — otherwise the manifest points at `/icon-192.png` etc.
+    # that were never generated (no `bin/icons` run), and every install
+    # attempt / Lighthouse PWA audit 404s. A user-supplied `manifest.icons`
+    # array overrides this entirely (via the `.merge(@cfg)` above).
+    def default_icons
+      public_dir = File.join(@site.site_root, 'public')
+      present = DEFAULT_ICONS.select { |icon| File.exist?(File.join(public_dir, icon['src'].sub(%r{\A/}, ''))) }
+      present.empty? ? nil : present
     end
   end
 end

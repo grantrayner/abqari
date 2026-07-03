@@ -143,7 +143,7 @@ module Abqari
         # Path 2 + 3 — hand-rolled siblings or plain <img>.
         attrs = []
         attrs << %(class="#{h(class_)}")            if class_
-        attrs << %(src="#{img_url}")
+        attrs << %(src="#{h(img_url)}")
         attrs << %(alt="#{h(alt)}")
         attrs << %(loading="#{loading}")
         attrs << %(fetchpriority="#{fetchpriority}") if fetchpriority
@@ -164,11 +164,11 @@ module Abqari
         sources = []
         if avif_exists
           avif_url = sanitized_url(bundle_asset_url_for(page, "#{basename}.avif"))
-          sources << %(<source type="image/avif" srcset="#{avif_url}">)
+          sources << %(<source type="image/avif" srcset="#{h(avif_url)}">)
         end
         if webp_exists
           webp_url = sanitized_url(bundle_asset_url_for(page, "#{basename}.webp"))
-          sources << %(<source type="image/webp" srcset="#{webp_url}">)
+          sources << %(<source type="image/webp" srcset="#{h(webp_url)}">)
         end
 
         "<picture>#{sources.join}#{plain_img}</picture>"

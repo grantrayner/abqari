@@ -128,11 +128,24 @@ module Abqari
       return @date if defined?(@date)
 
       source_for_date = bundle_dir ? File.basename(bundle_dir) : File.basename(source_path)
+      prefix_match    = source_for_date.match(DATE_PREFIX_RE)
 
       @date = if frontmatter['date']
-                Helpers.to_time(frontmatter['date'])
-              elsif (match = source_for_date.match(DATE_PREFIX_RE))
-                Time.new(match[1].to_i, match[2].to_i, match[3].to_i)
+                fm_date = begin
+                  Helpers.to_time(frontmatter['date'])
+                rescue ArgumentError, TypeError => e
+                  raise "invalid date #{frontmatter['date'].inspect} in #{source_path}: #{e.message}"
+                end
+                # Front matter wins over the filename prefix, but warn if
+                # they disagree — a silent mismatch is a common "why is my
+                # URL/order wrong?" gotcha.
+                if prefix_match && fm_date.strftime('%Y-%m-%d') != prefix_match[0].chomp('-')
+                  Log.warn "date mismatch in #{source_path}: frontmatter " \
+                           "#{fm_date.strftime('%Y-%m-%d')} overrides filename prefix #{prefix_match[0].chomp('-')}"
+                end
+                fm_date
+              elsif prefix_match
+                Time.new(prefix_match[1].to_i, prefix_match[2].to_i, prefix_match[3].to_i)
               end
     end
 
@@ -363,7 +376,8 @@ module Abqari
           break unless paragraph_lines.empty?
           next
         end
-        next if stripped.start_with?('#', '>', '-', '*', '+', '```', '~~~', '|', '<%')
+        next if stripped.start_with?('#', '>', '```', '~~~', '|', '<%')
+        next if stripped.match?(/\A[-*+]\s/)          # unordered list item (marker + space)
         next if stripped.match?(/\A\d+\.\s/)         # ordered list
         next if stripped.match?(/\A!\[/)              # image-only line
         next if stripped.match?(/\A\[.+\]:\s/)        # link reference
@@ -374,12 +388,12 @@ module Abqari
 
       raw = paragraph_lines.join(' ')
       # Strip basic markdown decorations so the description reads as
-      # prose, not source. Order matters: links first (`[text](url)` →
-      # `text`), then inline code (`` `code` `` → `code`), then bold /
-      # italic markers.
+      # prose, not source. Images first (`![alt](url)` → `alt`) so the
+      # link pattern below doesn't consume `[alt](url)` and orphan the
+      # leading `!`; then inline links, inline code, bold / italic.
       plain = raw.dup
-      plain.gsub!(/\[([^\]]+)\]\([^)]+\)/, '\1')
       plain.gsub!(/!\[([^\]]*)\]\([^)]+\)/, '\1')
+      plain.gsub!(/\[([^\]]+)\]\([^)]+\)/, '\1')
       plain.gsub!(/`([^`]+)`/, '\1')
       plain.gsub!(/\*\*([^*]+)\*\*/, '\1')
       plain.gsub!(/__([^_]+)__/, '\1')

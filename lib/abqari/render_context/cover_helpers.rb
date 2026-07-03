@@ -71,6 +71,20 @@ module Abqari
         (site.collection_config(col).dig(context.to_s, 'cover') || DEFAULT_COVER_MODE).to_s
       end
 
+      # `cover:` is overloaded: it's usually a MODE enum (`svg`, `none`,
+      # …) but a site can also point it at an image path. This returns
+      # the value ONLY when it's an actual image path — a non-mode,
+      # non-boolean string — so the head partial doesn't turn
+      # `cover: svg` into an `og:image` of `/posts/foo/svg`. Returns nil
+      # for modes, booleans, and blanks.
+      def cover_image_path(page)
+        fm = page.respond_to?(:frontmatter) ? page.frontmatter['cover'] : nil
+        return nil unless fm.is_a?(String)
+        return nil if fm.strip.empty? || COVER_MODES.include?(fm)
+
+        fm
+      end
+
       # What to actually render for the cover slot, given the resolved
       # mode and whether the page has an `image:` set. Returns one of:
       #

@@ -105,7 +105,13 @@ class ErbEscapeAuditTest < Minitest::Test
     # config (webmention.io endpoint URL + Bridgy Fed domain
     # interpolation). The values come from `site.config['indieweb']`
     # which the site author writes themselves — no third-party data.
-    "link_tag"
+    "link_tag",
+
+    # _head.html.erb: `favicon_link` is a constant `<link>` string from
+    # the engine-defined `icon_links` hash (fixed filenames + fixed
+    # markup, no interpolation of any page/site/user value). Emitted raw
+    # so the tag renders as markup, not escaped text.
+    "favicon_link"
   ].freeze
 
   def test_no_unaudited_raw_interpolations

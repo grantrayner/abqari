@@ -21,7 +21,17 @@ module Abqari
 
     def self.process(html)
       html = html.gsub(COMMONMARKER_BLOCK) { highlight(Regexp.last_match[:lang], Regexp.last_match[:code]) }
-      html.gsub(PLAIN_BLOCK) { highlight(Regexp.last_match[:lang], Regexp.last_match[:code]) }
+      html.gsub(PLAIN_BLOCK) do
+        m = Regexp.last_match
+        # Skip blocks the first pass already produced — they carry
+        # `class="highlight"` on the <pre>. Re-running `highlight` on them
+        # would strip the Rouge `<span>`s (losing the highlighting) and
+        # unescape entities a second time (`&amp;amp;` → `&amp;` → `&`).
+        pre_tag = m[0][/\A<pre[^>]*>/]
+        next m[0] if pre_tag&.include?('highlight')
+
+        highlight(m[:lang], m[:code])
+      end
     end
 
     def self.highlight(lang, code)

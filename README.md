@@ -20,7 +20,10 @@ supported for users who want to own all the code.
 
 ## Design principles
 
-1. **Minimal dependencies.** Five or six gems, no more.
+1. **Minimal dependencies.** Eight small runtime gems — three
+   (`commonmarker`, `erubi`, `ruby-vips`) do the work on every build;
+   the rest cover syntax highlighting, the dev server, and content
+   importers.
 2. **Ruby-first.** ERB templates, real Ruby in views.
 3. **Rails-style structure.** `app/views/`, `app/helpers/`, `config/`.
 4. **SEO baked in.** Sitemap, RSS, JSON Feed, OG, JSON-LD, robots, redirects — all native.
@@ -123,9 +126,15 @@ on Ubuntu/Debian.
 
 ### Step 2 — Install Abqari (one-time)
 
-Abqari isn't on RubyGems yet, so you install it from a git checkout
-of the engine repository. From inside your projects folder (the one
-you `cd`'d into above — e.g. `~/apps`):
+Install the gem from RubyGems — this puts the global `abqari` command
+on your `PATH`:
+
+```bash
+gem install abqari
+```
+
+Prefer to work from a git checkout of the engine (to read or fork the
+source)? Build and install it locally instead:
 
 ```bash
 git clone https://github.com/grantrayner/abqari.git
@@ -133,9 +142,6 @@ cd abqari
 gem build abqari.gemspec
 gem install ./abqari-*.gem
 ```
-
-After this, `abqari/` lives at `~/apps/abqari/` and the global
-`abqari` command is on your `PATH`.
 
 Test that it worked:
 
@@ -356,7 +362,7 @@ Edit `Gemfile`:
 ```ruby
 source 'https://rubygems.org'
 
-gem 'abqari', '~> 0.2'
+gem 'abqari', '~> 1.0'
 
 group :development do
   gem 'listen', '~> 3.8'    # optional, for the dev-server file watcher
@@ -366,7 +372,7 @@ end
 Or — pin to a git ref while tracking pre-release work:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v0.2.0'
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.0.0'
 ```
 
 Install the libvips C library once (hard dep for the image pipeline):
@@ -486,20 +492,61 @@ internals. For most sites, Path A is cleaner.
 
 ### Commands
 
-| Command | What it does |
+A freshly scaffolded site (`abqari new`) ships five `bin/` scripts —
+`build`, `serve`, `audit`, `new`, and `import`. The rest in the table
+below (`fetch-fonts`, `index`, `deploy`, `upgrade`, `test`) are thin
+one-line wrappers around the engine; add them when you need the
+feature (each linked section shows the exact contents), or inherit
+them all by [forking the engine](#path-b--fork-the-engine). `bin/test`
+is engine-only — it runs the engine's own suite, not your site's.
+
+| Command | Scaffolded? | What it does |
+| --- | --- | --- |
+| `bin/new` | ✅ | Configure site identity, locale, theme; `--clean` to wipe examples. See [Generator](#generator). |
+| `bin/new post "Title"` | ✅ | Scaffold a new post bundle: `content/posts/<date>-<slug>/index.md`. |
+| `bin/new page "Title"` | ✅ | Scaffold a top-level page: `content/<slug>.md`. |
+| `bin/import <platform> <source>` | ✅ | Import content from another platform's export (Substack, Ghost, Jekyll). See [Importing content](#importing-content). |
+| `bin/build` | ✅ | Render the site to `_site/`. Defaults to `ABQARI_ENV=production`. |
+| `bin/serve` | ✅ | Build and serve on `:4000`. Defaults to `ABQARI_ENV=development` with file-watch + livereload. |
+| `bin/audit` | ✅ | Build the site, walk the output, write a markdown audit report. See [Audit](#audit). |
+| `bin/fetch-fonts` | add as needed | Download self-hosted Google Fonts to `vendor/fonts/`. See [Fonts](#fonts). |
+| `bin/index` | add as needed | Build the Pagefind search index (also auto-runs in `bin/build` when `search: true`). See [Search](#search). |
+| `bin/deploy` | add as needed | Build and ship `_site/` to your configured host. See [Deploying](#deploying). |
+| `bin/upgrade` | fork only | Pull engine updates from your upstream Abqari repo. See [Upgrading](#upgrading). |
+| `bin/test` | engine only | Run the engine's Minitest suite. See [Testing](#testing). |
+
+### Environment variables
+
+Abqari reads these at build/serve time. Most sites need none of them —
+they're for CI, previews, and edge cases.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ABQARI_ENV` | `development` | Build environment. `production` enables indexing + minification and excludes drafts/future posts. |
+| `ABQARI_SITE_ROOT` | current dir | Site root. Set by `bin/*` wrappers; override to build a site elsewhere. |
+| `ABQARI_OUTPUT_DIR` | `<site>/_site` | Output directory. Refuses to wipe the site root or a source dir. |
+| `ABQARI_LOG` | `info` | Log level: `debug` / `info` / `warn` / `error`. |
+| `ABQARI_INCLUDE_DRAFTS` | unset | `true` forces `published: false` posts into the build. |
+| `ABQARI_INCLUDE_FUTURE` | unset | `true` forces future-dated posts into the build. |
+| `ABQARI_STRICT_CONFIG` | unset | `true` turns unknown-config-key warnings (and a missing `config/site.yml`) into hard errors. Recommended in CI. |
+| `ABQARI_BIND` | `127.0.0.1` | Dev-server bind address. Set `0.0.0.0` to preview on a phone over LAN. |
+| `ABQARI_SLOW_PAGE_MS` | `500` | Slow-page warning threshold (ms); `0` disables it. |
+| `ABQARI_ALLOW_EXTERNAL_OUTPUT` | unset | `true` permits an output dir outside the site root (CI artifact mounts). |
+| `ABQARI_ALLOW_EXTERNAL_SYMLINKS` | unset | `true` permits symlinks that escape the site root. Avoid. |
+
+**Secrets** (POSSE syndication + webmentions) can come from the
+environment instead of committed `config/site.yml` — set these in your
+CI's secret store:
+
+| Variable | Replaces |
 | --- | --- |
-| `bin/new` | Configure site identity, locale, theme; `--clean` to wipe examples. See [Generator](#generator). |
-| `bin/new post "Title"` | Scaffold a new post bundle: `content/posts/<date>-<slug>/index.md`. |
-| `bin/new page "Title"` | Scaffold a top-level page: `content/<slug>.md`. |
-| `bin/import <platform> <source>` | Import content from another platform's export (Substack, Ghost, Jekyll). See [Importing content](#importing-content). |
-| `bin/build` | Render the site to `_site/`. Defaults to `ABQARI_ENV=production`. |
-| `bin/serve` | Build and serve on `:4000`. Defaults to `ABQARI_ENV=development` with file-watch + livereload. |
-| `bin/test` | Run the Minitest suite. See [Testing](#testing). |
-| `bin/audit` | Build the site, walk the output, write a markdown audit report. See [Audit](#audit). |
-| `bin/fetch-fonts` | Download self-hosted Google Fonts to `vendor/fonts/`. See [Fonts](#fonts). |
-| `bin/index` | Build the Pagefind search index (also auto-runs in `bin/build` when `search: true`). See [Search](#search). |
-| `bin/deploy` | Build and ship `_site/` to your configured host. See [Deploying](#deploying). |
-| `bin/upgrade` | Pull engine updates from your upstream Abqari repo. See [Upgrading](#upgrading). |
+| `ABQARI_MASTODON_TOKEN` | `syndication.mastodon.access_token` |
+| `ABQARI_BLUESKY_APP_PASSWORD` | `syndication.bluesky.app_password` |
+| `ABQARI_WEBMENTION_IO_TOKEN` | `indieweb.webmention_io_token` |
+
+> Syndication and webmention sending only fire in `ABQARI_ENV=production`
+> — a dev build (`bin/serve`) never posts to Mastodon/Bluesky, even
+> with `syndication.enabled: true`.
 
 ## Generator
 
@@ -1348,18 +1395,6 @@ and a sun when dark is active. Customize the icons in
 `app/icons/sun.svg` and `app/icons/moon.svg`; restyle the button via
 `.theme-toggle` in your site's CSS.
 
-### Light/dark toggle
-
-Each shipped theme has a built-in dark mode that responds to `prefers-color-scheme` *and* a manual user toggle. The toggle is opt-in via a partial, but the default nav already renders it — remove `<%= render 'partials/theme_toggle' %>` from `_nav.html.erb` if you don't want it.
-
-How it works:
-- A tiny inline `<script>` in `<head>` reads `localStorage['theme']` and sets `<html data-theme="dark">` (or `light`) **before** render — no flash of the wrong theme.
-- The strict CSP is preserved by pinning the inline script's SHA256 hash in `_headers`. No `'unsafe-inline'`.
-- Each theme's CSS responds to `[data-theme="dark"]` / `[data-theme="light"]` overrides; without an attribute, `prefers-color-scheme` still wins.
-- Clicking the toggle button flips `data-theme` and persists in localStorage via `app/assets/js/theme-toggle.js` (deferred, no FOUC risk).
-
-The button shows a moon when light is active (click → switch to dark) and a sun when dark is active. Customize the icons in `app/icons/sun.svg` and `app/icons/moon.svg`; restyle the button via `.theme-toggle` in your theme CSS.
-
 ## Fonts
 
 Self-host Google Fonts to keep your site privacy-friendly (no requests to `fonts.googleapis.com` from your visitors' browsers). Configure in `site.yml`:
@@ -2140,7 +2175,7 @@ bin/audit                  # verify nothing regressed
 Optionally pin to a tagged release in your `Gemfile`:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/your-handle/abqari.git', tag: 'v0.2.0'
+gem 'abqari', git: 'https://github.com/your-handle/abqari.git', tag: 'v1.0.0'
 ```
 
 Pinning to a tag is recommended for production deploys — you get
@@ -2184,7 +2219,7 @@ flows:
 bin/upgrade --check         # show what would change; modify nothing
 bin/upgrade --engine-only   # overwrite lib/, bin/, Gemfile from upstream — safest
 bin/upgrade                 # full git merge — for users who want everything
-bin/upgrade --to v0.2.0     # target a specific tag
+bin/upgrade --to v1.0.0     # target a specific tag
 ```
 
 `--engine-only` is the recommended default for sites that have
@@ -2297,8 +2332,9 @@ layout: application       # optional, defaults to 'application'
 
 Stable, semver-tracked surface area as of `1.0.0`. The
 [CHANGELOG](CHANGELOG.md) lists every shipping feature; broadly:
-five collections (`posts`, `cookbook`, `photos`, `publications`,
-`workshops`), ERB templating with the standard helper library,
+four built-in collections (`posts`, `photos`, `publications`,
+`workshops`) plus the `bundles`/`series` meta-collections, ERB
+templating with the standard helper library,
 the libvips image pipeline, full SEO suite, IndieWeb + POSSE,
 content importers, `bin/audit` quality gates, and shipped deploy
 templates for Cloudflare Pages, GitHub Pages, and Render.

@@ -31,7 +31,17 @@ module Abqari
       # site declares its own theme, Folio config, etc.
       site_root = ENV['ABQARI_SITE_ROOT'] || Dir.pwd
       path = File.join(site_root, 'config', 'site.yml')
-      return {} unless File.exist?(path)
+      unless File.exist?(path)
+        # Silent `{}` here means "wrong directory" or a typo'd
+        # ABQARI_SITE_ROOT produces a defaults-only build with no signal.
+        # Warn loudly (and let ABQARI_STRICT_CONFIG make it fatal).
+        msg = "config/site.yml not found at #{path} — building with defaults only " \
+              '(no title, no url). Are you in the site directory?'
+        raise ArgumentError, msg if ENV['ABQARI_STRICT_CONFIG'] == 'true'
+
+        Log.warn msg
+        return {}
+      end
 
       raw = YAML.safe_load_file(path, permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}
       envs = raw.delete('environments') || {}

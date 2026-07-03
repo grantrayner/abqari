@@ -1752,6 +1752,34 @@ article > header > .series__tagline {
   }
 }
 
+/* Fan positioning inputs (`--i` = 0-based cover index, `--n` = cover
+   count) used to be inline `style="--i:..;--n:.."` attributes. Those
+   need `style-src 'unsafe-inline'`, which would weaken the shipped
+   strict CSP for every site. Deriving them in CSS keeps `style-src
+   'self'` intact:
+     - `--i` is the child's position, so `:nth-child()` supplies it.
+     - `--n` rides a `data-n` attribute on the row and inherits down to
+       the covers (custom properties inherit).
+   Covered up to 8 covers per fan — preview stacks never show more, and
+   a 9th+ cover simply falls back to the centred default (`--i:0;
+   --n:1`), which degrades gracefully rather than breaking layout. */
+.series-preview__row[data-n="1"] { --n: 1; }
+.series-preview__row[data-n="2"] { --n: 2; }
+.series-preview__row[data-n="3"] { --n: 3; }
+.series-preview__row[data-n="4"] { --n: 4; }
+.series-preview__row[data-n="5"] { --n: 5; }
+.series-preview__row[data-n="6"] { --n: 6; }
+.series-preview__row[data-n="7"] { --n: 7; }
+.series-preview__row[data-n="8"] { --n: 8; }
+.series-preview__cover:nth-child(1) { --i: 0; }
+.series-preview__cover:nth-child(2) { --i: 1; }
+.series-preview__cover:nth-child(3) { --i: 2; }
+.series-preview__cover:nth-child(4) { --i: 3; }
+.series-preview__cover:nth-child(5) { --i: 4; }
+.series-preview__cover:nth-child(6) { --i: 5; }
+.series-preview__cover:nth-child(7) { --i: 6; }
+.series-preview__cover:nth-child(8) { --i: 7; }
+
 /* Posts series preview — flex row of landscape hero images, with
    tight horizontal overlap. Different visual metaphor from the book
    stack above: heroes lined up side-by-side with overlap, not a

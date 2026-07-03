@@ -22,6 +22,7 @@ collaborator who already has commit access:
 | `data/**/*.{yml,json}`    | Trusted     | Author-curated tables (testimonials, nav, footer). |
 | `app/views/**/*.erb`      | Trusted     | Template code; runs with full Ruby access. |
 | `themes/**/*`             | Trusted     | CSS + ERB partials shipped with the engine or the site. |
+| `plugins/**/*.rb`         | Trusted     | Loaded and executed with full Ruby access at Site construction (see `docs/plugins.md`). |
 | Folio API (`folio.foliobooks.app` or self-hosted) | Bounded | Build-time HTTP. Size-capped and timed out. |
 | Google Fonts CSS / woff2  | Bounded     | Build-time HTTP. Size-capped and timed out. |
 | Visitor browsers (HTML output) | Untrusted | Anything we emit must survive being read by any UA. |
@@ -61,9 +62,13 @@ against the cases where the cost of getting it wrong is high.
     — publisher integrations (e.g. Folio) are bounded-trust, so an
     attacker-controlled `slug:` in a compromised response can't write
     outside `_site/`.
-- `Site#reset_output` asserts containment under `site_root` before
-  `FileUtils.rm_rf` runs. Escape hatch: `ABQARI_ALLOW_EXTERNAL_OUTPUT=true`
-  for CI setups that publish to an artifact mount.
+- `ArtifactWriter#reset_output` refuses to `FileUtils.rm_rf` the
+  filesystem root, the home dir, the **site root itself** (so
+  `ABQARI_OUTPUT_DIR=.` can't wipe the project), or a source directory
+  (`content/`, `config/`, `data/`, `.git`), and asserts containment
+  under `site_root`. Escape hatch for the containment check only:
+  `ABQARI_ALLOW_EXTERNAL_OUTPUT=true` for CI setups that publish to an
+  artifact mount.
 
 ### Symlink containment
 

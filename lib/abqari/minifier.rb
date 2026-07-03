@@ -20,7 +20,14 @@ module Abqari
 
       minified = protected_html
                  .gsub(COMMENT_REGEX, '')
-                 .gsub(/>\s+</, '><')
+                 # Collapse inter-tag whitespace to a SINGLE space, not
+                 # nothing. `<em>a</em> <strong>b</strong>` must stay
+                 # "a b" — deleting the space renders "ab". The size win
+                 # from collapsing runs is nearly identical; only the
+                 # word-joining bug is avoided. (This runs after <pre>/
+                 # <textarea>/<script>/<style> are stashed, so
+                 # significant whitespace inside them is untouched.)
+                 .gsub(/>\s+</, '> <')
                  .gsub(/\s{2,}/, ' ')
                  .strip
 

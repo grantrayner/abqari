@@ -69,6 +69,31 @@ class ResetOutputTest < Minitest::Test
     end
   end
 
+  def test_reset_output_refuses_site_root_itself
+    # ABQARI_OUTPUT_DIR=. (or the site root path) passes the "under
+    # site_root" check on equality — it would wipe the whole project.
+    ENV['ABQARI_OUTPUT_DIR'] = @tmpdir
+    File.write(File.join(@tmpdir, 'precious.txt'), 'do not delete')
+    assert_raises(Abqari::PathSafe::Error) { reset_output! }
+    assert File.exist?(File.join(@tmpdir, 'precious.txt')),
+           'Site root must NOT be wiped'
+  end
+
+  def test_reset_output_refuses_content_dir
+    ENV['ABQARI_OUTPUT_DIR'] = File.join(@tmpdir, 'content')
+    FileUtils.mkdir_p(ENV['ABQARI_OUTPUT_DIR'])
+    File.write(File.join(ENV['ABQARI_OUTPUT_DIR'], 'index.md'), 'x')
+    assert_raises(Abqari::PathSafe::Error) { reset_output! }
+    assert File.exist?(File.join(ENV['ABQARI_OUTPUT_DIR'], 'index.md')),
+           'content/ must NOT be wiped'
+  end
+
+  def test_reset_output_refuses_git_dir
+    ENV['ABQARI_OUTPUT_DIR'] = File.join(@tmpdir, '.git')
+    FileUtils.mkdir_p(ENV['ABQARI_OUTPUT_DIR'])
+    assert_raises(Abqari::PathSafe::Error) { reset_output! }
+  end
+
   def test_reset_output_allows_external_dir_when_escape_hatch_set
     external = Dir.mktmpdir('abqari-external-allowed')
     begin

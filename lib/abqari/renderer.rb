@@ -96,7 +96,7 @@ module Abqari
     # ErbiTemplate for the rationale.
     def compiled_template(path)
       @template_mutex.synchronize do
-        @template_cache[path] ||= ErbiTemplate.new(File.read(path, encoding: 'UTF-8'))
+        @template_cache[path] ||= ErbiTemplate.new(File.read(path, encoding: 'UTF-8'), path)
       end
     end
 
@@ -248,6 +248,8 @@ module Abqari
     # whichever thread finishes its current page picks the next one up
     # immediately.
     def render_pages
+      detect_output_collisions!
+
       pages = @site.incremental? ? @site.all_pages.select(&:needs_render?) : @site.all_pages
       return if pages.empty?
 
@@ -320,6 +322,44 @@ module Abqari
     end
 
     private
+
+    # Fail the build when two pages resolve to the same output file.
+    # Without this, whichever page the (parallel) render loop writes
+    # last silently wins — nondeterministically build-to-build — and
+    # the sitemap emits a duplicate <loc>. Common causes: two post
+    # directories whose names differ only by the stripped `YYYY-MM-DD-`
+    # date prefix, two pages sharing a `permalink:`, or two taxonomy
+    # terms that slugify to the same value. Runs over the FULL page set
+    # (not just `needs_render?`) so a collision is caught even on an
+    # incremental rebuild that only touches one side of it.
+    def detect_output_collisions!
+      by_path = Hash.new { |h, k| h[k] = [] }
+      @site.all_pages.each do |page|
+        next unless page.respond_to?(:output_path)
+
+        by_path[page.output_path] << page
+      end
+
+      collisions = by_path.select { |_, pages| pages.size > 1 }
+      return if collisions.empty?
+
+      details = collisions.map do |path, pages|
+        sources = pages.map { |p| page_identifier(p) }.sort
+        "  #{path}\n    <- #{sources.join("\n    <- ")}"
+      end.join("\n")
+      raise "output path collision: #{collisions.size} output file(s) claimed by more than " \
+            "one page. Rename or re-slug the sources:\n#{details}"
+    end
+
+    def page_identifier(page)
+      if page.respond_to?(:source_path) && page.source_path
+        page.source_path
+      elsif page.respond_to?(:url) && page.url
+        page.url
+      else
+        page.class.name
+      end
+    end
 
     # Render a single page, collecting any exception into `errors` so a
     # failure in one page doesn't silently kill an entire slice. The
@@ -633,6 +673,13 @@ module Abqari
         raw.positive? ? raw : nil
       elsif raw == true
         configured_per_page(coll_name)
+      else
+        # A quoted `paginate: "10"` (String) or any other non-Integer,
+        # non-boolean value silently disabled pagination. Warn so the
+        # typo is visible.
+        src = page.respond_to?(:source_path) ? page.source_path : page
+        Log.warn "Ignoring `paginate: #{raw.inspect}` in #{src} — expected true, false, or a positive integer."
+        nil
       end
     end
 

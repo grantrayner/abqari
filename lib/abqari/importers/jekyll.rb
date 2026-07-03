@@ -229,13 +229,23 @@ module Abqari
         nil
       end
 
+      # Layout names imported from an untrusted export are resolved to a
+      # file path and ERB-eval'd at build time, so a traversing value is
+      # a code-execution vector. Only carry through flat/nested layout
+      # identifiers; anything with `.`, `\`, a leading `/`, or other
+      # oddities is dropped so the imported post falls back to the
+      # collection default.
+      SAFE_LAYOUT = %r{\A[A-Za-z0-9][A-Za-z0-9_\-/]*\z}.freeze
+
       def jekyll_extras(fm)
         # Preserve frontmatter keys Abqari understands. Anything else
         # is dropped silently — Jekyll's frontmatter is wildly diverse
         # and we don't want to inherit unknowns into the new site's
         # schema.
         keep = %w[layout permalink redirect_from author authors series share_image]
-        fm.slice(*keep).reject { |_, v| v.nil? || v == '' }
+        extras = fm.slice(*keep).reject { |_, v| v.nil? || v == '' }
+        extras.delete('layout') if extras['layout'] && !extras['layout'].to_s.match?(SAFE_LAYOUT)
+        extras
       end
 
       def redirects_for(_source_slug)

@@ -84,7 +84,11 @@ module Abqari
     end
 
     def render
-      layout = @source.frontmatter['layout'] || 'application'
+      # Mirror the source page's layout resolution — `layout_name` falls
+      # back to the collection's default layout before `application`, so
+      # a paginating page inside a collection renders pages 2+ with the
+      # same layout as page 1 (previously they diverged to `application`).
+      layout = @source.respond_to?(:layout_name) ? @source.layout_name : (@source.frontmatter['layout'] || 'application')
       RenderContext.new(self, @site).render_layout(layout)
     end
   end

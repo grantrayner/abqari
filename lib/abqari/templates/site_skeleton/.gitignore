@@ -4,8 +4,14 @@ vendor/fonts/*
 !vendor/fonts/.gitkeep
 vendor/folio/*
 !vendor/folio/.gitkeep
-vendor/webmentions/
-vendor/syndication/
+# Webmention/POSSE caches are ignored, but the `sent.yml` dedup logs
+# MUST be committed. They're the only record of what's already been
+# posted/pinged; a fresh CI checkout without them re-syndicates every
+# post in the window on each deploy (duplicate toots/skeets).
+vendor/webmentions/*
+!vendor/webmentions/sent.yml
+vendor/syndication/*
+!vendor/syndication/sent.yml
 audit/*.md
 .DS_Store
 *.swp

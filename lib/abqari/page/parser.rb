@@ -18,7 +18,11 @@ module Abqari
       # `@frontmatter` and `@body` together so the first access of
       # either avoids a second I/O.
       def parse
-        raw = File.read(source_path, encoding: 'UTF-8')
+        # `bom|utf-8`: strip a leading UTF-8 BOM if present. Windows
+        # editors and some exporters prepend one; without stripping, the
+        # `\A---` frontmatter anchor doesn't match and the whole
+        # `--- … ---` block renders as visible body text.
+        raw = read_source
         if (match = raw.match(FRONTMATTER_RE))
           @frontmatter = parse_frontmatter(match[1])
           @body = match[2]
@@ -56,12 +60,30 @@ module Abqari
       # because `description` always found an explicit frontmatter
       # value to return first.)
       def load_body_from_file!
-        raw = File.read(source_path, encoding: 'UTF-8')
+        raw = read_source
         @body = if (match = raw.match(FRONTMATTER_RE))
                   match[2]
                 else
                   raw
                 end
+      end
+
+      # Read the source file as UTF-8, stripping a leading BOM. Invalid
+      # byte sequences surface with the source path attached rather than
+      # a bare `ArgumentError: invalid byte sequence` far from the file.
+      def read_source
+        raw = File.read(source_path, encoding: 'bom|utf-8')
+        # `File.read` tags the string UTF-8 without validating the bytes;
+        # an invalid sequence would otherwise blow up later (in a regex
+        # match or Commonmarker) with no source path. Check here so the
+        # error names the file.
+        unless raw.valid_encoding?
+          raise "invalid UTF-8 in #{source_path}: file contains bytes that are not valid UTF-8"
+        end
+
+        raw
+      rescue ArgumentError => e
+        raise "invalid encoding in #{source_path}: #{e.message}"
       end
 
       # Parse the YAML frontmatter block, re-raising on failure with
@@ -75,6 +97,19 @@ module Abqari
       # with the path so the operator can find the offending file
       # without grepping.
       def parse_frontmatter(yaml)
+        result = load_frontmatter_yaml(yaml)
+        # Frontmatter must be a mapping. A bare scalar (`title` typed
+        # without a value) or a sequence otherwise flows on as a String
+        # or Array — `frontmatter['title']` then does String#[] substring
+        # matching (garbage) or raises a TypeError far from the parse.
+        unless result.is_a?(Hash)
+          raise "frontmatter in #{source_path} must be a mapping (key: value pairs), " \
+                "got #{result.class}"
+        end
+        result
+      end
+
+      def load_frontmatter_yaml(yaml)
         YAML.safe_load(yaml,
                        permitted_classes: Abqari::YAML_PERMITTED_CLASSES,
                        filename: source_path) || {}

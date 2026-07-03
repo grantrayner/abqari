@@ -21,6 +21,17 @@ module Abqari
       # traversal vectors or just wrong for a URL.
       PERMALINK_ALLOWED = %r{\A[A-Za-z0-9_\-./]+\z}.freeze
 
+      # Permitted `layout:` value. A layout name is resolved to a file
+      # path (`app/views/layouts/<name>.html.erb`) via `find_in_paths`,
+      # which is then `File.read` + ERB-`eval`'d — so a traversing value
+      # (`../../../../etc/foo`) is a file-read + code-execution vector,
+      # not just a bad URL. Frontmatter `layout:` can arrive from an
+      # untrusted platform export (the Jekyll importer preserves it), so
+      # allow only flat/nested layout identifiers: alphanumerics, `_`,
+      # `-`, and `/` for subdirectories. No leading `/`, no `.` (so `..`
+      # can't form), no backslash.
+      LAYOUT_ALLOWED = %r{\A[A-Za-z0-9][A-Za-z0-9_\-/]*\z}.freeze
+
       def url
         output_path
           .sub(site.output_dir, '')
@@ -66,7 +77,15 @@ module Abqari
       end
 
       def layout_name
-        return frontmatter['layout'] if frontmatter['layout']
+        if (custom = frontmatter['layout'])
+          name = custom.to_s
+          unless name.match?(LAYOUT_ALLOWED)
+            raise PathSafe::Error,
+                  "invalid layout #{custom.inspect} in #{source_path}: " \
+                  'only A-Z, a-z, 0-9, `_`, `-`, `/` are allowed (no traversal)'
+          end
+          return name
+        end
         return site.collection_config(collection)['layout'] if collection
 
         'application'
@@ -76,6 +95,16 @@ module Abqari
 
       def render_permalink(template)
         d = date || Time.now
+        if template.include?(':slug') && slug.to_s.empty?
+          # An empty slug collapses `/posts/:slug/` to `/posts/`, which
+          # writes over the collection index. The usual cause is a title
+          # with no ASCII characters — `slugify("مرحبا")` is "" — so the
+          # message points at the fix.
+          raise PathSafe::Error,
+                "empty slug for #{source_path}: the source name produced no URL-safe " \
+                'characters. Rename the directory/file or set an explicit `slug:`/`permalink:`.'
+        end
+
         template
           .gsub(':slug',  slug)
           .gsub(':year',  d.strftime('%Y'))

@@ -89,10 +89,20 @@ ENV['ABQARI_ENV'] ||= 'production'
 # Build to a temp dir so tests don't clobber the user's _site/.
 # The tmpdir is intentionally outside site_root, so opt into the
 # external-output escape hatch that Site#reset_output requires.
-ENV['ABQARI_OUTPUT_DIR'] = File.join(Dir.tmpdir, 'abqari-test-site')
+#
+# CANONICAL_OUTPUT_DIR is the shared fixture's fixed home. The shared
+# site is pinned to it regardless of what any sibling test does to
+# ENV['ABQARI_OUTPUT_DIR'] — see TestHelpers.built_site. Without the
+# pin, a rebuild triggered mid-suite (sentinel missing) could target
+# another test's tmpdir, which may already be torn down (the source of
+# the historical order-dependent flake).
+CANONICAL_OUTPUT_DIR = File.join(Dir.tmpdir, 'abqari-test-site')
+ENV['ABQARI_OUTPUT_DIR'] = CANONICAL_OUTPUT_DIR
 ENV['ABQARI_ALLOW_EXTERNAL_OUTPUT'] = 'true'
 
 module TestHelpers
+  CANONICAL_OUTPUT_DIR = ::CANONICAL_OUTPUT_DIR
+
   # Build the canonical fixture site once per test run. The
   # `Abqari::BUILD_OK_SENTINEL` file is written by `Site#build`
   # only on a fully successful build — if it's absent, either the
@@ -100,19 +110,34 @@ module TestHelpers
   # `_site/`. Either way, rebuild. The sentinel guarantees that
   # when it's present, `@pages` is populated and every artifact
   # is on disk, so no additional integrity checks are needed.
+  #
+  # ENV['ABQARI_OUTPUT_DIR'] is force-restored to CANONICAL_OUTPUT_DIR
+  # for the duration of the build so a sibling test that left it
+  # pointing at its own (possibly deleted) tmpdir can't redirect the
+  # shared fixture's output. It's restored afterward so the calling
+  # test's environment is untouched.
   def self.built_site
+    prev_out = ENV['ABQARI_OUTPUT_DIR']
+    ENV['ABQARI_OUTPUT_DIR'] = CANONICAL_OUTPUT_DIR
     @built_site ||= Abqari::Site.new
-    sentinel = File.join(@built_site.output_dir, Abqari::BUILD_OK_SENTINEL)
+    sentinel = File.join(CANONICAL_OUTPUT_DIR, Abqari::BUILD_OK_SENTINEL)
     @built_site.build unless File.exist?(sentinel)
     @built_site
+  ensure
+    ENV['ABQARI_OUTPUT_DIR'] = prev_out
   end
 
+  # Read/exist checks target CANONICAL_OUTPUT_DIR directly rather than
+  # `built_site.output_dir` (which floats with ENV) so they're immune
+  # to a sibling test's env mutation.
   def self.read_output(relative_path)
-    File.read(File.join(built_site.output_dir, relative_path), encoding: 'UTF-8')
+    built_site
+    File.read(File.join(CANONICAL_OUTPUT_DIR, relative_path), encoding: 'UTF-8')
   end
 
   def self.output_exists?(relative_path)
-    File.exist?(File.join(built_site.output_dir, relative_path))
+    built_site
+    File.exist?(File.join(CANONICAL_OUTPUT_DIR, relative_path))
   end
 end
 
@@ -126,6 +151,24 @@ end
 # test gets a chance to interfere.
 TestHelpers.built_site
 
+# Global test isolation for the process-wide `Abqari::Hooks` registry.
+# Plugin-loading tests write plugin files that register lifecycle hooks
+# (`:before_build`, `:after_generate`, `:post_process`, …) into the
+# global registry via `PluginLoader`. If a test leaks those, they fire
+# during any LATER build — including the shared fixture's rebuild in
+# AuditTest — corrupting its output (doubled taxonomy pages, mutated
+# HTML) nondeterministically. Individual test classes clear in their own
+# teardown, but a single missed path is enough; clearing here after
+# EVERY test guarantees no build ever inherits another test's hooks.
+module Minitest
+  class Test
+    def after_teardown
+      super
+      Abqari::Hooks.clear!
+    end
+  end
+end
+
 Minitest.after_run do
-  FileUtils.rm_rf(ENV['ABQARI_OUTPUT_DIR']) if ENV['ABQARI_OUTPUT_DIR']&.start_with?(Dir.tmpdir)
+  FileUtils.rm_rf(CANONICAL_OUTPUT_DIR) if CANONICAL_OUTPUT_DIR.start_with?(Dir.tmpdir)
 end

@@ -1,7 +1,12 @@
 _site/
 _import_report.md
-vendor/webmentions/
-vendor/syndication/
+# Ignore the webmention/POSSE caches but KEEP the `sent.yml` dedup logs
+# committed — they're what stops a fresh CI checkout from re-posting
+# every recent entry on each deploy.
+vendor/webmentions/*
+!vendor/webmentions/sent.yml
+vendor/syndication/*
+!vendor/syndication/sent.yml
 .bundle/
 vendor/bundle/
 vendor/folio/

@@ -87,8 +87,17 @@ module Abqari
           base = base_for(uri)
           filename = unique_filename("#{base}#{ext}")
 
-          res = Abqari::HttpSafe.get(uri, max_bytes: MAX_IMAGE_BYTES,
-                                          headers: { 'User-Agent' => 'abqari-importer' })
+          # `block_private: true` — image URLs come from a third-party
+          # export (least-trusted input in the engine). Refuse ones that
+          # resolve to internal / loopback / metadata addresses.
+          res = begin
+            Abqari::HttpSafe.get(uri, max_bytes: MAX_IMAGE_BYTES,
+                                      headers: { 'User-Agent' => 'abqari-importer' },
+                                      block_private: true)
+          rescue Abqari::HttpSafe::BlockedHostError => e
+            warn(e.message)
+            return nil
+          end
           unless res.success?
             warn("HTTP #{res.code} for #{url}")
             return nil

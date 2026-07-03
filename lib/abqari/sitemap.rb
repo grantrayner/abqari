@@ -57,7 +57,12 @@ module Abqari
 
     def skip?(page)
       return true unless page.url
-      return true if page.respond_to?(:frontmatter) && page.frontmatter['sitemap'] == false
+      return false unless page.respond_to?(:frontmatter)
+      return true if page.frontmatter['sitemap'] == false
+      # A page that tells crawlers `noindex` shouldn't also be advertised
+      # in the sitemap — the two signals contradict each other and
+      # Search Console flags it.
+      return true if page.frontmatter['robots'].to_s.include?('noindex')
 
       false
     end

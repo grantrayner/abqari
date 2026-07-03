@@ -41,10 +41,24 @@ module Abqari
     # neither in the allow-list nor `@_`-prefixed.
     TEMPLATE_PUBLIC_IVARS = %i[@page @site].freeze
 
+    # Local names that must never be shadowed by a `render(..., key: v)`
+    # local — doing so would silently replace the escaping function or a
+    # core API method for that partial. `page` is deliberately NOT here:
+    # rebinding it (`render 'partials/card', page: item`) is a supported
+    # pattern.
+    RESERVED_LOCALS = %i[h sanitized_url site render render_layout render_string
+                         script_safe_json get_binding yield_content].freeze
+
     def initialize(page, site, locals = {})
       @page = page
       @site = site
-      locals.each { |key, value| define_singleton_method(key) { value } }
+      locals.each do |key, value|
+        if RESERVED_LOCALS.include?(key.to_sym)
+          raise ArgumentError,
+                "render local #{key.inspect} would shadow the core helper of the same name — rename it"
+        end
+        define_singleton_method(key) { value }
+      end
     end
 
     def render(partial, **locals)
@@ -66,23 +80,38 @@ module Abqari
     #   ---
     #   layout: application       # this layout extends application.html.erb
     #   ---
-    def render_layout(name)
+    def render_layout(name, seen = [])
+      # Cycle guard. A layout chain that loops (`a` extends `b` extends
+      # `a`, or a layout that extends itself) would recurse forever and
+      # blow the stack with a `SystemStackError` — which isn't a
+      # `StandardError`, so it escapes the renderer's per-page rescue
+      # and crashes a worker thread with no layout name attached. Fail
+      # with the actual cycle instead.
+      if seen.include?(name)
+        raise "layout cycle detected: #{(seen + [name]).join(' -> ')}"
+      end
+      seen = seen + [name]
+
       # Layouts are hybrid: site override wins, engine version is the
       # fallback. Users override a layout by dropping their own copy
       # at `app/views/layouts/<name>.html.erb` in the site root.
       path = site.find_in_paths(File.join('app', 'views', 'layouts', "#{name}.html.erb"))
-      raw  = File.read(path, encoding: 'UTF-8')
+      unless File.exist?(path)
+        raise "layout #{name.inspect} not found (searched site root then engine root: " \
+              "#{File.join('app', 'views', 'layouts', "#{name}.html.erb")})"
+      end
+      raw = File.read(path, encoding: 'UTF-8')
 
       layout_fm, body = parse_layout_frontmatter(raw)
 
-      template = ErbiTemplate.new(body)
+      template = ErbiTemplate.new(body, path)
       inner    = template.result(get_binding)
 
       parent = layout_fm['layout']
       return inner unless parent
 
       @_yielded_content = inner
-      render_layout(parent.to_s)
+      render_layout(parent.to_s, seen)
     end
 
     # The output of the inner layout, available inside a wrapping layout
@@ -104,7 +133,8 @@ module Abqari
     # to support `erb: true` opt-in templating in markdown bodies. No
     # template caching — these strings are one-off per build.
     def render_string(template)
-      ErbiTemplate.new(template).result(get_binding)
+      label = page.respond_to?(:source_path) && page.source_path ? "#{page.source_path} (erb body)" : '(erb body)'
+      ErbiTemplate.new(template, label).result(get_binding)
     end
 
     # Slug-aware "back to index" data for a show-view page. Returns the

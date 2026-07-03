@@ -83,9 +83,43 @@ module Abqari
       apply_plausible(policy)        if plausible_key
       apply_folio(policy)            if folio_enabled?
       apply_fontawesome_kit(policy)  if fontawesome_kit?
+      apply_search(policy)           if search_enabled?
+      apply_speculation_rules(policy) if speculation_rules_enabled?
       apply_newsletter(policy)
 
       policy.map { |k, vs| "#{k} #{vs.join(' ')}" }.join('; ')
+    end
+
+    # Pagefind (opt-in via `search: true`) loads its runtime from the
+    # same origin, but that runtime compiles a WebAssembly module —
+    # and WASM compilation is governed by `script-src` regardless of
+    # origin. Without `'wasm-unsafe-eval'` the search box silently
+    # fails with a CSP violation on any host that enforces `_headers`
+    # (Cloudflare Pages, Netlify). Same-origin does NOT exempt WASM.
+    def apply_search(policy)
+      policy['script-src'] << "'wasm-unsafe-eval'"
+    end
+
+    def search_enabled?
+      @site.config['search'] == true
+    end
+
+    # The `<script type="speculationrules">` block the head emits is an
+    # inline script as far as CSP is concerned, so `script-src` must
+    # carry `'inline-speculation-rules'` (Chrome's keyword for exactly
+    # this) or the block is rejected — no prerender, plus a console
+    # error on every page. Its content is config-dependent (posts slug,
+    # eagerness), so a static hash can't cover it. On by default; the
+    # head gates on `speculation_rules.enabled` not being false.
+    def apply_speculation_rules(policy)
+      policy['script-src'] << "'inline-speculation-rules'"
+    end
+
+    def speculation_rules_enabled?
+      cfg = @site.config['speculation_rules']
+      return true unless cfg.is_a?(Hash)
+
+      cfg['enabled'] != false
     end
 
     # Plausible: external tracker + inline init script. Both need explicit

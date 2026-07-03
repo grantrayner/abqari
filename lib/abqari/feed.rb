@@ -95,7 +95,10 @@ module Abqari
 
     def feed_title
       base = @site.config['title'].to_s
-      @collection_name == 'posts' ? base : "#{base} — #{@collection_name.capitalize}"
+      # Use the slug-aliased name so the feed's own <title> matches the
+      # `<link rel="alternate" … title="…">` the head advertises (a
+      # `posts → stories` site reads "Stories", not "Posts").
+      @collection_name == 'posts' ? base : "#{base} — #{effective_name.capitalize}"
     end
 
     def rss

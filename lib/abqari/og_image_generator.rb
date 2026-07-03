@@ -72,7 +72,10 @@ module Abqari
     end
 
     def skip?(page)
-      fm = page.frontmatter rescue {}
+      # `respond_to?` instead of a blanket `rescue {}` — generated pages
+      # may not expose frontmatter, but a real error reading it shouldn't
+      # be silently swallowed.
+      fm = page.respond_to?(:frontmatter) ? page.frontmatter : {}
       # Explicit opt-out OR explicit share_image set OR page hero set
       # (in which case the head template uses the hero, not the auto
       # image — no point generating one that won't be used).

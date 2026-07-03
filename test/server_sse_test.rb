@@ -11,7 +11,16 @@ require 'socket'
 # on the wire in valid SSE format.
 class ServerSseTest < Minitest::Test
   def setup
-    @site = TestHelpers.built_site
+    # A PRIVATE Site instance, not the shared TestHelpers.built_site.
+    # `Server#start` launches a background file-watcher that calls
+    # `site.build` (→ mutates `@generated_pages`) on every change it
+    # sees under the engine tree. Pointed at the shared fixture, that
+    # watcher races other tests' use of it — the historical source of
+    # the order-independent flake. A private instance keeps the race
+    # (if any) contained to a throwaway object; teardown stops the
+    # watcher regardless.
+    @site = Abqari::Site.new
+    @site.build
     # Silence WEBrick's internal logger. The SSE endpoint rescues
     # `Errno::ECONNRESET` at the handler level, but WEBrick's request
     # loop logs the SAME error from `io_fillbuf` when the test's
@@ -34,6 +43,10 @@ class ServerSseTest < Minitest::Test
   end
 
   def teardown
+    # Stop the file watcher FIRST so no background rebuild can fire
+    # after the test — a leaked watcher thread would keep calling
+    # site.build during later tests.
+    @server&.stop_watcher
     @server.send(:shutdown_subscribers)
     # WEBrick's `shutdown` is asynchronous — give it a moment so the
     # next test's port acquisition doesn't race with the socket

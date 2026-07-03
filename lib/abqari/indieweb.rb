@@ -84,7 +84,14 @@ module Abqari
       end
 
       def enabled?
-        Indieweb.enabled?(@site) && !@cfg['webmention_io_token'].to_s.empty?
+        Indieweb.enabled?(@site) && !webmention_io_token.empty?
+      end
+
+      # ENV fallback so the API token can live in a CI secret instead of
+      # committed site.yml. Config value wins when set.
+      def webmention_io_token
+        value = @cfg['webmention_io_token'].to_s
+        value.empty? ? ENV['ABQARI_WEBMENTION_IO_TOKEN'].to_s : value
       end
 
       def cache_dir
@@ -132,7 +139,7 @@ module Abqari
         headers = {
           'Accept'        => 'application/json',
           'User-Agent'    => USER_AGENT,
-          'Authorization' => "Bearer #{@cfg['webmention_io_token']}"
+          'Authorization' => "Bearer #{webmention_io_token}"
         }
         headers['If-None-Match'] = etag if etag
 
@@ -147,7 +154,14 @@ module Abqari
         when 200
           parsed = safe_parse(res.body) || {}
           Abqari.atomic_write(cache_path, JSON.pretty_generate(parsed))
-          Abqari.atomic_write(etag_path, res['etag'].to_s) if res['etag']
+          if res['etag']
+            Abqari.atomic_write(etag_path, res['etag'].to_s)
+          elsif File.exist?(etag_path)
+            # 200 with no ETag: drop the stale one. Otherwise it keeps
+            # riding `If-None-Match` and the API answers 304 forever —
+            # the cache freezes and new mentions never appear.
+            File.delete(etag_path)
+          end
           cached_children(parsed)
         when 304
           cached_children(cached)
@@ -172,10 +186,23 @@ module Abqari
       # post layout's URL ("/posts/foo/") matches even when the original
       # webmention pointed at "https://example.com/posts/foo".
       def index_by_target(mentions)
+        own_host = begin
+          URI(@site.config['url'].to_s).host
+        rescue URI::InvalidURIError
+          nil
+        end
+
         index = Hash.new { |h, k| h[k] = [] }
         mentions.each do |mention|
           target = mention['wm-target'] || mention['target']
           next if target.to_s.empty?
+          # Drop mentions whose target is a DIFFERENT host — the lookup
+          # keys on path only (page.url has no host), so without this a
+          # mention for `https://other.example/posts/foo` would be
+          # attributed to our `/posts/foo/`. webmention.io is queried
+          # per-domain so this is belt-and-braces, but cheap.
+          next unless target_host_matches?(target, own_host)
+
           key = canonicalise(target)
           index[key] << mention
         end
@@ -183,6 +210,17 @@ module Abqari
         # section visual convention.
         index.each_value { |list| list.sort_by! { |m| m['published'].to_s }.reverse! }
         index
+      end
+
+      # True when `target`'s host matches the site's own host. When the
+      # site host is unknown (no `url` configured), don't filter — keep
+      # the historical path-only behaviour.
+      def target_host_matches?(target, own_host)
+        return true if own_host.nil?
+
+        URI(target.to_s).host == own_host
+      rescue URI::InvalidURIError
+        false
       end
 
       def canonicalise(url)
@@ -234,6 +272,13 @@ module Abqari
       # pair not already in the sent log.
       def send_all
         return unless enabled?
+        # Hard production gate — same rationale as the syndication
+        # Dispatcher. Sending webmentions is an outbound POST to every
+        # site a post links to; doing it from a dev build (which includes
+        # drafts / future posts and resolves source URLs against the dev
+        # `url`) would ping targets with unpublished, localhost-scoped
+        # source URLs. Only fire in production.
+        return unless @site.respond_to?(:env) && @site.env == :production
 
         FileUtils.mkdir_p(File.dirname(log_path))
         log = load_log
@@ -296,7 +341,14 @@ module Abqari
       def recent_posts(cutoff)
         posts = @site.respond_to?(:posts) ? @site.posts : Array(@site.collection('posts'))
         posts.select do |p|
-          p.respond_to?(:date) && p.date && p.date.to_date >= cutoff
+          next false unless p.respond_to?(:date) && p.date && p.date.to_date >= cutoff
+          # Defence in depth — never ping targets for drafts or future
+          # posts even if one reaches `posts`. See the production gate in
+          # `send_all`.
+          next false if p.respond_to?(:draft?) && p.draft?
+          next false if p.respond_to?(:future?) && p.future?
+
+          true
         end
       end
 
@@ -307,8 +359,9 @@ module Abqari
       end
 
       def canonical_site_url
-        env_url = @site.config.dig('environments', @site.env.to_s, 'url') if @site.respond_to?(:env)
-        env_url || @site.config['url']
+        # Already env-resolved — see the same method on
+        # Syndication::Dispatcher for why there's no `environments` dig.
+        @site.config['url']
       end
 
       # Extract distinct off-site http(s) URLs from a post's body.
@@ -356,7 +409,8 @@ module Abqari
           return link
         end
         link_in_html(body.body, uri)
-      rescue StandardError
+      rescue StandardError => e
+        Log.debug "webmention endpoint discovery failed for #{target}: #{e.class}: #{e.message}"
         nil
       end
 
@@ -389,7 +443,8 @@ module Abqari
                          max_bytes: max_bytes,
                          open_timeout: 5,
                          read_timeout: method == :head ? 5 : 10)
-      rescue StandardError
+      rescue StandardError => e
+        Log.debug "webmention #{method.upcase} #{uri} failed: #{e.class}: #{e.message}"
         nil
       end
 

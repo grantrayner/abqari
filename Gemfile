@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby '~> 3.3'
+ruby '>= 3.3'   # matches abqari.gemspec's required_ruby_version
 
 gem 'base64', '~> 0.2'    # used by ThemeBootstrap to compute the inline-script CSP hash
 gem 'commonmarker', '~> 1.1'

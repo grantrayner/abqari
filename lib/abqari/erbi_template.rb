@@ -41,22 +41,32 @@ module Abqari
   #                            defaults to ASCII-8BIT.)
   #   freeze_template_literals: true - frozen-string-literal-friendly
   class ErbiTemplate
-    def initialize(source)
+    # `filename` names the template on disk (a layout/partial path, or a
+    # synthetic label for an inline `erb: true` markdown body). It's
+    # threaded into both Erubi's compile and the `eval` below so a
+    # runtime error in a template reports the real file + line instead
+    # of an anonymous `(eval):NN` frame — with layout chaining and
+    # nested partials, that's the difference between "which of a dozen
+    # templates failed?" and a direct pointer.
+    def initialize(source, filename = '(erb)')
+      @filename = filename
       @compiled_src = Erubi::Engine.new(
         source,
         escape: true,
         escapefunc: 'h',
         trim: true,
         bufval: 'String.new(encoding: ::Encoding::UTF_8)',
-        freeze_template_literals: true
+        freeze_template_literals: true,
+        filename: filename
       ).src
     end
 
     # Evaluate against the supplied binding and return the rendered
     # output. The compiled source declares its own `_buf` and returns it
-    # as the last expression, mirroring ERB#result.
+    # as the last expression, mirroring ERB#result. Passing `@filename`
+    # + line 1 makes backtraces point at the template file.
     def result(bindng)
-      eval(@compiled_src, bindng) # rubocop:disable Security/Eval
+      eval(@compiled_src, bindng, @filename, 1) # rubocop:disable Security/Eval
     end
   end
 end

@@ -49,15 +49,19 @@
     #      uses the site's theme colours + page title + author + date.
     #   4. Site-wide `share_image:` config (final fallback)
     # Returns absolute URL for OG/Twitter or nil to skip.
+    # `cover:` is only an image source when it's an actual path — a
+    # `cover: svg`/`none` MODE must not become an og:image (see
+    # CoverHelpers#cover_image_path).
+    cover_img = cover_image_path(page)
     auto_og_path = if site.config.dig('og_images', 'auto') &&
                       page.frontmatter['share_image'].to_s.empty? &&
                       page.frontmatter['image'].to_s.empty? &&
-                      page.frontmatter['cover'].to_s.empty?
+                      cover_img.to_s.empty?
                      "#{page.url}og.svg"
                    end
     raw_share = page.frontmatter['share_image'] ||
                 page.frontmatter['image'] ||
-                page.frontmatter['cover'] ||
+                cover_img ||
                 auto_og_path ||
                 site.config['share_image']
     share_image = if raw_share.nil? || raw_share.to_s.empty?
@@ -220,6 +224,11 @@
     <% feeds_enabled = coll_cfg.dig('feeds', 'enabled') %>
     <% feeds_enabled = (coll_name == 'posts') if feeds_enabled.nil? %>
     <% next unless feeds_enabled %>
+    <%# Only advertise a feed that will actually be written — Feed#write
+        needs a `url` AND at least one dated item, else the <link> points
+        at a 404. Mirror those conditions here. %>
+    <% next if site.config['url'].to_s.empty? %>
+    <% next unless site.collection(coll_name).any? { |p| p.respond_to?(:date) && p.date } %>
     <% effective_name = coll_cfg['slug'].to_s.empty? ? coll_name : coll_cfg['slug'].to_s %>
     <% prefix = effective_name == 'posts' ? '' : "/#{effective_name}" %>
     <% title = effective_name == 'posts' ? site.config['title'] : "#{site.config['title']} — #{effective_name.capitalize}" %>
@@ -243,15 +252,23 @@
       only present in the rendered HTML when the file actually exists, so the
       audit stays green for users who haven't generated icons yet. %>
   <%
-    public_dir = File.join(Abqari::ROOT, 'public')
+    # Look in the SITE's public/, not the engine gem's (Abqari::ROOT).
+    # `bin/icons` writes favicons into the consuming site's public/, so
+    # checking the engine root meant a gem-installed site's favicons were
+    # never detected. (In the forked-engine layout the two roots coincide,
+    # which is why this passed the engine's own fixture.)
+    public_dir = File.join(site.site_root, 'public')
     icon_links = {
       'favicon-32x32.png'    => '<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">',
       'favicon-16x16.png'    => '<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">',
       'apple-touch-icon.png' => '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
     }
   %>
-  <% icon_links.each do |file, tag| %><% if File.exist?(File.join(public_dir, file)) %>
-  <%= tag %>
+  <%# favicon_link is a pre-built <link> element from the constant
+      icon_links hash above (no user input), emitted raw so it renders as
+      markup — auto-escaping would ship the escaped tag as visible text. %>
+  <% icon_links.each do |file, favicon_link| %><% if File.exist?(File.join(public_dir, file)) %>
+  <%== favicon_link %>
   <% end %><% end %>
   <link rel="manifest" href="/manifest.json">
   <%
@@ -294,8 +311,10 @@
   <%# Speculation Rules — prerender posts the user is likely to click
       (any `/posts/<slug>/` link in the current document). Modern
       browsers (Chrome, Edge) act on this for measurably-faster
-      navigations; other browsers safely ignore it. Strict-CSP friendly:
-      no inline JS, just a typed JSON block. Toggle off with
+      navigations; other browsers safely ignore it. The generated
+      `_headers` CSP adds `'inline-speculation-rules'` to script-src so
+      this typed JSON block is allowed under strict CSP (see
+      HeadersFile#apply_speculation_rules). Toggle off with
       `speculation_rules.enabled: false` in config.
 
       The CSP-pinned inline guard JS below honours `prefers-reduced-data`

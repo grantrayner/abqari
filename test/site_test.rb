@@ -539,7 +539,7 @@ class LayoutChainingTest < Minitest::Test
     # metadata. Match flexibly so future microformats additions don't
     # break this assertion.
     assert_match(%r{<h1[^>]*>About</h1>}, html, 'about content: h1 from page.title')
-    assert_match(%r{<header><h1[^>]*>About</h1>.*?</header>}m, html, 'header markup from inner layout')
+    assert_match(%r{<header>\s*<h1[^>]*>About</h1>.*?</header>}m, html, 'header markup from inner layout')
   end
 
   def test_yield_content_emits_inner_layout_output_inside_main

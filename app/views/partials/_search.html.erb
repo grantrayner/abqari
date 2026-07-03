@@ -4,8 +4,11 @@
 
   Pagefind walks _site/ at build time (or when `bin/index` is run) and
   emits its CSS/JS runtime + chunked search index into _site/pagefind/.
-  The runtime is loaded from /pagefind/ which is on the same origin, so
-  the strict CSP doesn't need relaxing.
+  The runtime is same-origin, but it compiles a WebAssembly module —
+  and WASM compilation is governed by CSP `script-src` regardless of
+  origin. HeadersFile#apply_search adds `'wasm-unsafe-eval'` to the
+  generated `_headers` CSP when `search: true`, so search works under
+  the strict policy on hosts that enforce `_headers`.
 
   Drop this into a layout or another partial wherever you want a search box:
     <%%= render 'partials/search' %>

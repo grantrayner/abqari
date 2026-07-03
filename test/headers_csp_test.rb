@@ -53,6 +53,28 @@ class HeadersCspTest < Minitest::Test
     assert_includes csp, "form-action 'self' https://www.cogentnotes.app"
   end
 
+  def test_search_adds_wasm_unsafe_eval
+    # Pagefind compiles a WebAssembly module; WASM compilation is
+    # governed by script-src regardless of origin.
+    assert_includes policy_for('search' => true), "'wasm-unsafe-eval'"
+  end
+
+  def test_no_search_no_wasm_unsafe_eval
+    refute_includes policy_for('search' => false), "'wasm-unsafe-eval'"
+    refute_includes policy_for, "'wasm-unsafe-eval'"
+  end
+
+  def test_speculation_rules_on_by_default_adds_keyword
+    # The inline <script type="speculationrules"> block needs the
+    # 'inline-speculation-rules' script-src keyword.
+    assert_includes policy_for, "'inline-speculation-rules'"
+  end
+
+  def test_speculation_rules_disabled_omits_keyword
+    csp = policy_for('speculation_rules' => { 'enabled' => false })
+    refute_includes csp, "'inline-speculation-rules'"
+  end
+
   def test_newsletter_extends_script_src_when_script_is_set
     csp = policy_for('newsletter' => {
                        'action' => 'https://buttondown.email/api/emails/embed-subscribe/me',

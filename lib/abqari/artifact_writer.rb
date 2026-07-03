@@ -21,16 +21,36 @@ module Abqari
       @site = site
     end
 
+    # Directory names we refuse to let `output_dir` resolve to, because
+    # wiping them destroys the user's source, not build output. Checked
+    # against the target itself AND against the site root's key children.
+    PROTECTED_SITE_DIRS = %w[content config data public .git].freeze
+
     # Wipe `output_dir` and recreate it empty. Refuses to delete:
     #   - The filesystem root (`/`, `C:\`)
     #   - The user's home directory
+    #   - The site root itself (`ABQARI_OUTPUT_DIR=.` — the guard below
+    #     for "under site_root" passes on equality, which would wipe the
+    #     whole project).
+    #   - A source directory (`content/`, `config/`, `data/`, `.git`, …).
     #   - Anything not under `site_root` (unless explicitly opted-in
     #     via ABQARI_ALLOW_EXTERNAL_OUTPUT=true).
     def reset_output
-      target = File.expand_path(@site.output_dir)
+      target    = File.expand_path(@site.output_dir)
+      site_root = File.expand_path(@site.site_root)
 
       raise PathSafe::Error, "refusing to wipe filesystem root: #{target}" if filesystem_root?(target)
       raise PathSafe::Error, "refusing to wipe home dir: #{target}" if target == File.expand_path('~')
+      raise PathSafe::Error, "refusing to wipe site root: #{target}" if target == site_root
+
+      protected_dir = PROTECTED_SITE_DIRS.find do |name|
+        dir = File.expand_path(File.join(site_root, name))
+        target == dir || dir.start_with?(target + File::SEPARATOR)
+      end
+      if protected_dir
+        raise PathSafe::Error,
+              "refusing to wipe #{target}: it is (or contains) the site's #{protected_dir}/ directory"
+      end
 
       unless ENV['ABQARI_ALLOW_EXTERNAL_OUTPUT'] == 'true'
         PathSafe.assert_under(@site.site_root, target)
@@ -52,9 +72,22 @@ module Abqari
 
         Dir.glob(File.join(public_dir, '**', '*'), File::FNM_DOTMATCH).sort.each do |entry|
           next if File.directory?(entry)
-          next if File.basename(entry).start_with?('.')
+          # Symlink containment — the one tree-walker that used to miss
+          # this. `FileUtils.cp` follows symlinks, so without the guard a
+          # `public/notes.txt -> ~/.ssh/id_ed25519` copies the target's
+          # CONTENTS into _site/ and ships them. Every other walker
+          # (asset pipeline, bundle assets, image pipeline, loader)
+          # enforces the same invariant.
+          next if @site.external_symlink?(entry)
 
-          rel  = entry.sub("#{public_dir}/", '')
+          rel = entry.sub("#{public_dir}/", '')
+          # Dotfile filter checks EVERY path component, not just the
+          # basename. FNM_DOTMATCH descends into hidden directories, so a
+          # basename-only check would still copy `.git/config`,
+          # `.svn/entries`, editor state dirs, etc. `.well-known/` is the
+          # one hidden dir a static site legitimately publishes.
+          next if hidden_path?(rel)
+
           dest = File.join(@site.output_dir, rel)
           next if File.exist?(dest) && File.mtime(dest) >= File.mtime(entry)
 
@@ -104,14 +137,21 @@ module Abqari
     # config values that should already be validated; all of those run
     # after Site#build has done its setup.
     def write_deploy_artifacts
-      Sitemap.new(@site).write
+      # Crawler-facing inventories (sitemap, llms.txt) are suppressed when
+      # the site opts out of indexing — otherwise a staging/preview deploy
+      # with `indexable: false` still publishes a full list of its URLs,
+      # defeating the point. `robots.txt` (which emits `Disallow: /` in
+      # that mode) is always written so crawlers get the signal.
+      indexable = @site.config['indexable'] != false
+
+      Sitemap.new(@site).write if indexable
       Feed.write_all(@site)
       Robots.new(@site).write
       HeadersFile.new(@site).write
       SecurityTxt.new(@site).write
       Redirects.new(@site).write
       Manifest.new(@site).write
-      LlmsTxt.new(@site).write
+      LlmsTxt.new(@site).write if indexable
       OgImageGenerator.new(@site).write
       SyntaxHighlighter::Stylesheet.new(@site).write
     end
@@ -120,6 +160,17 @@ module Abqari
 
     def filesystem_root?(path)
       path == '/' || path == File::SEPARATOR || path.match?(/\A[A-Za-z]:[\\\/]?\z/)
+    end
+
+    # True when any component of the relative path is a dotfile/dotdir,
+    # except an allowlisted `.well-known` (RFC 8615 — security.txt,
+    # ACME challenges, etc., which a static site is meant to publish).
+    ALLOWED_DOT_DIRS = %w[.well-known].freeze
+
+    def hidden_path?(rel)
+      rel.split('/').any? do |component|
+        component.start_with?('.') && !ALLOWED_DOT_DIRS.include?(component)
+      end
     end
   end
 end

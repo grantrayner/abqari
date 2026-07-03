@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'uri'
+
 module Abqari
   # Lightweight schema check for `config/site.yml`. The goal is not full
   # schema validation — yagni for a single-author tool — but to catch
@@ -108,8 +110,10 @@ module Abqari
       end
     end
 
-    def validate!(config, strict: nil)
+    def validate!(config, strict: nil, env: nil)
       strict = ENV['ABQARI_STRICT_CONFIG'] == 'true' if strict.nil?
+
+      validate_required!(config, strict: strict, env: env)
 
       unknown = config.keys.map(&:to_s).reject do |key|
         KNOWN_KEYS.include?(key) || key.start_with?('x_')
@@ -124,6 +128,55 @@ module Abqari
       raise ArgumentError, msg if strict
 
       Log.warn msg
+    end
+
+    # Keys that must be present for a correct build. `title` feeds
+    # <title>, RSS, OG; a blank one ships "Page · " everywhere. `url` is
+    # the base for every absolute URL (canonical, sitemap, feed, JSON-LD)
+    # — blank in production means no sitemap, no canonical, and invalid
+    # feed URLs. Warn on a blank title always; escalate a blank `url` in
+    # production (raise under strict, warn otherwise) since a live build
+    # with no base URL is almost always a mistake.
+    def validate_required!(config, strict:, env:)
+      if config['title'].to_s.strip.empty?
+        Log.warn 'Missing `title` in site.yml — pages will render with an empty <title>.'
+      end
+
+      if config['url'].to_s.strip.empty?
+        url_msg = 'Missing `url` in site.yml — canonical URLs, sitemap, and feeds ' \
+                  'need an absolute base URL. Set `url:` (per-environment under ' \
+                  '`environments:` is fine).'
+        if env.to_s == 'production'
+          raise ArgumentError, url_msg if strict
+
+          Log.warn url_msg
+        end
+        return
+      end
+
+      validate_url_has_no_path!(config['url'])
+    end
+
+    # Abqari emits root-relative asset and internal-link URLs (`/assets/…`,
+    # `/posts/…`, `/feed.xml`), so a `url:` with a path component
+    # (`https://user.github.io/repo`) produces a site whose every asset
+    # and link 404s under the prefix. Subdirectory/base-path deployment
+    # is not supported; fail loudly at config time instead of shipping a
+    # broken site. A bare host or a lone `/` path is fine.
+    def validate_url_has_no_path!(url)
+      path = begin
+        URI.parse(url.to_s).path.to_s
+      rescue URI::InvalidURIError
+        '' # a malformed URL is a separate problem; don't crash here
+      end
+      return if path.empty? || path == '/'
+
+      raise ArgumentError,
+            "`url` (#{url.inspect}) has a path component (#{path.inspect}). " \
+            'Abqari does not support subdirectory/base-path deployment — every ' \
+            'asset and internal link is root-relative and would 404 under a path ' \
+            'prefix. Deploy at a domain root (a custom domain, or a `<user>.github.io` ' \
+            'root repository).'
     end
   end
 end

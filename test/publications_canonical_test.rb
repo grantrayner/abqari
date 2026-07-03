@@ -141,15 +141,27 @@ class CollectionMergeTest < Minitest::Test
 
   def setup
     @site = TestHelpers.built_site
+    # Snapshot the shared site's generated-page list so teardown can
+    # restore it EXACTLY — these tests inject pages into the shared
+    # instance, and a partial cleanup leaks them into later tests.
+    @generated_snapshot = @site.instance_variable_get(:@generated_pages).dup
     @baseline = @site.collection('publications').map(&:slug)
   end
 
   def teardown
-    # Reset generated_pages caches so other tests don't see our
-    # injected page.
-    @site.instance_variable_get(:@generated_pages).reject! { |p| p.respond_to?(:slug) && p.slug == 'injected-publisher-pub' }
-    @site.instance_variable_set(:@collection_cache, nil)
-    @site.instance_variable_set(:@collection_url_index_cache, nil)
+    # Restore the exact generated-page list, then drop the memoised
+    # collection caches. The caches live in the private `@memos` hash
+    # under `:collection_cache` / `:collection_url_index_cache` — the
+    # old teardown set phantom `@collection_cache` ivars that never
+    # existed, so a stale collection (with our injected page still in
+    # it) leaked into later tests (e.g. PublicationsIndexTest saw an
+    # extra publication and failed nondeterministically by order).
+    @site.instance_variable_set(:@generated_pages, @generated_snapshot)
+    memos = @site.instance_variable_get(:@memos)
+    if memos
+      memos.delete(:collection_cache)
+      memos.delete(:collection_url_index_cache)
+    end
   end
 
   def test_collection_includes_publisher_show_page

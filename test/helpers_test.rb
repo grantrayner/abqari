@@ -102,6 +102,16 @@ class HelpersTest < Minitest::Test
     assert_equal '1 min read', reading_time(text)
   end
 
+  def test_reading_time_wpm_zero_does_not_raise
+    # `wpm: 0` used to divide to Infinity → FloatDomainError. Now wpm is
+    # clamped to ≥1, so it returns a sane string instead of crashing.
+    assert_match(/\A\d+ min read\z/, reading_time('word ' * 100, wpm: 0))
+  end
+
+  def test_reading_time_empty_text_is_one_minute
+    assert_equal '1 min read', reading_time('')
+  end
+
   # excerpt
 
   def test_excerpt_short_text_passes_through
@@ -267,10 +277,21 @@ class HelpersTest < Minitest::Test
     assert_nil sanitized_url('   ')
   end
 
-  def test_sanitized_url_escapes_quotes_in_url
-    # Even when scheme is allowed, the result must be safe to drop into href=""
-    result = sanitized_url('https://example.com/?q="><script>')
-    refute_includes result, '"'
-    refute_includes result, '<script>'
+  def test_sanitized_url_returns_raw_url_escaping_is_callers_job
+    # sanitized_url validates the scheme but returns the RAW URL — it no
+    # longer HTML-escapes. Escaping is the caller's job: `<%= %>` does it
+    # via Erubi auto-escaping, and helpers that build raw HTML (link_to,
+    # buy_button) call `h()` themselves. Returning pre-escaped output
+    # here double-escapes any URL with a query string in a `<%=` context.
+    result = sanitized_url('https://example.com/?a=1&b=2')
+    assert_equal 'https://example.com/?a=1&b=2', result,
+                 'no HTML-escaping — a single & must not become &amp;'
+  end
+
+  def test_link_to_escapes_the_url_it_embeds
+    # link_to returns a full <a> tag emitted raw (<%==), so it must
+    # escape the sanitized_url result itself.
+    html = link_to('X', 'https://example.com/?a=1&b=2')
+    assert_includes html, 'href="https://example.com/?a=1&amp;b=2"'
   end
 end

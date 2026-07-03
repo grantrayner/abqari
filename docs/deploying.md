@@ -205,8 +205,21 @@ a **public repo** (private repos need a paid plan).
 
    No secrets required — auth happens via OIDC.
 
-4. Push to `main`. The workflow builds the site and publishes it
-   to `https://<your-username>.github.io/<repo-name>/`.
+4. Push to `main`. The workflow builds the site and publishes it.
+
+   > **Deploy at a domain root, not a subpath.** Abqari emits
+   > root-relative asset and link URLs (`/assets/…`, `/posts/…`,
+   > `/feed.xml`), so a project site served under a path prefix
+   > (`https://<user>.github.io/<repo>/`) would 404 every asset. The
+   > build **hard-fails** if `url:` in `config/site.yml` has a path
+   > component. Use one of:
+   >
+   > - a **custom domain** (below) — the recommended path, and what
+   >   the shipped workflow assumes; or
+   > - a **user/organization Pages repo** named
+   >   `<user>.github.io`, which serves at the domain root.
+   >
+   > Subdirectory/base-path deployment is not supported in 1.0.
 
 ### Custom domain
 

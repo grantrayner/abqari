@@ -222,11 +222,10 @@ layout: application
         <% series_previews.each do |s| %>
           <li class="series-preview">
             <a class="series-preview__link" href="<%= sanitized_url(s[:url]) %>">
-              <span class="series-preview__row" aria-hidden="true">
-                <% s[:covers].each_with_index do |c, i| %>
+              <span class="series-preview__row" aria-hidden="true" data-n="<%= s[:covers].size %>">
+                <% s[:covers].each do |c| %>
                   <% if c[:cover] %>
                     <img class="series-preview__cover"
-                         style="--i:<%= i %>;--n:<%= s[:covers].size %>"
                          src="<%= sanitized_url(c[:cover]) %>" alt="" loading="lazy">
                   <% end %>
                 <% end %>
