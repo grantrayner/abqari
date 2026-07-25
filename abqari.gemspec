@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
-require_relative 'lib/abqari'
+# Load ONLY the version constant — never the engine. Requiring
+# `lib/abqari` here would pull in erubi/commonmarker/rouge/webrick, and
+# Bundler evaluates this file before installing dependencies when the
+# gem is consumed from a git or path source. See lib/abqari/version.rb.
+require_relative 'lib/abqari/version'
 
 Gem::Specification.new do |spec|
   spec.name        = 'abqari'

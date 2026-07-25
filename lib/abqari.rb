@@ -3,9 +3,12 @@
 require 'date'
 require 'time'
 
+# VERSION lives in its own dependency-free file so `abqari.gemspec` can
+# read it without loading the engine (and with it every runtime gem).
+require_relative 'abqari/version'
+
 module Abqari
   ROOT = File.expand_path('..', __dir__)
-  VERSION = '1.0.0'
 
   # Classes the engine accepts from any YAML input — site config,
   # data files, frontmatter, Folio cache, audit whitelists. Date +

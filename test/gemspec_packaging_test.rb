@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'test_helper'
+require 'open3'
 
 # The gemspec's `spec.files` globs decide what actually ships in the
 # published gem. `Dir.glob` skips dotfiles by default, which once
@@ -64,6 +65,39 @@ class GemspecPackagingTest < Minitest::Test
     ].each do |path|
       assert_includes spec_files, path
     end
+  end
+
+  # Evaluating the gemspec must NOT load the engine, because Bundler
+  # evaluates it before installing dependencies whenever the gem is
+  # consumed from a git or path source. It once did
+  # `require_relative 'lib/abqari'` to read VERSION, which dragged in
+  # erubi/commonmarker/rouge/webrick and broke every clean-builder
+  # deploy with "cannot load such file -- erubi". Locally it passed,
+  # because those gems were already installed — so this check has to
+  # run in a subprocess with a clean $LOADED_FEATURES.
+  def test_evaluating_the_gemspec_does_not_load_runtime_dependencies
+    script = <<~RUBY
+      spec = Gem::Specification.load('abqari.gemspec')
+      leaked = $LOADED_FEATURES.grep(/erubi|commonmarker|rouge|webrick|vips|reverse_markdown/)
+      puts spec.version
+      puts leaked.map { |f| File.basename(f) }.uniq.join(',')
+    RUBY
+
+    out, status = Open3.capture2e(RbConfig.ruby, '-e', script, chdir: ENGINE_ROOT)
+    assert status.success?, "gemspec failed to evaluate:\n#{out}"
+
+    version, leaked = out.lines.map(&:strip)
+    assert_equal Abqari::VERSION, version
+    assert_empty leaked.to_s,
+                 "gemspec loaded runtime deps (#{leaked}) — it must only read " \
+                 'lib/abqari/version.rb, or git/path installs break'
+  end
+
+  def test_version_file_is_dependency_free
+    src = File.read(File.join(ENGINE_ROOT, 'lib', 'abqari', 'version.rb'), encoding: 'UTF-8')
+    refute_match(/^\s*require/, src,
+                 'lib/abqari/version.rb must not require anything')
+    assert_includes GemspecPackagingTest.spec_files, 'lib/abqari/version.rb'
   end
 
   def test_site_specific_trees_do_not_ship
