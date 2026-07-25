@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Build the Pagefind search index for _site/. Standalone wrapper; bin/build
+# also runs this automatically when `search: true` is set in config/site.yml,
+# so you'd typically only call this directly to re-index without a full build.
+#
+# Requires pagefind on PATH. Install:
+#   macOS:   brew install pagefind
+#   General: curl -LSf https://pagefind.app/install.sh | bash
+#   Cargo:   cargo install pagefind
+
+ENV['ABQARI_ENV']       ||= 'production'
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+require 'bundler/setup'
+require 'abqari'
+
+site = Abqari::Site.new
+unless Dir.exist?(site.output_dir) && !Dir.empty?(site.output_dir)
+  abort '_site/ is empty or missing — run `bin/build` first.'
+end
+
+Abqari::Search.new(site).run!

@@ -2,8 +2,7 @@
 
 [![Ruby](https://img.shields.io/badge/ruby-%E2%89%A53.3-CC342D.svg?logo=ruby)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](test/)
-[![Audit](https://img.shields.io/badge/audit-0%20errors-brightgreen.svg)](audit/)
+[![CI](https://github.com/grantrayner/abqari/actions/workflows/ci.yml/badge.svg)](https://github.com/grantrayner/abqari/actions/workflows/ci.yml)
 
 A small, opinionated static site generator written in Ruby.
 
@@ -182,6 +181,23 @@ explanatory text on the home page, just the empty structure — add
 abqari new my-site --blank
 ```
 
+A new site starts posts-only. To enable more collections from the
+start, pass `--with` (comma-separated, any of `photos`,
+`publications`, `workshops`):
+
+```bash
+abqari new my-site --with photos
+abqari new my-site --with publications,workshops
+```
+
+For each collection named, the scaffold sets `enabled: true` in
+`config/site.yml` and creates the `content/<name>/index.md` collection
+index page with a nav entry — that index page is a real content file
+the engine doesn't auto-generate, which is the fiddly part of enabling
+a collection by hand. Skipped collections stay opt-in-able later: flip
+`enabled:` in the config and add the index page (the config comments
+show you how).
+
 You can also pass your site's name and theme up-front to skip editing
 the config later:
 
@@ -323,6 +339,8 @@ my-site/
 │       ├── index.md        # Posts landing
 │       └── welcome/        # Example post (omit with --blank)
 │           └── index.md
+│   # --with photos,publications,workshops adds the matching
+│   # content/<name>/index.md landing pages and enables them in config
 ├── app/
 │   └── assets/
 │       └── css/
@@ -492,13 +510,14 @@ internals. For most sites, Path A is cleaner.
 
 ### Commands
 
-A freshly scaffolded site (`abqari new`) ships five `bin/` scripts —
-`build`, `serve`, `audit`, `new`, and `import`. The rest in the table
-below (`fetch-fonts`, `index`, `deploy`, `upgrade`, `test`) are thin
-one-line wrappers around the engine; add them when you need the
-feature (each linked section shows the exact contents), or inherit
-them all by [forking the engine](#path-b--fork-the-engine). `bin/test`
-is engine-only — it runs the engine's own suite, not your site's.
+A freshly scaffolded site (`abqari new`) ships eight `bin/` scripts —
+`build`, `serve`, `audit`, `new`, `import`, `fetch-fonts`,
+`fetch-folio`, and `index`. The rest in the table below (`deploy`,
+`upgrade`, `test`) are thin one-line wrappers around the engine; add
+them when you need the feature (each linked section shows the exact
+contents), or inherit them all by
+[forking the engine](#path-b--fork-the-engine). `bin/test` is
+engine-only — it runs the engine's own suite, not your site's.
 
 | Command | Scaffolded? | What it does |
 | --- | --- | --- |
@@ -509,8 +528,9 @@ is engine-only — it runs the engine's own suite, not your site's.
 | `bin/build` | ✅ | Render the site to `_site/`. Defaults to `ABQARI_ENV=production`. |
 | `bin/serve` | ✅ | Build and serve on `:4000`. Defaults to `ABQARI_ENV=development` with file-watch + livereload. |
 | `bin/audit` | ✅ | Build the site, walk the output, write a markdown audit report. See [Audit](#audit). |
-| `bin/fetch-fonts` | add as needed | Download self-hosted Google Fonts to `vendor/fonts/`. See [Fonts](#fonts). |
-| `bin/index` | add as needed | Build the Pagefind search index (also auto-runs in `bin/build` when `search: true`). See [Search](#search). |
+| `bin/fetch-fonts` | ✅ | Download self-hosted Google Fonts to `vendor/fonts/`. See [Fonts](#fonts). |
+| `bin/fetch-folio` | ✅ | Force-refresh the Folio publications cache. See [Folio integration](#folio-integration). |
+| `bin/index` | ✅ | Build the Pagefind search index (also auto-runs in `bin/build` when `search: true`). See [Search](#search). |
 | `bin/deploy` | add as needed | Build and ship `_site/` to your configured host. See [Deploying](#deploying). |
 | `bin/upgrade` | fork only | Pull engine updates from your upstream Abqari repo. See [Upgrading](#upgrading). |
 | `bin/test` | engine only | Run the engine's Minitest suite. See [Testing](#testing). |
@@ -663,6 +683,8 @@ my-site/
 │   ├── build                           Thin wrapper: requires 'abqari', builds
 │   ├── serve                           Same, but for dev mode with livereload
 │   ├── audit                           Site audit → audit/<timestamp>.md
+│   ├── new                             Scaffold a post or page in content/
+│   ├── import                          Import from Substack / Ghost / Jekyll exports
 │   ├── fetch-folio                     Force-refresh the Folio cache
 │   ├── fetch-fonts                     Download self-hosted Google Fonts
 │   └── index                           Build the Pagefind search index (if enabled)
@@ -800,6 +822,8 @@ Locals passed to `render` are exposed as bare identifiers in the partial:
 | `back_to_index` | Slug-alias-aware "back to <collection>" link for show views |
 | `draft_banner`, `future_banner` | Amber banners on unpublished or future-dated pages |
 | `next_item`, `related_items`, `book_related` | Show-view follow-up blocks |
+| `next_in_series` | Forward-only "Next in the series" card (index-card treatment) |
+| `series_pager` | Bidirectional prev/next series nav; the shape to use for ordered runs — see [Ordered series](#ordered-series-courses-multi-part-guides) |
 | `testimonials` | Quote cards filtered by `data/testimonials.yml` and a book slug |
 | `publication_card` | Single book rendered as a horizontal card; shared between publications index, bundle pages, series pages |
 | `publication_header` | Cover + intro + buy buttons grid; used by the publication detail layout |
@@ -1134,6 +1158,58 @@ series: [getting-started]
 ```
 
 For each unique term across all posts in a taxonomy, Abqari generates an index page at the configured permalink. Layouts use `page.taxonomy`, `page.term`, and `page.posts`.
+
+### Ordered series (courses, multi-part guides)
+
+A taxonomy groups pages; `series_position:` orders them. Together they cover the "module of ordered lessons" shape without any extra machinery — a lesson is a page, a module is a series.
+
+```yaml
+# config/site.yml
+collections:
+  lessons:
+    enabled: true
+    source: content/lessons
+    permalink: /lessons/:slug/
+    layout: lesson
+    bundle: true          # directory per lesson, so audio/images colocate
+
+taxonomies:
+  lesson_modules:
+    field: series         # read `series:` from frontmatter
+    collection: lessons   # scope to lessons — a post in "Module 1" is a different run
+    permalink: /lessons/module/:slug/
+    layout: series_index
+```
+
+```yaml
+---
+layout: lesson
+title: Greetings and introductions
+series: Module 1 — First conversations
+series_position: 3
+---
+```
+
+Series are scoped **per collection**, matching the `<collection>_series` taxonomies: a lesson and a post that happen to share a `series:` value are independent runs, not one merged series.
+
+Navigation comes from two `site` methods and a partial:
+
+| | |
+| --- | --- |
+| `site.next_in_series(page)` | Page with the smallest position above this one, or nil |
+| `site.prev_in_series(page)` | Page with the largest position below this one, or nil |
+| `render 'partials/series_pager'` | Renders both as a compact prev/next nav |
+
+```erb
+<%# in your lesson layout %>
+<%== render 'partials/series_pager' %>
+```
+
+`series_pager` renders nothing outside a series, and drops one side at either end without letting the other change column. For a forward-only card in the index-row style, use `next_in_series` instead — that's what the built-in `post` layout does.
+
+`series_url(term)` resolves the series index URL for the *current page's* collection, so a layout shared between collections links each one to its own index. It returns nil when the collection has no series taxonomy configured — render the name as plain text in that case.
+
+**`series_position` must be an unquoted Integer.** `series_position: "3"` is a String, and a String position is invisible to `prev_in_series` / `next_in_series` — the page still builds and still appears on its module index, it just silently drops out of the prev/next chain. Duplicate positions fail the same way: the comparison is strict, so two pages at position 3 can't see each other and the chain skips one. `bin/audit` reports both under **Content**, along with pages in a series that have no position at all.
 
 ## Data files
 
@@ -1562,7 +1638,26 @@ Abqari generates a stub HTML page at `/old-tutorial/` with a `<meta refresh>` an
 
 **SEO meta** — every page's `<head>` includes canonical URL, Open Graph tags, Twitter card tags, RSS/JSON Feed alternates, and (for posts) JSON-LD `Article` structured data. All driven from `site.config` and frontmatter — no manual tagging required.
 
-**Security headers** — the default `_headers` ships with a strict CSP (`'self'` only — works because Abqari has no inline scripts/styles), HSTS (1 year), `Referrer-Policy`, `Permissions-Policy` (camera/mic/geolocation/FLoC all off), `X-Content-Type-Options`, and `frame-ancestors 'none'`. Override any of this with a `headers:` block in `site.yml`.
+**Security headers** — the default `_headers` ships with a strict CSP (`'self'` only — works because Abqari has no inline scripts/styles), HSTS (1 year), `Referrer-Policy`, `Permissions-Policy` (camera/mic/geolocation/FLoC all off), `X-Content-Type-Options`, and `frame-ancestors 'none'`.
+
+The policy is *built* from the features you've configured — enabling Plausible adds `plausible.io`, setting `newsletter.action` adds that provider's origin, and so on. You never hand-write it. Two keys extend it when the engine can't infer what you need:
+
+```yaml
+# Off-origin audio / video. Colocated bundle media needs nothing —
+# it's same-origin, so it inherits `default-src 'self'`. This key
+# exists for media on a CDN or object store.
+media:
+  host: https://media.example.com     # or a list
+
+# Any other origin the engine doesn't model.
+csp:
+  img-src:     [https://cdn.example.com]
+  connect-src: [https://api.example.com]
+```
+
+Both are **additive**: `'self'`, the pinned inline-script hashes, and every feature-derived origin survive. Values must be `scheme://host` — CSP keywords, wildcards and non-http schemes (`'unsafe-inline'`, `data:`, `blob:`, `*`) are rejected and fail the build rather than being silently dropped, because a malformed CSP fails open in the browser. Extendable directives: `child-src`, `connect-src`, `font-src`, `form-action`, `frame-src`, `img-src`, `manifest-src`, `media-src`, `script-src`, `style-src`, `worker-src`.
+
+To weaken a hardening directive (`object-src`, `frame-ancestors`, `base-uri`, `default-src`) or use a non-http scheme, take over the whole header with a `headers:` block in `site.yml` — that replaces the computed policy entirely, pinned hashes included, so reach for it last.
 
 ## Deploying
 
@@ -1782,6 +1877,10 @@ Off by default. When `folio:` is configured, Abqari pulls book/bundle data from 
 folio:
   base_url: https://www.foliobooks.app
   author_slug: your-author-slug
+  # covers_host: https://covers.example — only if your Folio instance
+  # serves cover images from a host other than the default
+  # covers.foliobooks.app CDN. Whatever host is in effect is added to
+  # the CSP's img-src automatically.
 ```
 
 That's it. On the next build:
@@ -1948,7 +2047,7 @@ Rebuilds the site, walks the output, and writes a markdown report to `audit/<YYY
 | **Accessibility** | Images without `alt`, multiple `<h1>` per page |
 | **Privacy** | External resource loads (URLs not on the site host) |
 | **Dependencies** | Outdated gems via `bundle outdated`, CVEs via `bundle-audit` (if installed) |
-| **Content** | Posts without descriptions, single-use tags |
+| **Content** | Posts without descriptions, single-use tags, `series_position` problems that break prev/next silently (non-Integer, duplicate, or missing) |
 
 The report opens with a summary table, a **Suggested fixes** code block listing every `bundle update <gem>` command needed to clear the dependency findings, and then groups findings by category with severity (`error`, `warn`, `info`) and a suggestion where applicable. Reports accumulate in `audit/` — useful to commit so you have a diffable history of site quality over time.
 
@@ -2085,8 +2184,10 @@ Build-time and runtime perf are already tuned for typical sites (~50–200 pages
 - **Parallel page rendering.** For sites with 16+ pages, rendering runs on a thread pool sized to `Etc.nprocessors`. Below that threshold, sequential (thread-spawn overhead would dominate).
 - **Incremental mode.** `bin/serve`'s watcher rebuilds with `incremental: true` — `_site/` isn't wiped; all the mtime/hash checks above pay off.
 - **HTML minification.** Production builds strip whitespace between tags, remove comments, collapse runs of whitespace. `<pre>`, `<textarea>`, `<script>`, and `<style>` content is preserved. Disable with `minify: false` in `site.yml`.
+- **CSS/JS minification.** Production builds strip comments and collapse whitespace in stylesheets and scripts before fingerprinting. Conservative on purpose: quoted CSS strings, `calc()` spacing, and descendant selectors survive; JS files using template literals ship untouched. Same `minify:` switch as HTML.
 
 **Runtime (page load):**
+- **One render-blocking stylesheet.** The syntax theme, `_common.css`, theme `app.css`, and `site.css` ship as a single fingerprinted bundle (`/assets/css/bundle.<hash>.css`) — one request instead of four, and the Rouge styles get a content hash so a syntax-theme change busts the immutable cache.
 - **Image dimensions.** `<img width="..." height="...">` is set whether or not the image pipeline is enabled — pure-Ruby parsers read PNG/JPEG/GIF headers. No CLS regardless of optimisation toggle.
 - **Lazy-loaded images.** `loading="lazy" decoding="async"` on every `<img>`.
 - **Strict CSP.** No inline scripts/styles → strict CSP works without `'unsafe-inline'`.
@@ -2096,7 +2197,7 @@ Build-time and runtime perf are already tuned for typical sites (~50–200 pages
 Configurable knobs:
 
 ```yaml
-minify: false              # disable HTML minification (default: on in production)
+minify: false              # disable HTML/CSS/JS minification (default: on in production)
 syntax_highlighting: false # disable Rouge highlighting
 images:
   optimise: true           # enable libvips/magick image pipeline
@@ -2167,24 +2268,24 @@ Two paths, mirroring the [Quickstart](#quickstart):
 Pull engine updates the standard Bundler way:
 
 ```bash
-bundle update abqari       # pulls latest from the git source
+bundle update abqari       # pulls the latest release within your pin
 bin/build                  # verify your site still builds
 bin/audit                  # verify nothing regressed
 ```
 
-Optionally pin to a tagged release in your `Gemfile`:
+`abqari new` scaffolds the Gemfile pinned to the current major.minor
+(`gem 'abqari', '~> 1.0'`), so `bundle update abqari` picks up patch
+releases and bumping the pin is the deliberate action of taking a
+feature release. To track a fork or an unreleased branch instead,
+swap the line for a git source:
 
 ```ruby
 gem 'abqari', git: 'https://github.com/your-handle/abqari.git', tag: 'v1.0.0'
 ```
 
-Pinning to a tag is recommended for production deploys — you get
-explicit control over engine versions, and `bundle update abqari`
-becomes the deliberate action of bumping the tag.
-
 The cadence: read [CHANGELOG.md](CHANGELOG.md) before each upgrade,
 note any breaking changes (`Removed:` and `Changed:` entries), then
-bump the tag and run the build.
+bump the pin and run the build.
 
 **Your customizations are unaffected** because they live in your
 site repo (`config/`, `content/`, `data/`, `public/`, and any

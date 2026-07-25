@@ -54,12 +54,18 @@ module Abqari
         @site = site
       end
 
-      def write
-        return unless @site.config['syntax_highlighting']
-
+      # The rendered Rouge theme CSS. Also consumed by AssetPipeline's
+      # CSS bundle, which is what the head partial actually links; the
+      # standalone file below stays for sites that override the head
+      # partial and reference it directly.
+      def css
         theme_name = @site.config['syntax_theme'] || DEFAULT_THEME
         theme = Rouge::Theme.find(theme_name) || Rouge::Themes::Github
-        css = theme.render(scope: '.highlight')
+        theme.render(scope: '.highlight')
+      end
+
+      def write
+        return unless @site.config['syntax_highlighting']
 
         dest = File.join(@site.output_dir, 'assets', 'css', 'syntax.css')
         FileUtils.mkdir_p(File.dirname(dest))

@@ -2404,7 +2404,7 @@ article > header > .series__tagline {
 
 
 /* ============================================================
- * 25. "Up next" + Related items
+ * 25. "Up next" + series pager + Related items
  * ============================================================
  *
  * `.next-item` — single-card section below the post body linking to
@@ -2412,6 +2412,10 @@ article > header > .series__tagline {
  * the next post by series position). Reuses `.post-list` so the
  * card reads exactly like a row from the posts index — there's only
  * ever one up-next post, so the full index treatment fits.
+ *
+ * `.series-pager` — the bidirectional alternative to `.next-item
+ * --series` for ordered collections. Compact prev/next pair rather
+ * than a card, because sequential readers use it constantly.
  *
  * `.related` — block below each show view (post, photo, publication)
  * listing items from the same collection ranked by tag/series
@@ -2436,6 +2440,64 @@ article > header > .series__tagline {
    the wrapping `.post-list` margin so the card sits flush against
    the heading. */
 .next-item .post-list { margin: 0; }
+
+/* `.series-pager` — bidirectional prev/next nav for ordered
+   collections (see `_series_pager.html.erb`). Deliberately lighter
+   than `.next-item`: a course reader hits this control on every
+   lesson, so it's a pair of compact link targets rather than two
+   full index cards.
+
+   Two equal columns at every width. The columns don't collapse on
+   mobile — "back" and "forward" side by side is the expected shape
+   for sequential navigation, and the titles wrap rather than the
+   layout reflowing. `--prev` / `--next` differ only in text
+   alignment so the two links read as one control. */
+.series-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin: var(--space-2xl) 0 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+}
+
+.series-pager__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-2);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.series-pager__link:hover,
+.series-pager__link:focus-visible {
+  border-color: var(--color-link);
+}
+
+/* `--next` is the only cell in column 2, so aligning its text to the
+   end puts the forward control hard against the right edge — the
+   direction of travel it represents. */
+.series-pager__link--next {
+  grid-column: 2;
+  text-align: right;
+}
+
+.series-pager__direction {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.series-pager__title {
+  font-family: var(--font-heading);
+  line-height: 1.3;
+}
 
 /* Section heading — ONE rule that owns the typography for every
    "small section heading" across the app. Show-view tails ("Related",

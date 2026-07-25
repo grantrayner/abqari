@@ -14,9 +14,15 @@ module Abqari
     # policy minimally — Plausible adds plausible.io to script-src and
     # connect-src plus the inline init script's hash, and that's it.
     #
+    # To allow an origin the engine doesn't model, add it to `csp:` in
+    # config/site.yml — additive, so everything computed here survives.
+    # `media:` does the same for off-origin audio / video.
+    #
     # Override the whole thing by setting `headers:` in config/site.yml
     # — that disables this dynamic build entirely and ships your structure
-    # verbatim. Useful for cases where you need precise control.
+    # verbatim. Reach for it only when you need to weaken a hardening
+    # directive or use a non-http scheme; `csp:` covers adding origins
+    # without losing the pinned script hashes.
     BASE_HEADERS = {
       'X-Content-Type-Options'    => 'nosniff',
       'Referrer-Policy'           => 'strict-origin-when-cross-origin',
@@ -86,8 +92,105 @@ module Abqari
       apply_search(policy)           if search_enabled?
       apply_speculation_rules(policy) if speculation_rules_enabled?
       apply_newsletter(policy)
+      apply_media(policy)
+      # Last, so an operator-declared origin can extend a directive that
+      # a feature rule above created.
+      apply_csp_extensions(policy)
 
       policy.map { |k, vs| "#{k} #{vs.join(' ')}" }.join('; ')
+    end
+
+    # Off-origin audio / video. Media served from the site itself needs
+    # no directive at all — it falls under `default-src 'self'`, which is
+    # why the base policy declares no `media-src`. Setting `media.host`
+    # creates it as `'self' <host>` (`add_origin` seeds `'self'` on any
+    # directive it has to create), so colocated bundle audio keeps
+    # working alongside the CDN.
+    #
+    # Accepts one host or a list:
+    #
+    #   media:
+    #     host: https://media.example.com
+    #
+    #   media:
+    #     host:
+    #       - https://audio.example.com
+    #       - https://video.example.com
+    def apply_media(policy)
+      cfg = @site.config['media']
+      return unless cfg.is_a?(Hash)
+
+      Array(cfg['host']).each { |host| add_origin(policy, 'media-src', host) }
+    end
+
+    # Directives an operator may extend via `csp:`. The omissions are
+    # deliberate: `default-src` would silently widen every directive
+    # that inherits from it, and `object-src` / `frame-ancestors` /
+    # `base-uri` are the static-site hardening directives documented on
+    # `csp_policy` — making those easy to weaken is exactly what this
+    # key must not do. A site that genuinely needs to change them owns
+    # the whole header via `headers:`.
+    EXTENDABLE_DIRECTIVES = %w[
+      child-src connect-src font-src form-action frame-src img-src
+      manifest-src media-src script-src style-src worker-src
+    ].freeze
+
+    # Operator-declared extra origins:
+    #
+    #   csp:
+    #     img-src:     [https://cdn.example.com]
+    #     connect-src: [https://api.example.com]
+    #
+    # Additive only. Values are appended to the computed policy, so
+    # `'self'`, the pinned inline-script hashes and every feature-derived
+    # origin survive. That's the point of the key: before it existed the
+    # only way to allow an unmodelled origin was `headers:`, which
+    # replaces the built policy wholesale and takes the theme-bootstrap
+    # hash, `'wasm-unsafe-eval'` and the Plausible hash down with it.
+    #
+    # Raises on an unknown directive or a value that isn't an http(s)
+    # origin. A malformed CSP fails open — the browser ignores the parts
+    # it can't parse — so skipping bad config silently would ship a
+    # policy the operator believes is in force. Fail the build instead.
+    def apply_csp_extensions(policy)
+      cfg = @site.config['csp']
+      return unless cfg.is_a?(Hash)
+
+      cfg.each do |directive, values|
+        name = directive.to_s
+        unless EXTENDABLE_DIRECTIVES.include?(name)
+          raise ArgumentError,
+                "csp: #{name.inspect} is not an extendable directive. " \
+                "Extendable: #{EXTENDABLE_DIRECTIVES.join(', ')}. " \
+                'Set `headers:` to take over the whole header instead.'
+        end
+
+        Array(values).each do |value|
+          assert_http_origin!(name, value)
+          add_origin(policy, name, value)
+        end
+      end
+    end
+
+    # `add_origin` is deliberately silent for feature-derived values (a
+    # relative `newsletter.action` is legitimately same-origin). Values
+    # typed directly into `csp:` get the opposite treatment: anything
+    # that isn't a scheme + host is an operator error worth stopping the
+    # build for, and rejecting everything else is what keeps `*`,
+    # `data:` and `'unsafe-inline'` out of this path by construction.
+    def assert_http_origin!(directive, value)
+      uri = begin
+        URI.parse(value.to_s)
+      rescue URI::InvalidURIError
+        nil
+      end
+      return if (uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)) && !uri.host.to_s.empty?
+
+      raise ArgumentError,
+            "csp: #{directive} value #{value.inspect} is not an http(s) origin. " \
+            'Use scheme + host (e.g. https://cdn.example.com). CSP keywords and ' \
+            "non-http schemes ('unsafe-inline', data:, blob:, *) are rejected here — " \
+            'set `headers:` if you need them.'
     end
 
     # Pagefind (opt-in via `search: true`) loads its runtime from the
@@ -131,12 +234,19 @@ module Abqari
       policy['connect-src'] << 'https://plausible.io'
     end
 
-    # Folio cover images are served from a separate cover host
-    # (covers.foliobooks.app). Layouts emit them as `<img src="https://…">`,
-    # so img-src needs the host explicitly. Buy / cart URLs are anchor
-    # navigations (no CSP) — only img-src needs extension.
+    # Folio cover images are served from a separate cover host. Layouts
+    # emit them as `<img src="https://…">`, so img-src needs the host
+    # explicitly. Defaults to the hosted foliobooks.app cover CDN; a
+    # Folio instance on another domain sets `folio.covers_host` to its
+    # own. Buy / cart URLs are anchor navigations (no CSP) — only
+    # img-src needs extension.
+    DEFAULT_FOLIO_COVERS_HOST = 'https://covers.foliobooks.app'
+
     def apply_folio(policy)
-      policy['img-src'] << 'https://covers.foliobooks.app'
+      cfg = @site.config['folio'] || {}
+      covers = cfg['covers_host'].to_s
+      covers = DEFAULT_FOLIO_COVERS_HOST if covers.empty?
+      add_origin(policy, 'img-src', covers)
     end
 
     def folio_enabled?

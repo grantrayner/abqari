@@ -5,7 +5,86 @@ All notable changes to Abqari will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] — 2026-06-19
+## [Unreleased]
+
+Ordered-series navigation and a CSP that can be extended without
+being replaced. Both came out of building a course-shaped site — a
+module of ordered lessons with colocated audio — on top of the
+existing series taxonomies.
+
+### Added
+
+- `Site#prev_in_series` — the backwards counterpart to
+  `next_in_series`. Both now delegate to a shared `series_sibling`
+  scan, so the two directions can't drift apart.
+- `partials/series_pager` — compact bidirectional prev/next series
+  nav, for collections readers move through sequentially. The
+  forward-only `partials/next_in_series` card is unchanged and still
+  what the built-in `post` layout renders; the pager is opt-in from
+  your own layout.
+- `RenderContext#series_url` and `Site#series_taxonomy_for` — resolve
+  the series index URL for a page's own collection instead of
+  assuming `posts_series`.
+- `media:` config — allows off-origin audio / video in the CSP:
+
+      media:
+        host: https://media.example.com   # or a list
+
+  Colocated bundle media needs nothing; it's same-origin and inherits
+  `default-src 'self'`. No `media-src` directive is emitted unless a
+  host is configured, so existing sites' headers are byte-identical.
+- `csp:` config — additive per-directive origin allow-list for
+  anything the engine doesn't model:
+
+      csp:
+        img-src:     [https://cdn.example.com]
+        connect-src: [https://api.example.com]
+
+  Previously the only escape hatch was `headers:`, which replaces the
+  computed policy wholesale and takes the pinned theme-bootstrap hash,
+  `'wasm-unsafe-eval'` and the Plausible hash down with it. `csp:`
+  appends instead. Restricted to eleven extendable directives (the
+  hardening directives and `default-src` are excluded); values must be
+  `scheme://host`, so keywords, wildcards and non-http schemes are
+  rejected by construction. A bad value fails the build rather than
+  being silently dropped — a malformed CSP fails open in the browser,
+  so a silent skip would ship a policy the operator believes is
+  enforced.
+- Audit (Content): `series_position` problems that are otherwise
+  invisible — a non-Integer position (warn), duplicate positions
+  within one series (warn), and a page in a series with no position
+  (info). Each of these builds cleanly and renders correctly in
+  isolation while dropping out of the prev/next chain.
+
+### Fixed
+
+- **The CSS minifier silently deleted every theme token in production
+  builds.** `Minifier.css` stashed quoted strings before stripping
+  comments, and treated a bare `'` as a string delimiter — but CSS
+  comments here are English prose, full of apostrophes ("the theme's
+  tokens", "Safari's tap-flash"). Two comments each carrying one
+  apostrophe were paired into a single "string" spanning both, so every
+  rule between them — plus the `*/` that should have closed the first
+  comment — was swallowed and then deleted.
+
+  `_common.css` has an odd number of apostrophes, so in the concatenated
+  bundle the casualty was the entire `:root` block of whatever theme
+  followed it: every colour and font custom property in the site. Pages
+  rendered in Times with no palette. Development builds don't minify, so
+  this only appeared once deployed.
+
+  Comments and strings are now tokenised in a single left-to-right pass
+  with ordered alternation, so whichever construct starts first consumes
+  the other. `content: "/* not a comment */"` still survives verbatim.
+
+- The `post` layout hardcoded `posts_series` in the series breadcrumb
+  and the end-of-series note. Since the layout is deliberately
+  reusable (`cookbook` ships on it), any other collection's series
+  breadcrumb linked into the posts series index. Now resolved from the
+  page's own collection, and rendered as plain text when the
+  collection has no series taxonomy configured. Posts are unaffected.
+
+## [1.0.0] — 2026-07-14
 
 Initial public release. The engine is feature-complete for the
 four content types it targets — long-form writing, photo
@@ -31,6 +110,10 @@ run a real working author / publisher site.
   `/guides/`).
 - Content scaffolders: `bin/new`, `bin/new post "Title"`,
   `bin/new page "Title"`.
+- Opt-in collections at scaffold time: `abqari new my-site --with
+  photos,publications,workshops` enables the named collections in
+  config and creates their `content/<name>/index.md` landing pages.
+  Default scaffold stays posts-only.
 - Content importers: `bin/import substack|ghost|jekyll <source>`
   pulls content from another platform's export into the site's
   collections — downloads images into bundles, writes
@@ -66,8 +149,11 @@ run a real working author / publisher site.
 
 **Build pipeline**
 
-- Pretty URLs, content-hashed asset fingerprinting, HTML
+- Pretty URLs, content-hashed asset fingerprinting, HTML + CSS + JS
   minification.
+- Render-blocking CSS (syntax theme, `_common.css`, theme, site
+  overrides) ships as a single fingerprinted bundle — one stylesheet
+  request per page, immutable-cached.
 - Self-hosted Google Fonts via `bin/fetch-fonts`.
 - libvips-backed image pipeline: responsive `<picture>`, AVIF +
   WebP variants, CLS-safe dimensions. Falls back to shell-out
@@ -136,8 +222,14 @@ run a real working author / publisher site.
 - `bin/deploy` for Cloudflare and Netlify.
 - GitHub Actions workflow templates for Cloudflare Pages, GitHub
   Pages, and Render (all SHA-pinned, Dependabot-managed).
-- Test suite: 598 runs, 3782 assertions, ~20 second wall-clock.
+- Test suite: 680+ runs, 8000+ assertions, ~30 second wall-clock.
 - Memo registry on `Site` — adding a new cached accessor doesn't
   require touching the rebuild-reset code path.
+- Pre-launch hardening pass: security, output-correctness, and DX
+  fixes from a full code review, each with regression tests.
+- Gem packaging: the site skeleton's dotfiles (`.gitignore`,
+  `vendor/*/.gitkeep`) ship in the gem, `abqari new` defaults to the
+  released RubyGems engine source, and Heroicons 2.2.0 is vendored
+  (with license) so the `heroicon` helper works from a gem install.
 
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

@@ -205,6 +205,121 @@ class AuditRulesTest < Minitest::Test
            "expected missing-main finding, got: #{msgs.inspect}"
   end
 
+  # --- Content: series_position ----------------------------------------
+  #
+  # All three findings share one failure mode: the page builds, renders
+  # correctly in isolation, and appears on its series index — but
+  # `Site#series_sibling` can't see it, so prev/next silently skips it.
+  # Nothing else in the build surfaces that, which is the whole reason
+  # these are audit findings rather than build warnings.
+
+  def fake_page(url:, collection: 'lessons', series: 'Module 1', position: 1)
+    frontmatter = {}
+    frontmatter['series'] = series if series
+    frontmatter['series_position'] = position unless position.nil?
+
+    page = Object.new
+    page.define_singleton_method(:url) { url }
+    page.define_singleton_method(:collection) { collection }
+    page.define_singleton_method(:frontmatter) { frontmatter }
+    page
+  end
+
+  def run_content(pages)
+    site = build_site_stub(@tmpdir)
+    site.define_singleton_method(:posts) { [] }
+    site.define_singleton_method(:posts_by_term) { |_term| {} }
+    site.define_singleton_method(:all_pages) { pages }
+    Abqari::Audit::Content.new(site, @findings).run
+    findings_for('content')
+  end
+
+  def test_well_ordered_series_produces_no_content_findings
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', position: 1),
+                             fake_page(url: '/lessons/b/', position: 2),
+                             fake_page(url: '/lessons/c/', position: 3)
+                           ])
+    assert_empty findings
+  end
+
+  def test_quoted_series_position_is_flagged_as_a_warning
+    findings = run_content([fake_page(url: '/lessons/a/', position: '3')])
+    assert_equal 1, findings.size
+    assert_equal 'warn', findings.first[:severity]
+    assert_equal '/lessons/a/', findings.first[:location]
+    assert_match(/not an Integer/, findings.first[:message])
+    assert_match(/String/, findings.first[:message])
+  end
+
+  def test_float_series_position_is_flagged
+    findings = run_content([fake_page(url: '/lessons/a/', position: 1.5)])
+    assert_equal 1, findings.size
+    assert_match(/not an Integer/, findings.first[:message])
+  end
+
+  def test_series_without_a_position_is_flagged_as_info
+    findings = run_content([fake_page(url: '/lessons/a/', position: nil)])
+    assert_equal 1, findings.size
+    assert_equal 'info', findings.first[:severity]
+    assert_match(/no series_position/, findings.first[:message])
+  end
+
+  def test_duplicate_positions_are_flagged_on_every_sharer
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', position: 2),
+                             fake_page(url: '/lessons/b/', position: 2)
+                           ])
+    assert_equal 2, findings.size
+    assert_equal %w[/lessons/a/ /lessons/b/], findings.map { |f| f[:location] }.sort
+    findings.each do |finding|
+      assert_equal 'warn', finding[:severity]
+      assert_match(/shared with 1 other page\b/, finding[:message])
+    end
+  end
+
+  def test_duplicate_positions_pluralise_the_sharer_count
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', position: 2),
+                             fake_page(url: '/lessons/b/', position: 2),
+                             fake_page(url: '/lessons/c/', position: 2)
+                           ])
+    assert_equal 3, findings.size
+    assert_match(/shared with 2 other pages/, findings.first[:message])
+  end
+
+  def test_same_position_in_different_collections_is_not_a_duplicate
+    # Series are scoped per collection — matching how the series
+    # taxonomies and Site#series_sibling scope. A lesson and a post that
+    # happen to share a `series:` value are independent runs.
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', collection: 'lessons', position: 1),
+                             fake_page(url: '/guides/a/',  collection: 'posts',   position: 1)
+                           ])
+    assert_empty findings
+  end
+
+  def test_same_position_in_different_series_is_not_a_duplicate
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', series: 'Module 1', position: 1),
+                             fake_page(url: '/lessons/b/', series: 'Module 2', position: 1)
+                           ])
+    assert_empty findings
+  end
+
+  def test_pages_outside_a_series_are_ignored
+    findings = run_content([
+                             fake_page(url: '/lessons/a/', series: nil, position: nil),
+                             fake_page(url: '/lessons/b/', series: '  ', position: nil)
+                           ])
+    assert_empty findings
+  end
+
+  def test_pages_without_a_collection_are_ignored
+    findings = run_content([fake_page(url: '/about/', collection: nil, position: '3')])
+    assert_empty findings
+  end
+
   # --- count / severity surface ----------------------------------------
 
   def test_count_filters_by_severity

@@ -1,0 +1,13 @@
+---
+title: Publications
+published: true
+description: Books, essays, and other publications.
+nav:
+  order: 4
+  label: Publications
+---
+
+Books, essays, atlases — anything with a cover. Each publication is a
+bundle at `content/publications/<slug>/index.md` with `cover:` art
+alongside it. Configure `folio:` in `config/site.yml` to auto-fill
+this collection from a Folio storefront instead.

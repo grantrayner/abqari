@@ -4,9 +4,10 @@ source 'https://rubygems.org'
 
 # Abqari is the static site generator. The engine ships content
 # pipelines, layouts, helpers, themes, and the build orchestrator.
-# Switch this line to a `tag:` once you're pinning to a versioned
-# release. The gem's own runtime deps (commonmarker, rouge, webrick,
-# base64) come in transitively via abqari.gemspec.
+# Its runtime deps (commonmarker, erubi, rouge, ruby-vips, webrick,
+# and friends) come in transitively via abqari.gemspec. To track a
+# fork or a local checkout instead of the released gem, swap this
+# line for a `git:` or `path:` source.
 <%= gemfile_line %>
 
 group :development do

@@ -11,4 +11,6 @@ ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
 require 'bundler/setup'
 require 'abqari'
 
-Abqari::Server.new.start
+site = Abqari::Site.new
+site.build
+Abqari::Server.new(site).start

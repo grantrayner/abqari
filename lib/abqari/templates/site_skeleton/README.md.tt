@@ -1,6 +1,6 @@
 # <%= title %>
 
-Built with [Abqari](https://github.com/your-handle/abqari) — a Ruby static
+Built with [Abqari](https://github.com/grantrayner/abqari) — a Ruby static
 site generator. The engine handles content pipelines, layouts, helpers,
 themes, and the build orchestrator; everything in this repo is YOUR
 site's content, configuration, and assets.
@@ -26,6 +26,11 @@ bin/new post "Title"   # scaffold a new post bundle in content/posts/
 bin/new page "Title"   # scaffold a top-level page in content/
 ```
 
+To enable another collection (photos, publications, workshops) after
+the fact: flip its `enabled:` flag in `config/site.yml` and create
+`content/<name>/index.md` — the comments in the config show the shape.
+(`abqari new --with <name>` does both for fresh sites.)
+
 ## Where to edit
 
 | Path | What lives here |
@@ -46,7 +51,7 @@ bin/build              # confirm the build still passes
 bin/audit              # confirm content audit still passes
 ```
 
-See the engine's [CHANGELOG](https://github.com/your-handle/abqari/blob/main/CHANGELOG.md)
+See the engine's [CHANGELOG](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md)
 for what changed between versions and whether any of your config or
 content needs a migration.
 

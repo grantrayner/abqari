@@ -17,7 +17,7 @@ README has the bigger picture.
 git clone https://github.com/your-handle/abqari
 cd abqari
 bundle install
-bin/test          # should report 600+ runs, 0 failures
+bin/test          # should report 680+ runs, 0 failures
 bin/build         # should produce _site/
 bin/audit         # should report 0 errors, 0 warnings
 ```
@@ -57,7 +57,8 @@ Running the suite needs the libvips C library (`brew install vips` /
 These are the project's defining choices. Changes that violate them need
 an explicit conversation in an issue first:
 
-1. **Minimal dependencies.** Five runtime gems plus development extras.
+1. **Minimal dependencies.** Eight small runtime gems plus development
+   extras.
 2. **Real Ruby in templates.** ERB, not a sandboxed templating language.
 3. **Gem-distributed, fork-friendly.** Distributed as a Ruby gem so
    consuming sites stay minimal (content + config). Forking remains

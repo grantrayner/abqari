@@ -38,11 +38,11 @@ collections:
       enabled: true
 
   photos:
-    enabled: false
+    enabled: <%= with.include?('photos') %>
   publications:
-    enabled: false
+    enabled: <%= with.include?('publications') %>
   workshops:
-    enabled: false
+    enabled: <%= with.include?('workshops') %>
 
 home:
   latest_post:          false

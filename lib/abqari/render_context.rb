@@ -129,6 +129,17 @@ module Abqari
       @_yielded_content.to_s
     end
 
+    # The <title> text: "Page · Site", except when the two are the same
+    # string — the home page usually titles itself after the site, and
+    # "Mysite · Mysite" reads like a bug in the browser tab.
+    def document_title
+      page_title = page.title.to_s
+      site_title = site.config['title'].to_s
+      return site_title if page_title.empty? || page_title == site_title
+
+      "#{page_title} · #{site_title}"
+    end
+
     # Render an ERB string against this context. Used by Page#rendered_body
     # to support `erb: true` opt-in templating in markdown bodies. No
     # template caching — these strings are one-off per build.
@@ -174,6 +185,21 @@ module Abqari
       cfg = site.taxonomy_config(taxonomy_name.to_s)
       permalink = cfg['permalink'] || "/#{taxonomy_name}/:slug/"
       permalink.sub(':slug', slugify(term))
+    end
+
+    # URL of the series index that covers `target`'s collection.
+    # Resolves the owning taxonomy first, so a layout shared between
+    # collections links each one to its own series index:
+    #
+    #   series_url('Inside Abqari')            → "/guides/series/inside-abqari/"
+    #   series_url('Module 1', lesson_page)    → "/lessons/module/module-1/"
+    #
+    # Returns nil when the page's collection has no series taxonomy
+    # configured — callers render the series name as plain text rather
+    # than linking it somewhere that was never built.
+    def series_url(term, target = page)
+      name = site.series_taxonomy_for(effective_collection_name(target))
+      name && taxonomy_url(name, term)
     end
 
     def get_binding

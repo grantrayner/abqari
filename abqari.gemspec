@@ -35,7 +35,7 @@ Gem::Specification.new do |spec|
   # `config/`, `data/`, `vendor/folio/`, or `vendor/fonts/` from
   # the engine repo — those are site-specific and live in the
   # consuming site.
-  spec.files = Dir[
+  spec.files = (Dir[
     'lib/**/*',
     'app/views/**/*',
     'app/icons/**/*',
@@ -45,14 +45,18 @@ Gem::Specification.new do |spec|
     'vendor/d3/**/*',
     'README*',
     'LICENSE*',
-    'CHANGELOG*'
-  ] + Dir[
-    # The skeleton ships a `.github/workflows/` tree (the deploy
-    # workflows for Cloudflare / Render / GitHub Pages). `Dir.glob`
-    # excludes dotfiles by default, so the lib/**/* entry above
-    # silently drops them. The explicit dotglob below picks them up.
-    'lib/abqari/templates/site_skeleton/.github/**/*'
-  ]
+    'CHANGELOG*',
+    'THIRD_PARTY_NOTICES*'
+  ] + Dir.glob(
+    # The skeleton ships dotfiles — `.gitignore`, the `vendor/*/.gitkeep`
+    # placeholders, and the `.github/` deploy workflows (Cloudflare /
+    # Render / GitHub Pages). `Dir.glob` excludes dotfiles by default,
+    # so the lib/**/* entry above silently drops them; this second pass
+    # re-globs the whole skeleton with FNM_DOTMATCH to pick them up.
+    # The trailing `file?` filter drops directories from both passes,
+    # and `uniq` folds the overlap with lib/**/*.
+    'lib/abqari/templates/site_skeleton/**/*', File::FNM_DOTMATCH
+  )).select { |f| File.file?(f) }.uniq
 
   # Single global executable. `exe/abqari` is on PATH after `gem
   # install abqari`; it dispatches to subcommands (currently `new` —

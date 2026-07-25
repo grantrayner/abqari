@@ -1,17 +1,23 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Build, then walk _site/ for link/SEO/a11y/privacy/dependency issues.
-# Writes a markdown report to audit/<timestamp>.md. Exit code is 0
-# unless --strict is set, in which case any error-severity finding
-# exits non-zero (suitable for CI).
+# Build (side-effect-free — no syndication, no webmention sends), then
+# walk _site/ for link/SEO/a11y/privacy/dependency issues. Writes a
+# markdown report to audit/<timestamp>.md.
+#
+# Flags:
+#   --strict        — exit non-zero on any error-severity finding (CI).
+#   --strict=warn   — exit non-zero on errors AND warnings.
 
 require 'optparse'
 
-options = { strict: false }
+options = { strict: nil }
 OptionParser.new do |opts|
-  opts.banner = 'Usage: bin/audit [--strict]'
-  opts.on('--strict', 'Exit non-zero on any error finding (for CI)') { options[:strict] = true }
+  opts.banner = 'Usage: bin/audit [--strict[=warn]]'
+  opts.on('--strict[=LEVEL]', %w[error warn],
+          'Exit non-zero when findings exist at LEVEL or above (default: error)') do |level|
+    options[:strict] = level || 'error'
+  end
 end.parse!(ARGV)
 
 ENV['ABQARI_ENV']       ||= 'production'
@@ -20,7 +26,12 @@ ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
 require 'bundler/setup'
 require 'abqari'
 
-site = Abqari::Site.new
-site.build
-audit = Abqari::Audit.new(site).run
-exit(1) if options[:strict] && audit.error_count.positive?
+audit = Abqari::Audit.new(Abqari::Site.new).run
+
+if options[:strict]
+  count = audit.count(at_least: options[:strict])
+  if count.positive?
+    Abqari::Log.error "Audit failed: #{count} finding(s) at severity >= #{options[:strict]}"
+    exit 1
+  end
+end

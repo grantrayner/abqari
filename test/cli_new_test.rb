@@ -53,7 +53,7 @@ class CliNewTest < Minitest::Test
 
   def test_bin_scripts_are_executable
     run_new('mysite')
-    %w[build serve audit new].each do |script|
+    %w[build serve audit new import index fetch-fonts fetch-folio].each do |script|
       assert File.executable?("mysite/bin/#{script}"), "bin/#{script} should be executable"
     end
   end
@@ -93,8 +93,17 @@ class CliNewTest < Minitest::Test
     assert_match(/^locale: fr$/, config)
   end
 
-  def test_gemfile_uses_git_source_by_default
+  def test_gemfile_uses_rubygems_source_by_default
     run_new('mysite')
+    gemfile = File.read('mysite/Gemfile')
+    major_minor = Abqari::VERSION.split('.').first(2).join('.')
+    assert_match(/^gem 'abqari', '~> #{Regexp.escape(major_minor)}'$/, gemfile)
+    refute_match(/gem 'abqari', git:/, gemfile)
+    refute_match(/gem 'abqari', path:/, gemfile)
+  end
+
+  def test_engine_git_writes_git_source_in_gemfile
+    run_new('mysite', '--engine', 'git')
     gemfile = File.read('mysite/Gemfile')
     assert_match(/gem 'abqari', git:/, gemfile)
     refute_match(/gem 'abqari', path:/, gemfile)
@@ -104,7 +113,67 @@ class CliNewTest < Minitest::Test
     run_new('mysite', '--engine', 'path')
     gemfile = File.read('mysite/Gemfile')
     assert_match(%r{gem 'abqari', path: '../abqari'}, gemfile)
-    refute_match(/git:/, gemfile)
+    refute_match(/gem 'abqari', git:/, gemfile)
+  end
+
+  # --- Optional collections (--with) ---------------------------------
+
+  def config_yaml(project = 'mysite')
+    YAML.safe_load_file("#{project}/config/site.yml")
+  end
+
+  def test_default_scaffold_is_posts_only
+    run_new('mysite')
+    collections = config_yaml['collections']
+    assert_equal true,  collections['posts']['enabled']
+    assert_equal false, collections['photos']['enabled']
+    assert_equal false, collections['publications']['enabled']
+    assert_equal false, collections['workshops']['enabled']
+    refute Dir.exist?('mysite/content/photos')
+    refute Dir.exist?('mysite/content/publications')
+    refute Dir.exist?('mysite/content/workshops')
+  end
+
+  def test_with_flag_enables_collection_and_scaffolds_its_index_page
+    run_new('mysite', '--with', 'photos')
+    assert_equal true,  config_yaml['collections']['photos']['enabled']
+    assert_equal false, config_yaml['collections']['publications']['enabled']
+
+    index = File.read('mysite/content/photos/index.md', encoding: 'UTF-8')
+    assert_match(/^title: Photos$/, index)
+    assert_match(/^nav:$/, index, 'collection index needs a nav entry')
+    refute Dir.exist?('mysite/content/publications')
+  end
+
+  def test_with_flag_accepts_comma_separated_list
+    run_new('mysite', '--with', 'photos,workshops')
+    collections = config_yaml['collections']
+    assert_equal true,  collections['photos']['enabled']
+    assert_equal true,  collections['workshops']['enabled']
+    assert_equal false, collections['publications']['enabled']
+    assert File.exist?('mysite/content/photos/index.md')
+    assert File.exist?('mysite/content/workshops/index.md')
+  end
+
+  def test_with_flag_is_repeatable
+    run_new('mysite', '--with', 'publications', '--with', 'workshops')
+    collections = config_yaml['collections']
+    assert_equal true, collections['publications']['enabled']
+    assert_equal true, collections['workshops']['enabled']
+  end
+
+  def test_with_flag_composes_with_blank_mode
+    run_new('mysite', '--blank', '--with', 'photos')
+    assert_equal true, config_yaml['collections']['photos']['enabled']
+    assert File.exist?('mysite/content/photos/index.md')
+    refute Dir.exist?('mysite/content/posts/welcome')
+  end
+
+  def test_unknown_with_collection_is_rejected
+    refute run_new('mysite', '--with', 'posts')   # always on — not a valid --with value
+    refute run_new('mysite2', '--with', 'banana')
+    refute Dir.exist?('mysite')
+    refute Dir.exist?('mysite2')
   end
 
   # --- Validation + safety -------------------------------------------
@@ -115,7 +184,7 @@ class CliNewTest < Minitest::Test
   end
 
   def test_unknown_engine_is_rejected
-    refute run_new('mysite', '--engine', 'rubygems')   # not yet supported
+    refute run_new('mysite', '--engine', 'svn')
     refute Dir.exist?('mysite')
   end
 

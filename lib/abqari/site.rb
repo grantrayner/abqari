@@ -471,22 +471,20 @@ module Abqari
     # relationship exists. Generic across collections — works for
     # posts, photos, publications, workshops alike.
     def next_in_series(page)
-      return nil unless page.respond_to?(:frontmatter)
-      return nil unless page.respond_to?(:collection) && page.collection
+      series_sibling(page, :forward)
+    end
 
-      series_name = page.frontmatter['series'].to_s
-      return nil if series_name.empty?
-
-      current_pos = page.frontmatter['series_position']
-      return nil if current_pos.nil?
-
-      candidates = collection(page.collection).select do |p|
-        p.frontmatter['series'].to_s == series_name &&
-          p.frontmatter['series_position'].is_a?(Integer) &&
-          p.frontmatter['series_position'] > current_pos.to_i
-      end
-
-      candidates.min_by { |p| p.frontmatter['series_position'].to_i }
+    # The "previous" page within the same series — the page with the
+    # largest `series_position` strictly less than this page's. Exact
+    # mirror of `next_in_series`: same guards, same nil semantics, same
+    # per-collection scoping.
+    #
+    # Exists because course-shaped collections (a module of ordered
+    # lessons) need to navigate backwards as well as forwards. The
+    # `_series_pager` partial pairs the two into one prev/next nav;
+    # `_next_in_series` remains the forward-only card.
+    def prev_in_series(page)
+      series_sibling(page, :back)
     end
 
     # Shared-term count between two frontmatter values. Both can be
@@ -515,6 +513,27 @@ module Abqari
       defaults = DEFAULT_TAXONOMIES[name] || {}
       override = taxonomies[name] || {}
       defaults.merge(override)
+    end
+
+    # Which taxonomy owns the series index for `collection_name` — the
+    # first taxonomy whose `field:` is `series` and whose `collection:`
+    # scope matches. Returns the taxonomy name (e.g. `'posts_series'`)
+    # or nil when the collection has no series taxonomy configured.
+    #
+    # Layouts must not hardcode `'posts_series'`: the `post` layout is
+    # deliberately reusable (cookbook, glossary, lessons), and every
+    # collection that reuses it has its own `<collection>_series`
+    # taxonomy. A hardcoded name sends every series breadcrumb in every
+    # reusing collection to the posts series index instead of its own.
+    def series_taxonomy_for(collection_name)
+      return nil if collection_name.to_s.empty?
+
+      memo("series_taxonomy_#{collection_name}") do
+        taxonomies.find do |_name, cfg|
+          cfg['field'].to_s == 'series' &&
+            cfg['collection'].to_s == collection_name.to_s
+        end&.first
+      end
     end
 
     # Index dated pages by taxonomy term. Reads `frontmatter[field]`
@@ -745,6 +764,44 @@ module Abqari
       @generated_pages = []
       @memos.clear
       @renderer.clear_template_cache
+    end
+
+    # Shared scan behind `next_in_series` / `prev_in_series`. Direction
+    # `:forward` takes the smallest position above the current one,
+    # `:back` the largest position below it.
+    #
+    # A candidate's `series_position` must be a real Integer. A quoted
+    # YAML value ("3") drops that page out of the chain with no other
+    # symptom, which is why `bin/audit` flags the type — see
+    # `Audit::Content#flag_series_position_problems`. The *current*
+    # page's position is coerced with `to_i` so a page whose own value
+    # is mistyped can still find its neighbours.
+    #
+    # Two pages sharing a position are invisible to each other in both
+    # directions (the comparison is strict), so the chain silently
+    # skips one. The audit flags duplicates for the same reason.
+    def series_sibling(page, direction)
+      return nil unless page.respond_to?(:frontmatter)
+      return nil unless page.respond_to?(:collection) && page.collection
+
+      series_name = page.frontmatter['series'].to_s
+      return nil if series_name.empty?
+
+      raw_pos = page.frontmatter['series_position']
+      return nil if raw_pos.nil?
+
+      current_pos = raw_pos.to_i
+      candidates = collection(page.collection).select do |p|
+        next false unless p.frontmatter['series'].to_s == series_name
+
+        pos = p.frontmatter['series_position']
+        next false unless pos.is_a?(Integer)
+
+        direction == :forward ? pos > current_pos : pos < current_pos
+      end
+
+      positions = ->(p) { p.frontmatter['series_position'] }
+      direction == :forward ? candidates.min_by(&positions) : candidates.max_by(&positions)
     end
 
     # Memoise the result of `block` under `key` for the lifetime of

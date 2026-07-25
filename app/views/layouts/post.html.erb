@@ -61,10 +61,15 @@ layout: application
       <%= reading_time(page.content) %>
       <%# Series breadcrumb — only when the post carries both `series:`
           and `series_position:` in frontmatter. Position renders as a
-          plain "#N" prefix; the series name links back to the per-
-          collection series taxonomy page. %>
+          plain "#N" prefix; the series name links back to the series
+          taxonomy page for THIS page's collection (`series_url`
+          resolves which one — this layout is reused by cookbook,
+          glossary and any other collection, so the taxonomy can't be
+          hardcoded). Unlinked when the collection has no series
+          taxonomy configured. %>
       <% if (sn = page.frontmatter['series']) && (sp = page.frontmatter['series_position']) %>
-        · #<%= sp %> in the <a href="<%= sanitized_url(taxonomy_url('posts_series', sn)) %>"><%= sn %></a> series
+        <% series_link = series_url(sn) %>
+        · #<%= sp %> in the <%== series_link ? link_to(sn, series_link) : h(sn) %> series
       <% end %>
     </p>
     <%# Hero — `cover_choice_for` returns :photo / :placeholder /
@@ -133,9 +138,11 @@ layout: application
 <% if next_in_series_post %>
   <%== render 'partials/next_in_series' %>
 <% elsif in_series %>
+  <% series_name = page.frontmatter['series'] %>
+  <% series_link = series_url(series_name) %>
   <aside class="series-end" aria-label="End of series">
     <p>This is the last post in the
-      <a href="<%= sanitized_url(taxonomy_url('posts_series', page.frontmatter['series'])) %>"><%= page.frontmatter['series'] %></a>
+      <%== series_link ? link_to(series_name, series_link) : h(series_name) %>
       series.</p>
   </aside>
   <%== render 'partials/next_item' %>

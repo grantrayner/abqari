@@ -13,7 +13,7 @@
       before render to avoid a flash of the wrong theme. The strict CSP
       pins this script by SHA256 hash — no 'unsafe-inline' needed. %>
   <script><%== Abqari::ThemeBootstrap::SCRIPT %></script>
-  <title><%= page.title %> · <%= site.config['title'] %></title>
+  <title><%= document_title %></title>
   <% if page.description %>
   <meta name="description" content="<%= page.description %>">
   <% end %>
@@ -354,7 +354,14 @@
   <% if Array(site.config['fonts']).any? %>
   <link rel="stylesheet" href="/assets/fonts/fonts.css">
   <% end %>
-  <% if site.config.fetch('syntax_highlighting', true) %>
+  <%# Render-blocking CSS ships as ONE fingerprinted bundle (syntax +
+      _common + theme app.css + site.css, same cascade order as the
+      individual links it replaces) — one request, minified, immutable-
+      cached. When no bundle was built (a `none`-theme site without its
+      own app.css), the individual links below take over, preserving
+      the original behaviour and error surface. %>
+  <% css_bundle = optional_asset_path('css/bundle.css') %>
+  <% if !css_bundle && site.config.fetch('syntax_highlighting', true) %>
   <link rel="stylesheet" href="/assets/css/syntax.css">
   <% end %>
   <%# Icon libraries.
@@ -380,7 +387,7 @@
       placeholders) loads first so theme app.css can override on cascade-equal
       specificity. Bootstrap theme bundles its own version — skip _common
       there to avoid duplicate rules. %>
-  <% unless %w[bootstrap none].include?(site.config['theme'].to_s) %>
+  <% if !css_bundle && !%w[bootstrap none].include?(site.config['theme'].to_s) %>
   <link rel="stylesheet" href="<%= asset_path('css/_common.css') %>">
   <% end %>
   <%# Bootstrap theme: load the vendored dist (copied from
@@ -390,6 +397,9 @@
   <% if site.config['theme'].to_s == 'bootstrap' %>
   <link rel="stylesheet" href="/css/bootstrap.min.css">
   <% end %>
+  <% if css_bundle %>
+  <link rel="stylesheet" href="<%= css_bundle %>">
+  <% else %>
   <link rel="stylesheet" href="<%= asset_path('css/app.css') %>">
   <%# Site-local override slot. Loaded AFTER the theme's app.css so a
       site's CSS wins on cascade-equal specificity. Opt-in: create
@@ -398,6 +408,7 @@
       the link silently disappears. %>
   <% if (site_css = optional_asset_path('css/site.css')) %>
   <link rel="stylesheet" href="<%= site_css %>">
+  <% end %>
   <% end %>
   <% if site.config['theme'].to_s == 'bootstrap' %>
   <script src="/js/bootstrap.bundle.min.js" defer></script>

@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# The engine itself, not just the subcommands — CLI::New pins the
+# scaffolded Gemfile to Abqari::VERSION, and `abqari version` prints it.
+require_relative '../abqari'
 require_relative 'cli/new'
 
 module Abqari

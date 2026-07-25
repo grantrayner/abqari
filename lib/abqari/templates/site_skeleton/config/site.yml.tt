@@ -65,14 +65,22 @@ collections:
     feeds:
       enabled: true                # RSS + JSON Feed at /posts/feed.xml + .json
 
+  # Photo galleries. Scaffold enabled with `abqari new ... --with photos`,
+  # or flip `enabled:` later — create `content/photos/index.md` too (the
+  # collection index page is a real content file, not auto-generated).
   photos:
-    enabled: false                 # flip to true to enable photo galleries
+    enabled: <%= with.include?('photos') %>
 
+  # Books / atlases / anything with a cover and a price. Scaffold with
+  # `--with publications`, or flip later + create
+  # `content/publications/index.md`.
   publications:
-    enabled: false                 # flip to true if you ship books / atlases
+    enabled: <%= with.include?('publications') %>
 
+  # Training offerings / courses. Scaffold with `--with workshops`, or
+  # flip later + create `content/workshops/index.md`.
   workshops:
-    enabled: false                 # flip to true if you run workshops / courses
+    enabled: <%= with.include?('workshops') %>
 
 # Home modules ──────────────────────────────────────────────────────────
 # Optional cards rendered below content/index.md's markdown body.

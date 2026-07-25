@@ -1,0 +1,48 @@
+<!--
+  Bidirectional series pager — previous / next by `series_position`.
+
+  The forward-only counterpart is `_next_in_series`, which reuses the
+  prominent `_post_list` index card. A pager is the right shape once
+  you need both directions: two stacked full-width cards read as two
+  unrelated sections rather than as one navigation control.
+
+  Intended for course-shaped collections — a module of ordered lessons,
+  a numbered guide run — where readers move backwards as often as
+  forwards. Generic across collections; nothing here is posts-specific.
+
+  Renders nothing when the page has no series neighbour in either
+  direction. When only one neighbour exists it renders alone and keeps
+  its slot (prev left, next right) so the controls don't swap sides
+  from page to page.
+
+  Required frontmatter: `series:` plus an Integer `series_position:`.
+  A quoted position ("3") drops the page out of the chain silently —
+  `bin/audit` flags it under Content.
+
+  Usage:
+      <%%== render 'partials/series_pager' %>
+-->
+<%
+  prev_page = site.prev_in_series(page)
+  next_page = site.next_in_series(page)
+%>
+<% if prev_page || next_page %>
+<nav class="series-pager" aria-label="Series navigation">
+  <% if prev_page %>
+    <a class="series-pager__link series-pager__link--prev" rel="prev" href="<%= sanitized_url(prev_page.url) %>">
+      <span class="series-pager__direction">Previous</span>
+      <span class="series-pager__title"><%= prev_page.title %></span>
+    </a>
+  <% else %>
+    <%# Empty slot keeps `next` in the right-hand column on the first
+        item in a series. Not focusable, not announced. %>
+    <span class="series-pager__slot-empty" aria-hidden="true"></span>
+  <% end %>
+  <% if next_page %>
+    <a class="series-pager__link series-pager__link--next" rel="next" href="<%= sanitized_url(next_page.url) %>">
+      <span class="series-pager__direction">Next</span>
+      <span class="series-pager__title"><%= next_page.title %></span>
+    </a>
+  <% end %>
+</nav>
+<% end %>

@@ -97,4 +97,132 @@ class HeadersCspTest < Minitest::Test
   def test_newsletter_no_config_leaves_form_action_self_only
     assert_includes policy_for, "form-action 'self'"
   end
+
+  # --- Folio cover host ----------------------------------------------
+
+  def folio_config(extra = {})
+    { 'folio' => { 'base_url' => 'https://foliobooks.app',
+                   'author_slug' => 'me' }.merge(extra) }
+  end
+
+  def test_folio_extends_img_src_with_default_covers_host
+    csp = policy_for(folio_config)
+    assert_match(%r{img-src [^;]*https://covers\.foliobooks\.app}, csp)
+  end
+
+  def test_folio_covers_host_is_configurable
+    csp = policy_for(folio_config('covers_host' => 'https://covers.my-folio.example'))
+    assert_match(%r{img-src [^;]*https://covers\.my-folio\.example}, csp)
+    refute_includes csp, 'covers.foliobooks.app'
+  end
+
+  def test_folio_covers_host_normalises_to_origin
+    # A full URL (path and all) still lands in the CSP as a bare origin.
+    csp = policy_for(folio_config('covers_host' => 'https://covers.my-folio.example/some/path'))
+    assert_match(%r{img-src [^;]*https://covers\.my-folio\.example( |;|\z)}, csp)
+    refute_includes csp, '/some/path'
+  end
+
+  def test_no_folio_no_covers_host
+    refute_includes policy_for, 'covers.foliobooks.app'
+  end
+
+  # --- media: off-origin audio / video --------------------------------
+  #
+  # Colocated bundle audio needs nothing: with no `media-src` declared
+  # it inherits `default-src 'self'`. The directive appears only when a
+  # host is configured, so existing sites see no header change.
+
+  def test_no_media_config_declares_no_media_src
+    refute_includes policy_for, 'media-src'
+  end
+
+  def test_media_host_adds_media_src_and_keeps_self
+    csp = policy_for('media' => { 'host' => 'https://media.example.com' })
+    assert_includes csp, "media-src 'self' https://media.example.com"
+  end
+
+  def test_media_host_accepts_a_list
+    csp = policy_for('media' => {
+                       'host' => ['https://audio.example.com', 'https://video.example.com']
+                     })
+    assert_match(%r{media-src 'self' https://audio\.example\.com https://video\.example\.com}, csp)
+  end
+
+  def test_media_host_normalises_to_origin
+    csp = policy_for('media' => { 'host' => 'https://media.example.com/lessons/01.mp3' })
+    assert_includes csp, "media-src 'self' https://media.example.com"
+    refute_includes csp, '/lessons/01.mp3'
+  end
+
+  # --- csp: operator-declared origins ---------------------------------
+  #
+  # Additive by contract: the whole reason the key exists is that
+  # `headers:` replaces the computed policy and silently drops the
+  # pinned inline-script hashes with it.
+
+  def test_csp_extension_appends_to_an_existing_directive
+    csp = policy_for('csp' => { 'img-src' => ['https://cdn.example.com'] })
+    assert_includes csp, "img-src 'self' data: https://cdn.example.com"
+  end
+
+  def test_csp_extension_creates_a_directive_seeded_with_self
+    csp = policy_for('csp' => { 'media-src' => ['https://media.example.com'] })
+    assert_includes csp, "media-src 'self' https://media.example.com"
+  end
+
+  def test_csp_extension_accepts_a_bare_string
+    csp = policy_for('csp' => { 'connect-src' => 'https://api.example.com' })
+    assert_includes csp, "connect-src 'self' https://api.example.com"
+  end
+
+  def test_csp_extension_preserves_pinned_script_hashes
+    csp = policy_for('csp' => { 'script-src' => ['https://cdn.example.com'] })
+    assert_includes csp, "'#{Abqari::ThemeBootstrap::SHA256}'"
+    assert_includes csp, 'https://cdn.example.com'
+  end
+
+  def test_csp_extension_preserves_feature_derived_origins
+    csp = policy_for(
+      'plausible' => { 'enabled' => true, 'key' => 'example.com' },
+      'csp'       => { 'connect-src' => ['https://api.example.com'] }
+    )
+    assert_includes csp, 'https://plausible.io'
+    assert_includes csp, 'https://api.example.com'
+  end
+
+  def test_csp_rejects_non_extendable_hardening_directives
+    %w[object-src frame-ancestors base-uri default-src].each do |directive|
+      error = assert_raises(ArgumentError) do
+        policy_for('csp' => { directive => ['https://cdn.example.com'] })
+      end
+      assert_match(/not an extendable directive/, error.message)
+      assert_match(/headers:/, error.message, 'error should point at the real escape hatch')
+    end
+  end
+
+  def test_csp_rejects_an_unknown_directive
+    error = assert_raises(ArgumentError) do
+      policy_for('csp' => { 'imgsrc' => ['https://cdn.example.com'] })
+    end
+    assert_match(/"imgsrc"/, error.message)
+  end
+
+  def test_csp_rejects_wildcards_and_keywords_and_non_http_schemes
+    ['*', "'unsafe-inline'", "'unsafe-eval'", 'data:', 'blob:', "'self'",
+     'javascript:alert(1)', 'cdn.example.com'].each do |value|
+      error = assert_raises(ArgumentError, "#{value.inspect} must be rejected") do
+        policy_for('csp' => { 'img-src' => [value] })
+      end
+      assert_match(/is not an http\(s\) origin/, error.message)
+    end
+  end
+
+  def test_csp_rejection_fails_the_build_rather_than_shipping_a_stale_policy
+    # A malformed CSP fails open in the browser, so a silent skip would
+    # ship a policy the operator believes is enforced. `#write` must
+    # propagate rather than swallow.
+    site = make_site('csp' => { 'img-src' => ['*'] })
+    assert_raises(ArgumentError) { Abqari::HeadersFile.new(site).send(:build) }
+  end
 end

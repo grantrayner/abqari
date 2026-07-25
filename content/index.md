@@ -116,7 +116,7 @@ run workshops.
   the theme, ideal for site-specific brand details
 
 **Build pipeline**
-- Pretty URLs, content-hashed asset fingerprinting, HTML minification
+- Pretty URLs, content-hashed asset fingerprinting, HTML/CSS/JS minification, single-bundle CSS
 - Self-hosted Google Fonts (`bin/fetch-fonts`)
 - PWA manifest + favicons (`bin/icons` generates from a master PNG)
 - Inline SVG icons; ships GitHub, RSS, mail, X, Mastodon, Bluesky,

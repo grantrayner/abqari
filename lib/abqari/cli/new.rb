@@ -19,10 +19,9 @@ module Abqari
     #   * `theme:`       = minimal
     #   * `locale:`      = en
     #   * Engine source  = whichever shape the user passes via
-    #                      `--engine`. Defaults to "git" (a github URL
-    #                      placeholder — operator edits to point at
-    #                      their fork) since the engine isn't on
-    #                      RubyGems yet.
+    #                      `--engine`. Defaults to "rubygems" (the
+    #                      published gem, pinned to the current
+    #                      major.minor).
     #
     # Flags:
     #   --name "..."          Site title (defaults to projectname)
@@ -30,10 +29,21 @@ module Abqari
     #   --author "..."        Author
     #   --theme NAME          Theme (one of VALID_THEMES below)
     #   --locale CODE         ISO 639-1 (en, fr, ja, …)
-    #   --engine SOURCE       'git' (default — github placeholder),
-    #                         'path' (path-source to ../abqari, useful
-    #                         for engine devs), or a literal Gemfile
-    #                         line (anything starting with "gem ").
+    #   --with LIST           Extra collections to enable alongside posts
+    #                         (comma-separated: photos, publications,
+    #                         workshops — repeatable). For each one the
+    #                         scaffold sets `enabled: true` in
+    #                         config/site.yml AND creates the
+    #                         `content/<name>/index.md` collection index
+    #                         page (a real content file the engine does
+    #                         not auto-generate). Everything stays
+    #                         opt-in-able later by hand; the flag just
+    #                         removes the copy-an-example friction.
+    #   --engine SOURCE       'rubygems' (default — the published gem),
+    #                         'git' (github URL placeholder — operator
+    #                         edits to point at their fork), or 'path'
+    #                         (path-source to ../abqari, useful for
+    #                         engine devs).
     #   --blank               Bare-minimum scaffold: no example post,
     #                         no tutorial text on the home / about
     #                         pages, no in-line docs in
@@ -46,7 +56,18 @@ module Abqari
     #   --force               Overwrite target directory if non-empty
     class New
       VALID_THEMES = %w[minimal magazine notebook sand bootstrap custom none].freeze
-      VALID_ENGINES = %w[git path].freeze
+      VALID_ENGINES = %w[rubygems git path].freeze
+      # Collections `--with` can enable. Posts is always on — it's the
+      # backbone collection (disable it in config/site.yml if you must).
+      WITH_COLLECTIONS = %w[photos publications workshops].freeze
+
+      # Skeleton paths that only copy when their collection is selected
+      # via `--with`. Each matches itself and anything underneath it.
+      COLLECTION_CONTENT_PATHS = {
+        'photos'       => 'content/photos',
+        'publications' => 'content/publications',
+        'workshops'    => 'content/workshops'
+      }.freeze
 
       # Directories that are example-only — skipped when --blank is
       # passed. Paths are relative to the skeleton root, no trailing
@@ -55,11 +76,14 @@ module Abqari
         content/posts/welcome
       ].freeze
 
-      # Default engine-source line in the scaffolded Gemfile. Placeholder
-      # github URL — the operator edits it to their fork. Once Abqari is
-      # on RubyGems, this default becomes `gem 'abqari', '~> X.Y'`.
-      DEFAULT_GIT_GEMFILE_LINE  = "gem 'abqari', git: 'https://github.com/your-handle/abqari.git'"
-      DEFAULT_PATH_GEMFILE_LINE = "gem 'abqari', path: '../abqari'"
+      # Engine-source line in the scaffolded Gemfile, one per --engine
+      # option. The default pins to the running engine's major.minor so
+      # a scaffolded site tracks patch releases but not breaking ones.
+      # The git line is a placeholder URL — the operator edits it to
+      # point at their fork.
+      DEFAULT_RUBYGEMS_GEMFILE_LINE = "gem 'abqari', '~> #{Abqari::VERSION.split('.').first(2).join('.')}'"
+      DEFAULT_GIT_GEMFILE_LINE      = "gem 'abqari', git: 'https://github.com/your-handle/abqari.git'"
+      DEFAULT_PATH_GEMFILE_LINE     = "gem 'abqari', path: '../abqari'"
 
       def self.run(argv)
         new.run(argv)
@@ -69,7 +93,8 @@ module Abqari
         @options = {
           theme:         'minimal',
           locale:        'en',
-          engine:        'git',
+          engine:        'rubygems',
+          with:          [],
           blank:         false,
           skip_bundle:   false,
           force:         false
@@ -110,7 +135,8 @@ module Abqari
           opts.on('--author NAME',        'Author')                                               { |v| @options[:author] = v }
           opts.on('--theme NAME',         "Theme (#{VALID_THEMES.join('/')})")                    { |v| @options[:theme] = v }
           opts.on('--locale CODE',        'ISO 639-1 locale (en, fr, ja, …)')                    { |v| @options[:locale] = v }
-          opts.on('--engine SOURCE',      "Gem source: 'git' (default) or 'path'")                { |v| @options[:engine] = v }
+          opts.on('--engine SOURCE',      "Gem source: 'rubygems' (default), 'git', or 'path'")   { |v| @options[:engine] = v }
+          opts.on('--with LIST', Array,   "Extra collections to enable (#{WITH_COLLECTIONS.join('/')}, comma-separated, repeatable)") { |v| @options[:with] |= v.map(&:strip) }
           opts.on('--blank',              'Minimum-viable scaffold (no example post, no tutorial text, no in-line config docs)') { @options[:blank] = true }
           opts.on('--skip-bundle',        "Don't run `bundle install` after scaffolding")         {     @options[:skip_bundle] = true }
           opts.on('--force',              'Overwrite the target directory if non-empty')         {     @options[:force] = true }
@@ -141,6 +167,11 @@ module Abqari
           warn "Unknown --engine: #{@options[:engine].inspect}. Valid: #{VALID_ENGINES.join(', ')}"
           return false
         end
+        unknown = @options[:with] - WITH_COLLECTIONS
+        unless unknown.empty?
+          warn "Unknown --with collection(s): #{unknown.join(', ')}. Valid: #{WITH_COLLECTIONS.join(', ')} (posts is always on)"
+          return false
+        end
         true
       end
 
@@ -155,6 +186,7 @@ module Abqari
           author:       @options[:author] || 'Your Name',
           theme:        @options[:theme],
           locale:       @options[:locale],
+          with:         @options[:with],
           gemfile_line: engine_gemfile_line,
           year:         Time.now.year
         }
@@ -162,8 +194,9 @@ module Abqari
 
       def engine_gemfile_line
         case @options[:engine]
-        when 'git'  then DEFAULT_GIT_GEMFILE_LINE
-        when 'path' then DEFAULT_PATH_GEMFILE_LINE
+        when 'rubygems' then DEFAULT_RUBYGEMS_GEMFILE_LINE
+        when 'git'      then DEFAULT_GIT_GEMFILE_LINE
+        when 'path'     then DEFAULT_PATH_GEMFILE_LINE
         end
       end
 
@@ -223,6 +256,14 @@ module Abqari
       def skip_in_mode?(rel, blank, skeleton_root)
         if blank && BLANK_MODE_SKIP.any? { |p| rel == p || rel.start_with?("#{p}/") }
           return true
+        end
+
+        # Collection content dirs only scaffold when requested via
+        # `--with` — an unselected collection stays config-off with no
+        # stray content/<name>/ directory.
+        COLLECTION_CONTENT_PATHS.each do |collection, path|
+          next if @options[:with].include?(collection)
+          return true if rel == path || rel.start_with?("#{path}/")
         end
 
         blank_variant = rel.include?('.blank.')

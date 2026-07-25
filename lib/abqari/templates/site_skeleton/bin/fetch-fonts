@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Self-host fonts declared in config/site.yml. Downloads woff2 files from
+# Google Fonts and writes a fonts.css with rewritten URLs into vendor/fonts/.
+# Run once after adding/changing the `fonts:` block. Build copies the result
+# into _site/assets/fonts/.
+
+ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+
+require 'bundler/setup'
+require 'abqari'
+
+Abqari::FontPipeline.new(Abqari::Site.new).fetch

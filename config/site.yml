@@ -947,6 +947,9 @@ visualizations:
 #   author_slug: your-author-slug
 #   include_slugs: [book-one, book-two]    # only these (otherwise: all)
 #   exclude_slugs: [some-other-book]
+#   covers_host: https://covers.foliobooks.app   # cover-image host, added
+#                                # to the CSP img-src. Only set this when
+#                                # your Folio serves covers elsewhere.
 #
 # Book detail page toggles live alongside other collections — see
 # `collections.books.show.*` above. Per-book hero image goes in the

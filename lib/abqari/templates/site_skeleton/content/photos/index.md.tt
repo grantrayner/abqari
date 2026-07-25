@@ -1,0 +1,12 @@
+---
+title: Photos
+published: true
+description: Photo galleries, newest first.
+nav:
+  order: 3
+  label: Photos
+---
+
+Photo galleries, newest first. Each photo is a bundle at
+`content/photos/<slug>/index.md` with the image alongside it —
+set `image:` in the frontmatter and the gallery index picks it up.

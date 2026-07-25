@@ -50,6 +50,7 @@ module Abqari
       block_ai_scraping
       collections
       contact
+      csp
       description
       drafts
       environments
@@ -67,6 +68,7 @@ module Abqari
       llms
       locale
       manifest
+      media
       minify
       nav
       newsletter

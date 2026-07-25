@@ -83,10 +83,11 @@ class SiteBuildTest < Minitest::Test
 
   # Theme & assets
 
-  def test_default_theme_css_fingerprinted
-    pattern = %r{/assets/css/app\.[a-f0-9]{10}\.css}
+  def test_head_css_is_fingerprinted
+    # Theme CSS ships inside the single fingerprinted bundle — the head
+    # must reference content-hashed CSS, never a bare stable URL.
     home = TestHelpers.read_output('index.html')
-    assert_match pattern, home
+    assert_match %r{/assets/css/bundle\.[a-f0-9]{10}\.css}, home
   end
 
   # SEO meta
@@ -919,8 +920,12 @@ class SyntaxHighlightingTest < Minitest::Test
     assert_includes html, 'class="k">def'  # 'k' is Rouge's keyword class
   end
 
-  def test_head_links_to_syntax_stylesheet
+  def test_head_links_css_bundle_which_carries_syntax_styles
+    # Rouge styles ship inside the fingerprinted CSS bundle; the
+    # standalone syntax.css is only for sites overriding the head
+    # partial, so the default head must NOT link it.
     html = TestHelpers.read_output('index.html')
-    assert_includes html, '/assets/css/syntax.css'
+    assert_match %r{/assets/css/bundle\.[0-9a-f]{10}\.css}, html
+    refute_includes html, '/assets/css/syntax.css'
   end
 end
