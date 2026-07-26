@@ -58,6 +58,15 @@ class CliNewTest < Minitest::Test
     end
   end
 
+  def test_pins_ruby_version_to_the_scaffolding_ruby
+    # A committed `.ruby-version` is what stops a deploy host from
+    # choosing its own default Ruby — the failure mode being a native
+    # gem with no precompiled binary for that version.
+    run_new('mysite')
+    assert File.exist?('mysite/.ruby-version'), 'scaffold must pin a Ruby version'
+    assert_equal RUBY_VERSION, File.read('mysite/.ruby-version', encoding: 'UTF-8').strip
+  end
+
   def test_no_template_suffix_in_output
     # `.tt` files in the skeleton are ERB; output should land at the
     # path without the suffix.

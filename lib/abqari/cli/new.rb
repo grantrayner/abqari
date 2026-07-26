@@ -188,6 +188,12 @@ module Abqari
           locale:       @options[:locale],
           with:         @options[:with],
           gemfile_line: engine_gemfile_line,
+          # Pins the scaffolded site to the Ruby doing the scaffolding.
+          # Without a committed `.ruby-version`, a deploy host picks its
+          # own default — which is how a site ends up building on a
+          # newer Ruby than it was developed on, and hitting native gems
+          # that ship no precompiled binary for it.
+          ruby_version: RUBY_VERSION,
           year:         Time.now.year
         }
       end

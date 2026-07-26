@@ -72,7 +72,12 @@ Gem::Specification.new do |spec|
   spec.executables = ['abqari']
 
   spec.add_dependency 'base64',          '~> 0.2'
-  spec.add_dependency 'commonmarker',    '~> 1.1'
+  # commonmarker: floor is 2.4 deliberately. Its precompiled native
+  # binaries are per-Ruby-ABI, and 3.4 support first appears in 2.4 —
+  # on 1.1.x (binaries stop at Ruby 3.3) anyone installing under 3.4
+  # falls back to building from source, which needs a Rust toolchain
+  # most deploy hosts don't have.
+  spec.add_dependency 'commonmarker',    '~> 2.4'
   # csv: used by `Abqari::Importers::Substack` to read the export's
   # posts.csv manifest. Moved out of Ruby's default gem set in 3.4 —
   # pinned explicitly so the gem still works under Bundler's frozen mode.

@@ -112,12 +112,19 @@ end
       "#{count} #{word}"
     end
 
-    # Count words in a string — naive whitespace split. Used for
-    # JSON-LD `wordCount` and any UI that surfaces word counts. The
-    # `reading_time` helper has its own (more punctuation-aware)
-    # tokenizer; this one keeps `wordCount` honest as a rough integer.
+    # Count words in a string. Used for JSON-LD `wordCount` and any UI
+    # that surfaces word counts.
+    #
+    # Tags are stripped first (same as `reading_time`) because callers
+    # pass RENDERED HTML — `page.content`, not the markdown source. A
+    # naive `\S+` split over markup counts every attribute as a word,
+    # which inflated `wordCount` by roughly the tag density of the
+    # page. Commonmarker 2.x made that starkly visible: its heading
+    # anchors repeat the heading text in both `aria-label` and
+    # `data-heading-content`, so each heading silently added several
+    # phantom "words" to the structured data search engines read.
     def word_count(text)
-      text.to_s.scan(/\S+/).length
+      text.to_s.gsub(/<[^>]+>/, ' ').scan(/\S+/).length
     end
 
     # Format a date or time. Default format is "1 January 2026"
@@ -196,8 +203,46 @@ end
       "#{minutes} min read"
     end
 
+    # Latin letters that NFKD leaves alone, because their stroke or
+    # ligature is part of the letterform rather than a combining mark.
+    # Without these they'd hit the `[^a-z0-9]` strip and vanish — the
+    # same silent-deletion bug diacritic folding fixes ("Ø" → "", so
+    # "Åland Ø" would slug to "aland"). Keyed on the lowercase form;
+    # `downcase` runs first.
+    NON_DECOMPOSING_LETTERS = {
+      'ø' => 'o', 'đ' => 'd', 'ð' => 'd', 'ł' => 'l', 'ħ' => 'h',
+      'ı' => 'i', 'ŧ' => 't', 'æ' => 'ae', 'œ' => 'oe', 'ß' => 'ss',
+      'þ' => 'th'
+    }.freeze
+    NON_DECOMPOSING_LETTERS_RE = Regexp.union(NON_DECOMPOSING_LETTERS.keys).freeze
+
+    # Turn arbitrary text into a URL-safe slug.
+    #
+    # Diacritics are FOLDED, not dropped. NFKD decomposition splits "é"
+    # into "e" plus a combining acute, and removing the combining marks
+    # leaves the base letter behind. Without that step the `[^a-z0-9]`
+    # strip below deletes the whole character: "Café" became "caf" and
+    # "Mabrūk" became "mabr-k". That matters because this function
+    # builds public taxonomy URLs (`/tags/:slug/`) as well as internal
+    # ids — a transliterated tag would otherwise get a mangled URL.
+    #
+    # Non-Latin scripts (Arabic, CJK) have no Latin base letter to fold
+    # to and still slugify to "", which `Page::Path#render_permalink`
+    # catches with an explicit error.
     def slugify(text)
-      text.to_s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/\A-|-\z/, '')
+      s = text.to_s
+      # Path-derived strings reach here tagged ASCII-8BIT, and
+      # `unicode_normalize` refuses binary input outright. Re-tag as
+      # UTF-8 (the bytes almost always already are), then drop any
+      # sequence that isn't — `valid_encoding?` alone can't be trusted
+      # here, since every byte string is "valid" as ASCII-8BIT.
+      s = s.dup.force_encoding(Encoding::UTF_8) unless s.encoding == Encoding::UTF_8
+      s = s.scrub('') unless s.valid_encoding?
+      s = s.unicode_normalize(:nfkd).gsub(/\p{Mn}/, '')
+      s.downcase
+       .gsub(NON_DECOMPOSING_LETTERS_RE) { |c| NON_DECOMPOSING_LETTERS[c] }
+       .gsub(/[^a-z0-9]+/, '-')
+       .gsub(/\A-|-\z/, '')
     end
 
     # Render a markdown string to HTML. For frontmatter prose fields

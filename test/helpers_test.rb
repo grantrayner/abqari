@@ -71,6 +71,52 @@ class HelpersTest < Minitest::Test
     assert_equal 'already-a-slug', slugify('already-a-slug')
   end
 
+  # slugify — diacritic folding. These characters must FOLD to their
+  # base letter, not vanish. slugify builds public taxonomy URLs
+  # (`/tags/:slug/`), so dropping them mangles the URL: "Café" used to
+  # slug to "caf" and "Mabrūk" to "mabr-k".
+
+  def test_slugify_folds_accents_to_base_letters
+    assert_equal 'cafe',   slugify('Café')
+    assert_equal 'naive',  slugify('naïve')
+    assert_equal 'zurich', slugify('Zürich')
+  end
+
+  def test_slugify_folds_transliteration_marks
+    # Macrons and dots-below — the transliterated Arabic that prompted
+    # this (a Syrian-Arabic site is full of it).
+    assert_equal 'mabruk',      slugify('Mabrūk')
+    assert_equal 'sahha-enjoy', slugify('Ṣaḥḥa — enjoy')
+  end
+
+  def test_slugify_folds_letters_unicode_does_not_decompose
+    # Stroked/ligature letters have no combining mark to strip, so they
+    # need the explicit table or they'd disappear entirely.
+    assert_equal 'aland-o',      slugify('Åland Ø')
+    assert_equal 'fussball',     slugify('Fußball')
+    assert_equal 'aether-oeuvre', slugify('Æther œuvre')
+  end
+
+  def test_slugify_leaves_non_latin_scripts_empty
+    # No Latin base letter to fold to. Page::Path#render_permalink
+    # turns the empty result into an explicit, actionable error.
+    assert_equal '', slugify('日本語')
+    assert_equal '', slugify('مرحبا')
+  end
+
+  def test_slugify_handles_binary_encoded_input
+    # Path-derived strings arrive tagged ASCII-8BIT; unicode_normalize
+    # rejects binary outright, which crashed the whole build.
+    binary = "Caf\u00e9".dup.force_encoding(Encoding::ASCII_8BIT)
+    assert_equal 'cafe', slugify(binary)
+  end
+
+  def test_slugify_survives_invalid_encoding
+    # A bad byte sequence used to raise from `downcase` and fail the
+    # entire build rather than degrading one slug.
+    assert_equal 'caf-e', slugify("caf\xC3(e")
+  end
+
   # local_time
 
   def test_local_time_default_format
@@ -91,6 +137,28 @@ class HelpersTest < Minitest::Test
 
   def test_reading_time_one_minute_for_under_200_words
     assert_equal '1 min read', reading_time('word ' * 50)
+  end
+
+  # word_count
+
+  def test_word_count_ignores_markup
+    # Callers pass rendered HTML (page.content), so attributes must not
+    # count as words — JSON-LD wordCount is consumed by search engines.
+    assert_equal 2, word_count('<p class="lede">hello world</p>')
+  end
+
+  def test_word_count_does_not_count_heading_anchor_attributes
+    # Commonmarker 2.x repeats the heading text in aria-label and
+    # data-heading-content; only the visible text should count.
+    html = %(<h2 id="a-title">A title<a href="#a-title" ) +
+           %(aria-label="Link to heading 'A title'" ) +
+           %(data-heading-content="A title" class="anchor"></a></h2>)
+    assert_equal 2, word_count(html)
+  end
+
+  def test_word_count_handles_plain_text_and_nil
+    assert_equal 3, word_count('one two three')
+    assert_equal 0, word_count(nil)
   end
 
   def test_reading_time_scales_with_word_count

@@ -3,7 +3,7 @@ PATH
   specs:
     abqari (1.0.0)
       base64 (~> 0.2)
-      commonmarker (~> 1.1)
+      commonmarker (~> 2.4)
       csv (~> 3.3)
       erubi (~> 1.13)
       reverse_markdown (~> 2.1)
@@ -15,10 +15,12 @@ GEM
   remote: https://rubygems.org/
   specs:
     base64 (0.3.0)
-    commonmarker (1.1.5-aarch64-linux)
-    commonmarker (1.1.5-arm64-darwin)
-    commonmarker (1.1.5-x86_64-darwin)
-    commonmarker (1.1.5-x86_64-linux)
+    commonmarker (2.9.0-aarch64-linux)
+    commonmarker (2.9.0-aarch64-linux-musl)
+    commonmarker (2.9.0-arm64-darwin)
+    commonmarker (2.9.0-x86_64-darwin)
+    commonmarker (2.9.0-x86_64-linux)
+    commonmarker (2.9.0-x86_64-linux-musl)
     csv (3.3.5)
     docile (1.4.1)
     erubi (1.13.1)
@@ -86,10 +88,12 @@ DEPENDENCIES
 CHECKSUMS
   abqari (1.0.0)
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
-  commonmarker (1.1.5-aarch64-linux) sha256=0b2313c892000a8977d5ddf1677518281120d8a5f933c8165794e089fad8699b
-  commonmarker (1.1.5-arm64-darwin) sha256=6757d4eec4063f99e2bdddc40e4773c50a24a10018e134d1e1ca44e3edc5e7e8
-  commonmarker (1.1.5-x86_64-darwin) sha256=9b91250379ddf429aecfefe8d3da40f3c2be5a8454d8425bfde51535e5c841f0
-  commonmarker (1.1.5-x86_64-linux) sha256=3e369ccaa811003b1a235e21d022bfc557c0a9ae4d58de088775e25411c97953
+  commonmarker (2.9.0-aarch64-linux) sha256=e2b4aadb9a2cfa4e206582641ce3a49465549ac1ed4c289fdd63b78d8f24579c
+  commonmarker (2.9.0-aarch64-linux-musl) sha256=1cf4d2821f2a7e64945f1ed7c4eeced586fdb27ea7fe7337788802cf8f57cfca
+  commonmarker (2.9.0-arm64-darwin) sha256=1748dbfa4f5813b0d2a14bb4bbfa65a4ec293aa1c825016d60029ee0e132b046
+  commonmarker (2.9.0-x86_64-darwin) sha256=0a9914ccfd2f5d2a59c7bd0dda4fe90eb084cf513b477e499008e09ec9d6edd6
+  commonmarker (2.9.0-x86_64-linux) sha256=8cfe92970eef585a19ddf6613224b91cab64d6029834661bda801f877c9c7f43
+  commonmarker (2.9.0-x86_64-linux-musl) sha256=293921398b839f79ceaf55010e061357e34f053822c3b003cd0be6686176335e
   csv (3.3.5) sha256=6e5134ac3383ef728b7f02725d9872934f523cb40b961479f69cf3afa6c8e73f
   docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9

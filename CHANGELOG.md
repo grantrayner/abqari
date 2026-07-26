@@ -231,5 +231,37 @@ run a real working author / publisher site.
   `vendor/*/.gitkeep`) ship in the gem, `abqari new` defaults to the
   released RubyGems engine source, and Heroicons 2.2.0 is vendored
   (with license) so the `heroicon` helper works from a gem install.
+- The gemspec reads `VERSION` from a dependency-free
+  `lib/abqari/version.rb` rather than loading the engine. Loading it
+  pulled in every runtime gem, which broke `bundle install` for any
+  git or path source (Bundler evaluates the gemspec before installing
+  dependencies).
+- `abqari new` writes a `.ruby-version` pinned to the scaffolding
+  Ruby, so a scaffolded site doesn't silently build on whatever
+  version its deploy host defaults to.
+- commonmarker moved to `~> 2.4`. Its precompiled binaries are
+  per-Ruby-ABI and 1.1.x stops at Ruby 3.3, so installing under 3.4
+  fell back to a source build needing a Rust toolchain. Two rendering
+  details are pinned explicitly as a result: `hardbreaks: false`
+  (2.x defaults it to true, which turns every hard-wrapped source
+  line into a `<br />`), and the TOC partial now reads commonmarker
+  2.x's `id`-on-heading anchor markup.
+- `word_count` strips HTML before counting. Callers pass rendered
+  content, so JSON-LD `wordCount` had been counting tag attributes as
+  words.
+- `slugify` folds diacritics instead of deleting them: "Café" now
+  slugs to `cafe` rather than `caf`, and "Mabrūk" to `mabruk` rather
+  than `mabr-k`. It builds public taxonomy URLs (`/tags/:slug/`), so a
+  transliterated or accented tag previously got a mangled URL.
+  Stroked and ligature letters Unicode doesn't decompose (ø, ß, æ, þ,
+  …) fold via an explicit table. Non-Latin scripts still slug to "",
+  which `Page::Path` reports as an actionable error. Path-derived
+  strings tagged ASCII-8BIT and outright invalid byte sequences are
+  now handled rather than raising mid-build.
+
+  Upgrade note: this changes URLs only for taxonomy terms or slugs
+  that actually contain such characters. Pure-ASCII sites are
+  byte-identical. If you have an affected tag, add `redirect_from:`
+  for the old path.
 
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

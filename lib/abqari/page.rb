@@ -57,7 +57,14 @@ module Abqari
         header_ids: ''
       },
       render: {
-        unsafe: true
+        unsafe: true,
+        # Explicit, not inherited: commonmarker 2.x defaults this to
+        # TRUE, which turns every soft line break into a `<br />`.
+        # Prose in this project (and most markdown) is hard-wrapped in
+        # the source, so inheriting that default reflows every
+        # paragraph into ragged lines. Pin it and the wrap stays a
+        # source-formatting detail, invisible in the output.
+        hardbreaks: false
       },
       plugins: {
         syntax_highlighter: nil # Rouge handles this in Site#post_process

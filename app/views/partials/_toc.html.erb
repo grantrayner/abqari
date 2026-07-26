@@ -1,13 +1,20 @@
 <!--
   Auto-generated table of contents. Parses headings from the page's
   rendered body and emits a flat `<nav>` of anchor links. Commonmarker
-  emits markdown headings as:
+  2.x emits markdown headings as:
 
-      <h2><a href="#slug" id="slug" class="anchor"></a>Heading text</h2>
+      <h2 id="slug">Heading text<a href="#slug" … class="anchor"></a></h2>
 
-  We pluck level + id + text from that, skipping the auxiliary
-  headings the layouts add (their h2s have direct `id` attributes
-  rather than the anchor-with-id pattern — easy to filter out).
+  We pluck level + id + text from that. The trailing `class="anchor"`
+  child is what identifies a heading as commonmarker's: auxiliary
+  headings the layouts add carry an id but no anchor child, so they
+  stay out of the TOC.
+
+  (Commonmarker 1.x put the id on a LEADING anchor instead —
+  `<h2><a id="slug" class="anchor"></a>Heading text</h2>` — and the id
+  living on the anchor was itself the discriminator. 2.x moved the id
+  onto the heading, which is why both the pattern and the filter had
+  to change.)
 
   Wire from any show layout (post, publication, photo, workshop):
       <%%= render 'partials/toc' %>
@@ -91,11 +98,13 @@
 <% if enabled
      body         = page.respond_to?(:content) ? page.content.to_s : ''
      level_chars  = toc_levels.join              # e.g. "23" → matches h2 + h3
-     heading_re   = %r{<(h[#{level_chars}])><a[^>]*\sid="([^"]+)"[^>]*></a>([^<]+)</\1>}m
-     # The id-on-anchor pattern is commonmarker's anchor convention;
-     # layout-added headings (next-item, related, …) have the id on
-     # the heading tag itself and won't match, so they're excluded
-     # automatically.
+     heading_re   = %r{<(h[#{level_chars}])\s[^>]*id="([^"]+)"[^>]*>([^<]+)<a[^>]*class="anchor"[^>]*></a></\1>}m
+     # The trailing `class="anchor"` child is commonmarker's convention;
+     # layout-added headings (next-item, related, the TOC's own
+     # "Contents" h2) carry an id but no anchor child, so they're
+     # excluded automatically. As before, `[^<]+` means a heading
+     # containing inline markup (e.g. `## Using <code>foo</code>`) is
+     # skipped rather than half-rendered into the list.
      matches = body.scan(heading_re)
    else
      matches = []
