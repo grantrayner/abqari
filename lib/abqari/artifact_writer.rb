@@ -60,14 +60,30 @@ module Abqari
       FileUtils.mkdir_p(target)
     end
 
-    # Copy static passthrough files into the build output. Two sources:
+    # Copy static passthrough files into the build output. Three
+    # sources, later wins on conflict:
     #   1. Top-level `public/` — site-wide files (favicons, manifest).
-    #   2. The active theme's `themes/<name>/public/` — theme-scoped
+    #   2. The ENGINE theme's `themes/<name>/public/` — theme-scoped
     #      vendor files (e.g. the Bootstrap dist for `theme: bootstrap`).
-    #      Theme files win on conflict (copied second).
+    #   3. The SITE's `themes/<name>/public/` — per-file overrides.
+    #
+    # Engine and site theme dirs MERGE (same semantics as the asset
+    # pipeline): a site adding one file to `themes/bootstrap/public/`
+    # must not stop the engine's vendored dist from shipping. The old
+    # `find_in_paths` picked exactly one dir, so a single site-local
+    # file silently 404'd `/css/bootstrap.min.css`. Precedence is
+    # resolved in the map — NOT via copy order + the mtime skip, which
+    # would let whichever source file happened to be newer win.
     def copy_public
-      [File.join(@site.site_root, 'public'),
-       @site.find_in_paths(File.join('themes', @site.config['theme'].to_s, 'public'))].each do |public_dir|
+      theme = @site.config['theme'].to_s
+      sources = [
+        File.join(@site.site_root, 'public'),
+        File.join(@site.engine_root, 'themes', theme, 'public'),
+        File.join(@site.site_root, 'themes', theme, 'public')
+      ]
+
+      merged = {}
+      sources.each do |public_dir|
         next unless Dir.exist?(public_dir)
 
         Dir.glob(File.join(public_dir, '**', '*'), File::FNM_DOTMATCH).sort.each do |entry|
@@ -88,12 +104,16 @@ module Abqari
           # one hidden dir a static site legitimately publishes.
           next if hidden_path?(rel)
 
-          dest = File.join(@site.output_dir, rel)
-          next if File.exist?(dest) && File.mtime(dest) >= File.mtime(entry)
-
-          FileUtils.mkdir_p(File.dirname(dest))
-          FileUtils.cp(entry, dest)
+          merged[rel] = entry
         end
+      end
+
+      merged.each do |rel, entry|
+        dest = File.join(@site.output_dir, rel)
+        next if File.exist?(dest) && File.mtime(dest) >= File.mtime(entry)
+
+        FileUtils.mkdir_p(File.dirname(dest))
+        FileUtils.cp(entry, dest)
       end
     end
 

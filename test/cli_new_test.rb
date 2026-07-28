@@ -58,6 +58,32 @@ class CliNewTest < Minitest::Test
     end
   end
 
+  def test_scaffolds_themes_dir_so_serve_watches_it_from_day_one
+    # Listen watch roots are computed once at serve startup and filtered
+    # by Dir.exist? — without this dir, a theme created mid-session
+    # never hot-reloads.
+    run_new('mysite')
+    assert Dir.exist?('mysite/themes')
+    assert File.exist?('mysite/themes/.gitkeep')
+  end
+
+  def test_theme_none_scaffolds_an_editable_app_css
+    # `--theme none` used to scaffold a site that failed its first
+    # build: the head required css/app.css and the skeleton had none.
+    run_new('mysite', '--theme', 'none')
+    assert File.file?('mysite/app/assets/css/app.css')
+    assert_includes File.read('mysite/app/assets/css/app.css'), 'theme: none'
+  end
+
+  def test_theme_custom_copies_the_starter_into_the_site
+    # The starter used to load from inside the installed gem — a file
+    # the user can't edit and has never seen. Now it's theirs.
+    run_new('mysite', '--theme', 'custom')
+    assert File.file?('mysite/themes/custom/css/app.css')
+    engine_copy = File.read(File.join(Abqari::ROOT, 'themes', 'custom', 'css', 'app.css'))
+    assert_equal engine_copy, File.read('mysite/themes/custom/css/app.css')
+  end
+
   def test_pins_ruby_version_to_the_scaffolding_ruby
     # A committed `.ruby-version` is what stops a deploy host from
     # choosing its own default Ruby — the failure mode being a native

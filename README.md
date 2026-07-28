@@ -304,6 +304,15 @@ active one.
 `bundle install` from inside the site directory — the scaffolded
 Gemfile already includes `listen` in the `:development` group.
 
+**`ERROR Errno::ECONNRESET ... io_fillbuf` in the `bin/serve` output**
+Harmless, and filtered out as of 1.0.1 — if you still see it, you're
+on 1.0.0 or have `ABQARI_VERBOSE_LOG=true` set. It means a browser
+closed a connection without a clean shutdown, which happens
+every time you navigate: each tab holds a live-reload stream open, and
+WEBrick logs the teardown as an error with a backtrace. Nothing is
+wrong with your site, and it can't happen in production — the dev
+server isn't part of a deploy.
+
 **Images don't appear after I add them**
 Make sure the image file sits in the same folder as the post's
 `index.md` (e.g., `content/posts/<date>-my-post/hero.jpg`) and the
@@ -550,6 +559,7 @@ they're for CI, previews, and edge cases.
 | `ABQARI_INCLUDE_FUTURE` | unset | `true` forces future-dated posts into the build. |
 | `ABQARI_STRICT_CONFIG` | unset | `true` turns unknown-config-key warnings (and a missing `config/site.yml`) into hard errors. Recommended in CI. |
 | `ABQARI_BIND` | `127.0.0.1` | Dev-server bind address. Set `0.0.0.0` to preview on a phone over LAN. |
+| `ABQARI_VERBOSE_LOG` | unset | `true` restores stock WEBrick dev-server logging, including the client-disconnect backtraces Abqari filters out. For debugging the socket layer. |
 | `ABQARI_SLOW_PAGE_MS` | `500` | Slow-page warning threshold (ms); `0` disables it. |
 | `ABQARI_ALLOW_EXTERNAL_OUTPUT` | unset | `true` permits an output dir outside the site root (CI artifact mounts). |
 | `ABQARI_ALLOW_EXTERNAL_SYMLINKS` | unset | `true` permits symlinks that escape the site root. Avoid. |
@@ -1420,13 +1430,29 @@ template and `none` for bring-your-own CSS:
 | `notebook` | Mono-typeface headings (JetBrains Mono), paper + ochre palette, dense body type, dashed section dividers — docs-style aesthetic |
 | `sand` | Warm earth-toned palette (Merriweather body + Merriweather Sans headings, brand-red accents); hand-rolled CSS, no framework dependency |
 | `bootstrap` | Bootstrap 5.3.8 vendored (~232 KB) — use when you want Bootstrap's component library |
-| `custom` | Starter template with prominent inline guidance — copy the structure of one of the others, edit palette/fonts to taste |
-| `none` | No theme CSS at all — bring your own in `app/assets/` |
+| `custom` | Annotated starter template — `abqari new --theme custom` copies it into your site's `themes/custom/`, ready to edit |
+| `none` | No theme CSS at all — the scaffold gives you an empty `app/assets/css/app.css` to write into |
 
 Theme files live in `themes/<name>/css/app.css` (in the gem for
-Path A consumers; in your repo for Path B). The active theme's
-`app.css` is fingerprinted by the asset pipeline and served from
-`/assets/css/app.<hash>.css`.
+Path A consumers; in your repo for Path B). At build time the active
+theme's CSS ships inside the single fingerprinted bundle
+(`/assets/css/bundle.<hash>.css`) along with `_common.css`, the
+syntax stylesheet, and your `site.css`.
+
+### Building your own theme
+
+The full guide — including the complete token reference — is in
+[docs/theming.md](docs/theming.md). The short version: copy a theme
+into your site with
+
+```bash
+abqari theme eject custom
+```
+
+(or `eject minimal --as mytheme` to fork an existing look under your
+own name — any lowercase name works, no registration needed). Your
+site-local copy shadows the gem's automatically, and edits hot-reload
+under `bin/serve`.
 
 ### Architecture: tokens, not rule overrides
 
@@ -1470,6 +1496,29 @@ The button shows a moon when light is active (click → switch to dark)
 and a sun when dark is active. Customize the icons in
 `app/icons/sun.svg` and `app/icons/moon.svg`; restyle the button via
 `.theme-toggle` in your site's CSS.
+
+## Overrides
+
+Your site can replace any engine view, asset, or theme file by
+shipping its own copy at the same relative path. Resolution order —
+later wins on conflict:
+
+1. **Engine theme** — `themes/<name>/` inside the gem
+2. **Site theme** — `themes/<name>/` in your repo (same name)
+3. **Engine assets** — the gem's `app/assets/`
+4. **Site assets** — your repo's `app/assets/`
+
+So `themes/minimal/css/app.css` in your site shadows the gem's minimal
+theme file-for-file (that's what `abqari theme eject` sets up), and
+`app/assets/css/site.css` layers on top of whatever theme is active.
+Views resolve the same way: `app/views/partials/_footer.html.erb` in
+your site replaces the engine's footer, and `app/icons/<name>.svg`
+replaces or adds icons.
+
+Theme names don't need to exist in the engine at all — `theme: mytheme`
+plus `themes/mytheme/css/app.css` in your site is a complete custom
+theme. To read the engine's copies of anything (Path A), open the
+installed gem: `bundle show abqari`.
 
 ## Fonts
 

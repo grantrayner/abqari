@@ -61,6 +61,22 @@ class SkeletonBinsTest < Minitest::Test
     assert File.exist?(File.join(@site_dir, '_site', Abqari::BUILD_OK_SENTINEL))
   end
 
+  def test_theme_none_site_builds
+    # `--theme none` used to scaffold a site whose very first bin/build
+    # failed on every page with "Unknown asset: css/app.css".
+    none_dir = File.join(@tmpdir, 'nonesite')
+    capture_io do
+      Dir.chdir(@tmpdir) do
+        assert Abqari::CLI::New.run(['nonesite', '--skip-bundle', '--theme', 'none', '--blank'])
+      end
+    end
+
+    out, status = Open3.capture2e(bin_env, RbConfig.ruby, File.join(none_dir, 'bin', 'build'))
+    assert status.success?, "bin/build failed on a --theme none site:\n#{out}"
+    html = File.read(File.join(none_dir, '_site', 'index.html'), encoding: 'UTF-8')
+    refute_includes html, '_common', 'theme none must not pull in engine CSS'
+  end
+
   def test_with_collections_site_builds_including_empty_collection_indexes
     with_dir = File.join(@tmpdir, 'withsite')
     capture_io do

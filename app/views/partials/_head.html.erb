@@ -400,7 +400,14 @@
   <% if css_bundle %>
   <link rel="stylesheet" href="<%= css_bundle %>">
   <% else %>
-  <link rel="stylesheet" href="<%= asset_path('css/app.css') %>">
+  <%# Optional, not required: `theme: none` legitimately builds with no
+      app.css at all ("bring your own CSS" — site.css below is enough).
+      For every named theme, Site#build's validate_theme! has already
+      guaranteed an app.css exists, so this link can only vanish when
+      the operator chose that. %>
+  <% if (theme_css = optional_asset_path('css/app.css')) %>
+  <link rel="stylesheet" href="<%= theme_css %>">
+  <% end %>
   <%# Site-local override slot. Loaded AFTER the theme's app.css so a
       site's CSS wins on cascade-equal specificity. Opt-in: create
       `app/assets/css/site.css` in the consuming site to use it. When

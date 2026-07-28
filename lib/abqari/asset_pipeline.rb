@@ -7,8 +7,14 @@ module Abqari
   class AssetPipeline
     OUTPUT_SUBDIR = 'assets'
     HASH_LENGTH = 10
-    DEFAULT_THEME = 'minimal'
     BUNDLE_LOGICAL = 'css/bundle.css'
+    # A theme name is a directory name under themes/ and nothing more.
+    # The strict pattern is load-bearing: the name is joined into
+    # filesystem paths in several places (here, ArtifactWriter,
+    # Renderer), so without it `theme: ../something` walks and
+    # publishes arbitrary directories. Same containment class the
+    # symlink guards enforce.
+    THEME_NAME_RE = /\A[a-z0-9_-]+\z/.freeze
     # Extensions that get minified before fingerprinting (production
     # only — dev keeps sources readable for devtools).
     MINIFY_KINDS = { '.css' => :css, '.js' => :js }.freeze
@@ -23,6 +29,8 @@ module Abqari
     end
 
     def process
+      validate_theme!
+
       # Processing order matters — later passes overwrite earlier ones
       # on logical-path conflict (same filename).
       #
@@ -35,7 +43,16 @@ module Abqari
       # theme-bundled CSS on conflict). Hence the order:
       #   1. engine theme   →  2. site theme
       #   3. engine assets  →  4. site assets
-      [engine_theme_dir, site_theme_dir, engine_app_assets, site_app_assets].uniq.each do |dir|
+      #
+      # A theme's `public/` subtree is NOT an asset source — it's the
+      # verbatim passthrough tree ArtifactWriter#copy_public ships to
+      # the site root (e.g. the vendored Bootstrap dist). Walking it
+      # here used to fingerprint ~700 KB of dead, unreferenced copies
+      # into `_site/assets/public/`.
+      [engine_theme_dir, site_theme_dir].uniq.each do |dir|
+        process_dir(dir, skip_public: true) if dir && Dir.exist?(dir)
+      end
+      [engine_app_assets, site_app_assets].uniq.each do |dir|
         process_dir(dir) if dir && Dir.exist?(dir)
       end
       build_css_bundle
@@ -46,10 +63,56 @@ module Abqari
     end
 
     def theme_name
-      @site.config['theme'] || DEFAULT_THEME
+      @site.config['theme'] || SiteConfig::DEFAULTS['theme']
+    end
+
+    # Fail fast — called at the top of Site#build, BEFORE the output
+    # dir is wiped, so a config typo aborts with one clear message
+    # instead of N per-page "Unknown asset: css/app.css" failures (or,
+    # for a traversal-shaped name, a walk of whatever the path
+    # resolves to).
+    def validate_theme!
+      name = theme_name.to_s
+      return if name == 'none'
+
+      unless name.match?(THEME_NAME_RE)
+        raise PathSafe::Error,
+              "invalid theme name #{name.inspect}: must match #{THEME_NAME_RE.inspect} " \
+              "(lowercase letters, digits, '-', '_'), or 'none'"
+      end
+
+      unless Dir.exist?(File.join(@site.engine_root, 'themes', name)) ||
+             Dir.exist?(File.join(@site.site_root, 'themes', name))
+        raise "unknown theme #{name.inspect} — no themes/#{name}/ in the site or the engine. " \
+              "Available: #{available_theme_names.join(', ')}, or 'none'"
+      end
+
+      return if theme_app_css_candidates.any? { |f| File.file?(f) }
+
+      raise "theme #{name.inspect} has no css/app.css — looked in " \
+            "themes/#{name}/css/ (site and engine) and app/assets/css/ (site). " \
+            'Every theme needs one, even if empty; it anchors the CSS bundle.'
     end
 
     private
+
+    def available_theme_names
+      names = Dir.children(File.join(@site.engine_root, 'themes')).sort
+      site_themes = File.join(@site.site_root, 'themes')
+      names |= Dir.children(site_themes).sort if Dir.exist?(site_themes)
+      names.select { |n| n.match?(THEME_NAME_RE) }
+    end
+
+    # Everywhere a theme's `css/app.css` may legitimately live, in
+    # override order. `app/assets/css/app.css` is the `theme: none`
+    # convention ("bring your own CSS"), but it satisfies any theme.
+    def theme_app_css_candidates
+      [
+        File.join(@site.site_root, 'app', 'assets', 'css', 'app.css'),
+        File.join(@site.site_root, 'themes', theme_name.to_s, 'css', 'app.css'),
+        File.join(@site.engine_root, 'themes', theme_name.to_s, 'css', 'app.css')
+      ]
+    end
 
     def engine_app_assets
       File.join(@site.engine_root, 'app', 'assets')
@@ -71,10 +134,11 @@ module Abqari
       File.join(@site.site_root, 'themes', theme_name)
     end
 
-    def process_dir(src)
+    def process_dir(src, skip_public: false)
       Dir.glob(File.join(src, '**', '*')).sort.each do |entry|
         next if File.directory?(entry)
         next if File.basename(entry).start_with?('.')
+        next if skip_public && entry.start_with?(File.join(src, 'public') + File::SEPARATOR)
         next if entry.include?(File.join('assets', 'images') + File::SEPARATOR)
         # Symlink containment — same invariant `BundleAssets`,
         # `ImagePipeline`, and `SiteLoader` enforce. A theme or

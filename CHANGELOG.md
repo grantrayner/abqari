@@ -56,6 +56,26 @@ existing series taxonomies.
   (info). Each of these builds cleanly and renders correctly in
   isolation while dropping out of the prev/next chain.
 
+### Changed
+
+- The dev server no longer logs client-disconnect errors. Every open
+  tab holds a live-reload SSE stream, and navigating tears that socket
+  down without a clean close — WEBrick's own request loop raises
+  `Errno::ECONNRESET` from `io_fillbuf` and logs it at ERROR with a
+  full backtrace, one per tab per navigation. The SSE handler already
+  rescued these, but WEBrick raises before dispatching to application
+  code, so the rescue never saw them; filtering at the logger is the
+  only interception point.
+
+  `Server::QuietLog` drops `ECONNRESET`, `EPIPE`, `ECONNABORTED` and
+  `ENOTCONN` and is otherwise stock `WEBrick::Log`. Suppression is by
+  exception class, never by message text, so a genuine fault that
+  happens to mention a reset connection is still logged in full — as
+  are all other levels, and all String messages. Set
+  `ABQARI_VERBOSE_LOG=true` for stock WEBrick logging when the socket
+  layer is what you're debugging. Dev-server only; nothing about a
+  production deploy changes.
+
 ### Fixed
 
 - **The CSS minifier silently deleted every theme token in production
@@ -263,5 +283,26 @@ run a real working author / publisher site.
   that actually contain such characters. Pure-ASCII sites are
   byte-identical. If you have an affected tag, add `redirect_from:`
   for the old path.
+- Theme handling hardened and opened up:
+  - `theme:` is validated at the start of every build — a typo aborts
+    with one clear message listing the available themes (previously N
+    opaque per-page failures), and traversal-shaped names
+    (`theme: ../x`) are rejected outright.
+  - `abqari theme eject <name> [--as newname]` copies an engine
+    theme's stylesheet into the site's `themes/`, where it shadows the
+    gem's copy. `abqari new --theme custom` now copies the starter in
+    automatically, and `--theme none` scaffolds an editable
+    `app/assets/css/app.css` (a `--theme none` site previously failed
+    its first build).
+  - Site-local `themes/<name>/public/` now MERGES with the engine
+    theme's public tree per-file instead of replacing it wholesale.
+  - `theme: bootstrap` no longer fingerprints dead copies of the
+    vendored dist (~700 KB) into `_site/assets/`.
+  - The `minimal` default moved to `SiteConfig::DEFAULTS`, fixing
+    stale CSS hot-reload on sites with no `theme:` key; the skeleton
+    ships `themes/.gitkeep` so the watcher covers theme work from
+    first serve.
+  - New `docs/theming.md`: the theming guide and full token reference,
+    drift-tested against `_common.css`.
 
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

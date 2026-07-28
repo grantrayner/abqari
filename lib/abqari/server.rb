@@ -24,18 +24,52 @@ module Abqari
     # window.
     SSE_HEARTBEAT = 30
 
+    # WEBrick logs every exception that escapes a request thread as an
+    # ERROR with a full backtrace — including the ones that only mean
+    # "the browser went away". A dev session produces a steady stream
+    # of those: each open tab holds an SSE connection to `/__reload__`,
+    # and navigating or reloading tears that socket down without a
+    # clean close, so the `sock.eof?` check in WEBrick's own request
+    # loop raises `Errno::ECONNRESET` from `io_fillbuf`.
+    #
+    # The SSE handler's `rescue` can't help here: WEBrick raises before
+    # it ever dispatches to application code, so the error never
+    # reaches our block. The logger is the only interception point.
+    #
+    # Suppression is by exception CLASS, never by message text — a
+    # genuine fault whose message happens to mention a reset
+    # connection is still logged in full. Set
+    # `ABQARI_VERBOSE_LOG=true` to opt out and see everything WEBrick
+    # reports, which is what you want when debugging the socket layer
+    # itself.
+    class QuietLog < WEBrick::Log
+      # Each of these means the peer hung up. None is actionable, and
+      # none indicates a fault in the site being served.
+      CLIENT_DISCONNECTS = [
+        Errno::ECONNRESET,   # peer sent RST — by far the common one
+        Errno::EPIPE,        # wrote to a socket the peer already closed
+        Errno::ECONNABORTED, # aborted between accept and read
+        Errno::ENOTCONN      # socket no longer connected
+      ].freeze
+
+      def error(msg)
+        return if CLIENT_DISCONNECTS.any? { |klass| msg.is_a?(klass) }
+
+        super
+      end
+    end
+
     def initialize(site, port: DEFAULT_PORT, bind: nil, logger: nil)
       @site = site
       @port = port
       @bind = bind || ENV['ABQARI_BIND'] || DEFAULT_BIND
-      # WEBrick's internal logger. Defaults to nil → WEBrick uses its
-      # own stderr logger, which is what operators want in production.
-      # Tests can pass a silent `WEBrick::Log.new(File::NULL)` so
-      # ECONNRESET noise from socket-close races in `server_sse_test`
-      # doesn't pollute the test output (the rescue at the SSE
-      # endpoint already swallows the error functionally; this just
-      # silences the access-log side effect).
-      @logger = logger
+      # WEBrick's internal logger. Defaults to `QuietLog` — WEBrick's
+      # own stderr logger with client-disconnect errors filtered out
+      # (see the class comment above for why that filtering can't live
+      # at the SSE endpoint). Pass `logger:` to override: tests use a
+      # fully silent `WEBrick::Log.new(File::NULL)`, and
+      # `ABQARI_VERBOSE_LOG=true` falls back to stock WEBrick logging.
+      @logger = logger || default_logger
       @version = Time.now.to_f
       @scope = 'all'
       @mutex = Mutex.new
@@ -56,7 +90,7 @@ module Abqari
         AccessLog: [],
         DirectoryIndex: ['index.html']
       }
-      server_opts[:Logger] = @logger if @logger
+      server_opts[:Logger] = @logger
       server = WEBrick::HTTPServer.new(server_opts)
 
       server.mount_proc('/__reload__', &method(:handle_reload_endpoint))
@@ -166,6 +200,12 @@ module Abqari
     end
 
     private
+
+    # Stock WEBrick logging is one env var away, for when the noise is
+    # the thing you're trying to read.
+    def default_logger
+      ENV['ABQARI_VERBOSE_LOG'] == 'true' ? WEBrick::Log.new : QuietLog.new
+    end
 
     def watcher_kind
       listen_available? ? 'Listen (FS events)' : 'polling'

@@ -128,6 +128,11 @@ module Abqari
 
       Hooks.run(:before_build, self)
 
+      # Theme config is validated before ANY filesystem effect — a
+      # typo'd or traversal-shaped `theme:` must abort here, not after
+      # the output dir is wiped or mid-render with per-page errors.
+      assets.validate_theme!
+
       @artifacts.reset_output unless incremental
       reset_state_for_rebuild!
 

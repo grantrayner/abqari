@@ -22,7 +22,9 @@ locale: <%= locale %>
 # Visual styling. Each theme is one CSS file in themes/<name>/ inside
 # the engine gem. Switch freely — none of the theme files are in this
 # repo (they live in the gem). Built-ins: minimal / magazine / notebook /
-# bootstrap / sand / custom / none.
+# bootstrap / sand / custom / none. To customize one, copy it into this
+# repo with `abqari theme eject <name>` (see the engine's docs/theming.md
+# for the full token reference); your copy shadows the gem's.
 theme: <%= theme %>
 
 # Collections ────────────────────────────────────────────────────────────

@@ -39,7 +39,13 @@ module Abqari
       'block_ai_scraping'   => true,
       'syntax_highlighting' => true,
       'erb_in_markdown'     => false,
-      'theme_toggle'        => true
+      'theme_toggle'        => true,
+      # The default here (not buried in AssetPipeline) so EVERY reader
+      # of config['theme'] agrees. When it lived pipeline-side, a site
+      # with no `theme:` key built the minimal theme but the renderer's
+      # theme-mtime scoping read '' — so theme CSS edits rebuilt assets
+      # without re-rendering pages, and hot reload served stale hrefs.
+      'theme'               => 'minimal'
     }.freeze
 
     # Every top-level key the engine reads anywhere (rb + erb). Keep

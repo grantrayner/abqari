@@ -1,18 +1,25 @@
 /* Custom — your starting point for a site that looks like you.
-   Ships as a starter you can edit. The layout, component library,
-   and page structure all live in `app/assets/css/_common.css` and
-   load automatically — you don't need to copy that. Themes own
-   just three things:
+
+   Edit the copy in YOUR SITE, not this one: for gem-installed sites
+   this file lives inside the gem. `abqari new --theme custom` copies
+   it to your site's `themes/custom/css/app.css` automatically, and
+   `abqari theme eject custom` does the same for an existing site.
+   A site-local copy always shadows the gem's.
+
+   The layout, component library, and page structure all live in
+   `app/assets/css/_common.css` and load automatically — you don't
+   need to copy that. Themes own just three things:
 
      1. PALETTE      — colour CSS variables (light + dark)
      2. FONTS        — typography variables
      3. REFINEMENTS  — small theme-specific aesthetic tweaks
 
-   To activate this theme: set `theme: custom` in `config/site.yml`.
+   The full token reference is in the engine's docs/theming.md.
+   To activate: set `theme: custom` in `config/site.yml`.
 
    Want to start from one of the other shipped themes instead?
-   Set `theme: minimal` (or magazine, notebook, sand) and your edits
-   to this file stay — switching themes just stops loading it.
+   `abqari theme eject minimal --as mytheme` (or magazine, notebook,
+   sand) forks it under your own name.
 */
 
 

@@ -118,6 +118,7 @@ module Abqari
         return false unless validate_options!
 
         copy_skeleton!(target_dir, build_template_vars(projectname))
+        materialize_theme!(target_dir)
         run_bundle_install!(target_dir) unless @options[:skip_bundle]
         print_next_steps(projectname, target_dir)
         true
@@ -308,6 +309,38 @@ module Abqari
       # etc.) without ceremony.
       def render_erb(src, vars)
         ERB.new(src, trim_mode: '-').result_with_hash(vars)
+      end
+
+      # --- Theme materialization ------------------------------------------
+      #
+      # Two theme choices need files the generic skeleton doesn't carry:
+      #
+      #   * `--theme none` — the engine requires no CSS for `none`, but a
+      #     site with zero stylesheets is rarely the intent. Scaffold a
+      #     commented, empty `app/assets/css/app.css` so there's an
+      #     obvious file to write into (and the CSS bundle has its
+      #     anchor).
+      #   * `--theme custom` — the starter used to load from inside the
+      #     installed gem, where the user can't (and shouldn't) edit it.
+      #     Copy it into the site's `themes/custom/`, which shadows the
+      #     gem's copy; their edits live in their repo.
+      def materialize_theme!(target_dir)
+        case @options[:theme]
+        when 'none'
+          dest = File.join(target_dir, 'app', 'assets', 'css', 'app.css')
+          FileUtils.mkdir_p(File.dirname(dest))
+          File.write(dest, <<~CSS)
+            /* `theme: none` — no engine CSS at all (not even _common.css).
+             * This file is yours; the build bundles it with the syntax
+             * stylesheet and app/assets/css/site.css if present. */
+          CSS
+        when 'custom'
+          src  = File.join(Abqari::ROOT, 'themes', 'custom', 'css', 'app.css')
+          dest = File.join(target_dir, 'themes', 'custom', 'css', 'app.css')
+          FileUtils.mkdir_p(File.dirname(dest))
+          FileUtils.cp(src, dest)
+          puts 'Copied the custom-theme starter to themes/custom/css/app.css — edit away.'
+        end
       end
 
       # --- `bundle install` after scaffolding -----------------------------

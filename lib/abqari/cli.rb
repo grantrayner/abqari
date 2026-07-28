@@ -4,6 +4,7 @@
 # scaffolded Gemfile to Abqari::VERSION, and `abqari version` prints it.
 require_relative '../abqari'
 require_relative 'cli/new'
+require_relative 'cli/theme'
 
 module Abqari
   # Tiny subcommand dispatcher for the `abqari` global executable.
@@ -27,6 +28,7 @@ module Abqari
   module CLI
     COMMANDS = {
       'new'     => 'Abqari::CLI::New',
+      'theme'   => 'Abqari::CLI::Theme',
       'version' => :builtin_version,
       '-v'      => :builtin_version,
       '--version' => :builtin_version,
@@ -40,6 +42,7 @@ module Abqari
 
       Commands:
         new <projectname>    Scaffold a new Abqari site in ./<projectname>/
+        theme eject <name>   Copy an engine theme into this site for editing
         version              Print the engine version
         help                 Show this message
 
