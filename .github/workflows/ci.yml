@@ -30,7 +30,7 @@ jobs:
       matrix:
         ruby: ['3.3', '3.4']
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
@@ -65,7 +65,7 @@ jobs:
         # matrix entry produces duplicate artifacts under the same
         # name, which the upload-artifact action rejects.
         if: always() && matrix.ruby == '3.3'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: coverage-report
           path: coverage/
@@ -74,7 +74,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
@@ -111,7 +111,7 @@ jobs:
         run: bundle exec bin/audit --strict
 
       - name: Upload audit report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: audit-report
@@ -121,7 +121,7 @@ jobs:
   bundle-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
