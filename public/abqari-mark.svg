@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Abqari">
+  <!-- Rub el hizb (۞) — the eight-pointed star used in Arabic
+       manuscripts to divide and structure text. Two overlapping
+       squares, one rotated 45°, with a knocked-out centre. The mark
+       nods to the name: ʿabqarī, from Wādī ʿAbqar, the valley where
+       classical Arab poets were said to receive their genius. -->
+  <defs>
+    <mask id="centre-hole">
+      <rect width="512" height="512" fill="#fff"/>
+      <circle cx="256" cy="256" r="54" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="#1f2937" mask="url(#centre-hole)">
+    <rect x="106" y="106" width="300" height="300"/>
+    <rect x="106" y="106" width="300" height="300" transform="rotate(45 256 256)"/>
+  </g>
+</svg>

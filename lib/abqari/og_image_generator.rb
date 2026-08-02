@@ -115,6 +115,7 @@ module Abqari
             </linearGradient>
           </defs>
           <rect width="#{OG_WIDTH}" height="#{OG_HEIGHT}" fill="url(#bg)"/>
+          #{brand_mark}
           <text x="80" y="100" fill="#ffffff" font-size="28" font-weight="600" opacity="0.85" font-family="ui-sans-serif, system-ui, sans-serif">#{escape(site_t)}</text>
           <g font-family="ui-sans-serif, system-ui, sans-serif">
           #{title_tspans}
@@ -122,6 +123,18 @@ module Abqari
           #{meta_block(meta_parts)}
         </svg>
       SVG
+    end
+
+    # Faint rub el hizb (۞) in the top-right corner — the eight-pointed
+    # star Arabic manuscripts use to divide and structure text, and
+    # Abqari's mark. One even-odd path: the star outline (two
+    # overlapping squares, outer radius 106) plus a knocked-out centre
+    # circle, so the gradient shows through the hole without masks.
+    def brand_mark
+      star = 'M106,0 L75,31 L75,75 L31,75 L0,106 L-31,75 L-75,75 L-75,31 ' \
+             'L-106,0 L-75,-31 L-75,-75 L-31,-75 L0,-106 L31,-75 L75,-75 L75,-31 Z ' \
+             'M27,0 A27,27 0 1,0 -27,0 A27,27 0 1,0 27,0 Z'
+      %(<path d="#{star}" fill="#ffffff" opacity="0.12" fill-rule="evenodd" transform="translate(1090 110) scale(0.75)"/>)
     end
 
     def meta_block(parts)

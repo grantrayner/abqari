@@ -73,6 +73,11 @@ existing series taxonomies.
 
 ### Changed
 
+- Auto OG cards carry a faint rub el hizb (۞) in the top-right
+  corner — Abqari's mark, the eight-pointed star Arabic manuscripts
+  use to structure text. Rendered at 12% opacity so it reads as
+  texture, not branding, on your cards.
+
 - The dev server no longer logs client-disconnect errors. Every open
   tab holds a live-reload SSE stream, and navigating tears that socket
   down without a clean close — WEBrick's own request loop raises

@@ -2673,4 +2673,13 @@ templates for Cloudflare Pages, GitHub Pages, and Render.
 
 ## Why "Abqari"?
 
-Working name — short, nods to webrick, easy to find-and-replace when a real name lands.
+*ʿAbqarī* (عبقري) is Arabic for "genius." The word traces back to
+Wādī ʿAbqar — the legendary valley of the jinn where, in classical
+Arab lore, poets received their inspiration. A site generator built
+for working authors could hardly ask for a better namesake.
+
+The mark is a rub el hizb (۞), the eight-pointed star Arabic
+manuscripts use to divide and structure text — which is, at heart,
+what this engine does to yours. You'll find it faintly in the corner
+of the auto-generated share cards, and as the favicon on
+[abqari.dev](https://www.abqari.dev).
