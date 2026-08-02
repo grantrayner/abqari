@@ -129,6 +129,39 @@ class CliNewTest < Minitest::Test
     assert_match(/^locale: fr$/, config)
   end
 
+  # --- Per-theme fonts -------------------------------------------------
+
+  def test_webfont_theme_scaffolds_its_fonts_block
+    run_new('mysite', '--theme', 'sand')
+    config = File.read('mysite/config/site.yml', encoding: 'UTF-8')
+    assert_match(/^fonts:$/, config)
+    assert_match(/family: Merriweather$/, config)
+    assert_match(/family: Merriweather Sans$/, config)
+    assert_includes @stdout, 'bin/fetch-fonts'
+  end
+
+  def test_system_font_theme_scaffolds_commented_example_only
+    run_new('mysite') # default theme: minimal
+    config = File.read('mysite/config/site.yml', encoding: 'UTF-8')
+    refute_match(/^fonts:$/, config, 'no live fonts: block for a system-font theme')
+    assert_match(/^# fonts:$/, config, 'commented example should remain')
+    refute_includes @stdout, 'bin/fetch-fonts'
+  end
+
+  def test_every_shipped_theme_font_list_matches_its_stylesheet
+    # Guard against drift: every family ThemeFonts declares for a theme
+    # must actually appear in that theme's font stacks, so the map can't
+    # quietly outlive a theme redesign.
+    Abqari::ThemeFonts::FONTS.each do |theme, fonts|
+      css = File.read(File.join(Abqari::ROOT, 'themes', theme, 'css', 'app.css'),
+                      encoding: 'UTF-8')
+      fonts.map { |f| f['family'] }.uniq.each do |family|
+        assert_includes css, family,
+                        "#{theme}'s ThemeFonts lists #{family.inspect} but its stylesheet never names it"
+      end
+    end
+  end
+
   def test_gemfile_uses_rubygems_source_by_default
     run_new('mysite')
     gemfile = File.read('mysite/Gemfile')

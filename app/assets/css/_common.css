@@ -148,6 +148,12 @@
   --color-dark:           #212529;
   --color-on-dark:        #f8f9fa;
 
+  /* Price text on publication cards/headers. Defaults to the primary
+     accent; themes whose primary doubles as the link colour should
+     point it at `--color-text` instead, so prices don't read as
+     clickable (minimal does this). */
+  --color-price:          var(--color-primary);
+
   /* Responsive content max-width — col-12 / col-md-10 / col-lg-9 / col-xl-8. */
   --content-max-width: 100%;
 }
@@ -1285,6 +1291,14 @@ article > header > .lede {
   width: 100%;
   height: 100%;
 }
+/* Tile titles follow the theme's heading face — a stylesheet rule
+   outranks the SVG's presentational font-family attribute (which
+   stays as the no-CSS fallback). Without this, every tile bakes in
+   a generic sans and a post page can show two "titles" in two
+   different typefaces (the h1 and the hero tile). */
+.cover-svg text {
+  font-family: var(--font-heading);
+}
 .post-list__cover--svg .cover-svg,
 .workshops-index__cover--svg .cover-svg {
   aspect-ratio: 4 / 3;
@@ -1431,7 +1445,7 @@ article > header > .lede {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 1.25rem;
-  color: var(--color-primary);
+  color: var(--color-price);
   margin: 0 0 0.75rem;
 }
 
@@ -1576,7 +1590,7 @@ article > header > .series__tagline {
   margin: 0;
   font-family: var(--font-heading);
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-price);
 }
 
 /* Section heading shared by Bundles + Series. Styled to match
@@ -1957,7 +1971,7 @@ article > header > .series__tagline {
   margin: 0 0 var(--space-sm);
   font-family: var(--font-heading);
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-price);
 }
 .publications-index__isbn,
 .publications-index__pages,

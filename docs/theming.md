@@ -77,13 +77,28 @@ Defaults shown are what you get without a theme.
 | `--color-info` | `#0dcaf0` | info accents |
 | `--color-light` | `#f8f9fa` | light surface |
 | `--color-dark` | `#212529` | dark surface |
+| `--color-price` | `var(--color-primary)` | price text on publication cards/headers — point at `--color-text` when your primary doubles as the link colour, so prices don't read as clickable |
 
 Each `--color-X` above that paints a surface has a matching
 `--color-on-X` for text placed on it: `--color-on-primary`,
 `--color-on-secondary`, `--color-on-success`, `--color-on-warning`,
 `--color-on-danger`, `--color-on-info`, `--color-on-light`,
-`--color-on-dark`. Keep the pair legible together — the audit's
-contrast checks read the rendered result.
+`--color-on-dark`. Keep each pair at a WCAG-AA 4.5:1 contrast ratio
+in both modes — the shipped themes all measure at or above it.
+
+### Webfonts per shipped theme
+
+A theme's `--font-*` stacks can name any face, but the face only
+renders if the site downloads it — `fonts:` in `config/site.yml` +
+`bin/fetch-fonts`. `abqari new --theme <name>` scaffolds the right
+block; `abqari theme eject` prints it. For reference:
+
+| Theme | Webfonts |
+|-------|----------|
+| `minimal` / `custom` / `bootstrap` / `none` | none — system fonts |
+| `magazine` | Playfair Display 700 |
+| `notebook` | Inter 400/600 · JetBrains Mono 400/600 |
+| `sand` | Merriweather 400/700 + 400 italic · Merriweather Sans 400/600 |
 
 ### Fonts and density
 
@@ -147,3 +162,19 @@ you change a value. (A future engine release may collapse this to
 The toggle itself is engine-supplied (`theme_toggle: true` by default):
 a CSP-hash-pinned inline script applies the saved choice before first
 paint, so there's no flash of the wrong mode.
+
+## Syntax highlighting
+
+The syntax layer follows the same light/dark resolution as the theme
+tokens. `syntax_theme` (default `github`) renders at `.highlight`;
+its dark counterpart renders under the two dark-mode scopes above.
+
+- `syntax_theme_dark: <name>` — pick the dark Rouge theme explicitly
+  (mode-suffixed names like `github.dark` work).
+- unset — derived from `syntax_theme`'s own dark mode when it has one;
+  themes without modes (monokai etc.) are reused as-is in both modes.
+- `syntax_theme_dark: false` — opt out; light tokens in both modes.
+
+The code-block **background** always comes from `--color-code-bg`, not
+from Rouge — your theme owns it in both modes. Rouge supplies token
+colours only.

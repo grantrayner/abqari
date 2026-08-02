@@ -188,6 +188,7 @@ module Abqari
           theme:        @options[:theme],
           locale:       @options[:locale],
           with:         @options[:with],
+          fonts_block:  fonts_block,
           gemfile_line: engine_gemfile_line,
           # Pins the scaffolded site to the Ruby doing the scaffolding.
           # Without a committed `.ruby-version`, a deploy host picks its
@@ -204,6 +205,38 @@ module Abqari
         when 'rubygems' then DEFAULT_RUBYGEMS_GEMFILE_LINE
         when 'git'      then DEFAULT_GIT_GEMFILE_LINE
         when 'path'     then DEFAULT_PATH_GEMFILE_LINE
+        end
+      end
+
+      # The scaffolded `fonts:` section, matched to the chosen theme.
+      # Magazine and sand build their identity on webfonts their stacks
+      # only *name* — without the matching `fonts:` block +
+      # `bin/fetch-fonts`, both silently fall back to system serifs.
+      # System-font themes get a commented example instead.
+      def fonts_block
+        entries = ThemeFonts.yaml_entries(@options[:theme], indent: '  ')
+        if entries.empty?
+          <<~YAML.rstrip
+            # The #{@options[:theme]} theme uses system fonts — nothing to download.
+            # To self-host Google Fonts later (each shipped theme's faces are
+            # listed in the engine's docs/theming.md), declare them here and
+            # run `bin/fetch-fonts` once:
+            #
+            # fonts:
+            #   - family: Inter
+            #     weights: [400, 600]
+            #     style: normal
+          YAML
+        else
+          <<~YAML.rstrip
+            # Self-hosted webfonts for the #{@options[:theme]} theme — run
+            # `bin/fetch-fonts` once to download them into vendor/fonts/
+            # (served from your own origin; no requests to Google at visit
+            # time). Switching theme later? Each shipped theme's faces are
+            # listed in the engine's docs/theming.md.
+            fonts:
+            #{entries}
+          YAML
         end
       end
 
@@ -360,6 +393,9 @@ module Abqari
         puts ''
         puts 'Next:'
         puts "  cd #{projectname}"
+        unless ThemeFonts.for(@options[:theme]).empty?
+          puts "  bin/fetch-fonts      # download the #{@options[:theme]} theme's webfonts"
+        end
         puts '  bin/serve            # dev server on http://localhost:4000'
         puts ''
         puts 'Then:'

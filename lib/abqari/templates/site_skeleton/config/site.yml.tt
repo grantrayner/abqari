@@ -62,6 +62,9 @@ locale: <%= locale %>
 # for the full token reference); your copy shadows the gem's.
 theme: <%= theme %>
 
+# Fonts ──────────────────────────────────────────────────────────────────
+<%= fonts_block %>
+
 # Collections ────────────────────────────────────────────────────────────
 # Four collections ship as built-in defaults. Flip enabled to false on
 # any your site doesn't use. Per-collection toggles for index / show /

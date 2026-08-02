@@ -1,13 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Photos and galleries">
+  <!-- Fixture hero. Muted duotone + motif only: the page h1 carries
+       the title, so the artwork doesn't repeat it (and doesn't bake
+       a typeface that fights the active theme). The outlined frames
+       read as a photo wall. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f766e"/>
-      <stop offset="1" stop-color="#84cc16"/>
+      <stop offset="0" stop-color="#566251"/>
+      <stop offset="1" stop-color="#7d8a74"/>
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#bg)"/>
+  <g fill="none" stroke="#fff" stroke-width="6" opacity="0.22">
+    <rect x="560" y="300" width="220" height="160" rx="6"/>
+    <rect x="820" y="300" width="220" height="160" rx="6"/>
+    <rect x="560" y="500" width="220" height="160" rx="6"/>
+    <rect x="820" y="500" width="220" height="160" rx="6"/>
+  </g>
   <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#fff" text-anchor="middle">
-    <text x="800" y="420" font-size="110" font-weight="700" letter-spacing="-2">Photos</text>
-    <text x="800" y="540" font-size="44" opacity="0.85">collection &amp; gallery</text>
+    <text x="800" y="740" font-size="40" opacity="0.85">collection &amp; gallery</text>
   </g>
 </svg>

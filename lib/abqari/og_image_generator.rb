@@ -170,16 +170,26 @@ module Abqari
       lines
     end
 
+    # One stable on-brand gradient per shipped theme — accent shade
+    # into that theme's dark ground, dark enough for the card's white
+    # text. Unlike the cover tiles (slug-hashed for variety), share
+    # cards want a single recognisable look. Themes not listed
+    # (minimal, custom, bootstrap, none) use the neutral slate pair.
+    THEME_GRADIENTS = {
+      'magazine' => %w[#8a4a2a #3a2a1e],  # rust → deep umber
+      'notebook' => %w[#8a5c14 #2a2b2e],  # ochre → graphite
+      'sand'     => %w[#7a2018 #1b1a12]   # brick → olive-charcoal
+    }.freeze
+
     def gradient_colors
-      # Source the gradient from the site's theme_color (manifest) so
-      # auto-OG images feel on-brand. Generate a darker shade for the
-      # gradient endpoint. Fallback to a tasteful neutral pair.
+      # An explicit `manifest.theme_color` is a deliberate brand choice
+      # and always wins; otherwise derive from the active theme so the
+      # cards match the site the link opens into.
       raw = @site.config.dig('manifest', 'theme_color').to_s
-      if raw.match?(/\A#[0-9a-fA-F]{6}\z/)
-        [raw, darken(raw, 0.35)]
-      else
-        %w[#1f2937 #0f172a]  # slate-800 → slate-900
-      end
+      return [raw, darken(raw, 0.35)] if raw.match?(/\A#[0-9a-fA-F]{6}\z/)
+
+      THEME_GRADIENTS.fetch(@site.config['theme'].to_s,
+                            %w[#1f2937 #0f172a])  # slate-800 → slate-900
     end
 
     def darken(hex, factor)

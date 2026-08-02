@@ -34,7 +34,7 @@
   --color-on-danger:      #fff;
   --color-warning:        #b8860b;
   --color-on-warning:     #1a1410;
-  --color-info:           #6789a8;
+  --color-info:           #4d7095;   /* deep enough for 4.5:1 with white text */
   --color-on-info:        #fff;
   --color-light:          #fbf8f3;
   --color-on-light:       #1a1410;
@@ -132,15 +132,14 @@ h1, h2, h3, h4 {
 }
 
 /* Drop cap on the first paragraph of an article — the magazine
-   signature. Exclude `.back-link` (and any other classed top-of-
-   article meta paragraph): the back-link sits ABOVE the body
-   markdown as the literal first `<p>` of the article, so without
-   the `:not()` guard the drop-cap rule turns the `&larr;` arrow
-   into a 4rem floated glyph in the link colour — entirely broken
-   visual. Other themes render the arrow at body size; this rule
-   keeps the magazine signature for body prose and matches their
-   behaviour for the back-link. */
-article > p:first-of-type:not([class])::first-letter {
+   signature. Anchored to `.e-content` (the microformats2 wrapper
+   every body-rendering layout puts around the markdown): the old
+   `article > p:first-of-type` selector matched NOTHING on post
+   pages, because the body's paragraphs aren't direct children of
+   <article> — the only direct <p> child is the classed back-link.
+   The `:not([class])` guard stays as a belt-and-braces exclusion
+   for any classed paragraph a layout may inject above the prose. */
+.e-content > p:first-of-type:not([class])::first-letter {
   font-family: var(--font-heading);
   font-size: 4rem;
   float: left;
@@ -194,6 +193,15 @@ nav[aria-label="Primary"] [aria-current="page"] {
   font-family: var(--font-heading);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* Buttons — display serif with a touch of tracking, so CTAs speak in
+   the same editorial voice as the nav and pagination. Sentence case
+   stays (uppercase buttons fight long labels like "Add to cart"). */
+.btn,
+.folio-button {
+  font-family: var(--font-heading);
+  letter-spacing: 0.04em;
 }
 
 /* Code block — branded left border. */

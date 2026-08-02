@@ -1,14 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Hello from the blog">
+  <!-- Fixture hero. Muted duotone + small meta line only: the page
+       h1 carries the title, so the artwork doesn't repeat it (and
+       doesn't bake a typeface that fights the active theme). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#c2410c"/>
-      <stop offset="1" stop-color="#f59e0b"/>
+      <stop offset="0" stop-color="#7a5b46"/>
+      <stop offset="1" stop-color="#a08063"/>
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#bg)"/>
+  <g fill="#fff" opacity="0.14">
+    <circle cx="1340" cy="220" r="90"/>
+    <circle cx="230" cy="710" r="60"/>
+  </g>
   <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#fff" text-anchor="middle">
-    <text x="800" y="420" font-size="110" font-weight="700" letter-spacing="-2">Hello from</text>
-    <text x="800" y="560" font-size="110" font-weight="300" letter-spacing="-2">the blog.</text>
-    <text x="800" y="660" font-size="32" opacity="0.75">15 April 2026 · A first post</text>
+    <text x="800" y="470" font-size="40" opacity="0.85">15 April 2026 · A first post</text>
   </g>
 </svg>

@@ -102,7 +102,7 @@ module Abqari
         puts "Ejected #{name} → #{dest}"
 
         point_config_at(target_name) if target_name != current_config_theme
-        print_next_steps(dest)
+        print_next_steps(dest, name)
         true
       end
 
@@ -150,11 +150,31 @@ module Abqari
         end
       end
 
-      def print_next_steps(dest)
+      # `source_name` is the ENGINE theme that was copied — a fork via
+      # `--as mytheme` still wants the source theme's fonts.
+      def print_next_steps(dest, source_name)
         puts ''
         puts 'Next:'
         puts "  - Edit #{dest} — start with the :root token blocks."
         puts '  - bin/serve to preview; theme edits hot-reload.'
+        print_font_hint(source_name)
+      end
+
+      # The ejected theme's stacks may name webfonts the site isn't
+      # downloading yet — without the matching `fonts:` block the theme
+      # silently falls back to system faces and its typography never
+      # materialises. Print the block rather than editing config in
+      # place: `fonts:` may already exist with the operator's own
+      # entries, and config files are theirs.
+      def print_font_hint(theme_name)
+        entries = ThemeFonts.yaml_entries(theme_name, indent: '  ')
+        return if entries.empty?
+
+        puts "  - The #{theme_name} theme wants self-hosted webfonts. Ensure"
+        puts '    config/site.yml carries this block, then run bin/fetch-fonts:'
+        puts ''
+        puts '      fonts:'
+        entries.each_line { |l| puts "    #{l.rstrip}" }
       end
     end
   end

@@ -104,16 +104,34 @@ theme: minimal                # change to one of the names above
 #     weights: [400]
 #     style: italic
 
-# The notebook theme is set up to use JetBrains Mono (mono accents,
-# headings) + Inter (body). The pair below downloads both so the
-# fixture site demonstrates the theme's full visual character. If you
-# switch theme, you can leave or remove this block without effect —
-# unused fonts just sit in vendor/fonts/.
+# Each shipped theme's stacks name the faces below — declare the ones
+# for your theme and run `bin/fetch-fonts` (abqari new --theme <name>
+# scaffolds the right block automatically):
+#   minimal / custom / bootstrap — system fonts, nothing to download
+#   magazine — Playfair Display 700 (display headings)
+#   notebook — Inter 400/600 + JetBrains Mono 400/600
+#   sand     — Merriweather 400/700 (+400 italic) + Merriweather Sans 400/600
+# The fixture downloads the notebook pair so the theme demos at full
+# character. Unused fonts just sit in vendor/fonts/ — harmless.
 fonts:
   - family: Inter
     weights: [400, 600]
     style: normal
   - family: JetBrains Mono
+    weights: [400, 600]
+    style: normal
+  # Magazine + sand faces — fetched too so every shipped theme demos
+  # at full typographic character when you flip `theme:` above.
+  - family: Playfair Display
+    weights: [700]
+    style: normal
+  - family: Merriweather
+    weights: [400, 700]
+    style: normal
+  - family: Merriweather
+    weights: [400]
+    style: italic
+  - family: Merriweather Sans
     weights: [400, 600]
     style: normal
 

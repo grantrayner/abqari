@@ -92,6 +92,7 @@ module Abqari
       syndication
       syntax_highlighting
       syntax_theme
+      syntax_theme_dark
       taxonomies
       theme
       theme_toggle

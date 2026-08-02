@@ -27,7 +27,7 @@
      subtle paper-warm background and dark-graphite text. */
   --color-text:    #2a2a2a;
   --color-bg:      #f7f7f4;            /* warm paper */
-  --color-muted:   #767676;
+  --color-muted:   #6e6e6e;            /* 4.5:1+ on the paper bg */
   --color-link:    #a06419;            /* deep ochre — links + primary */
   --color-accent:  #c4811f;            /* lighter ochre — code-block left border, etc */
   --color-rule:    rgba(0, 0, 0, 0.1);
@@ -37,13 +37,13 @@
   /* Component palette */
   --color-primary:        #a06419;     /* deep ochre — buttons, links */
   --color-on-primary:     #fff;
-  --color-secondary:      #767676;
+  --color-secondary:      #6e6e6e;
   --color-on-secondary:   #fff;
   --color-success:        #3a8050;
   --color-on-success:     #fff;
   --color-danger:         #b03a3a;
   --color-on-danger:      #fff;
-  --color-warning:        #c4811f;     /* lighter ochre */
+  --color-warning:        #c98a2e;     /* lighter ochre — 4.5:1+ under dark text */
   --color-on-warning:     #2a2a2a;
   --color-info:           #2a5d8f;     /* dusty navy — distinct from primary */
   --color-on-info:        #fff;
@@ -87,7 +87,7 @@
   :root:not([data-theme="light"]) {
     --color-text:    #e6e6e6;
     --color-bg:      #1c1d1f;
-    --color-muted:   #888;
+    --color-muted:   #949494;
     --color-link:    #e0a857;            /* lighter ochre for legibility on dark */
     --color-accent:  #e0a857;
     --color-rule:    rgba(255, 255, 255, 0.1);
@@ -96,7 +96,7 @@
 
     --color-primary:        #e0a857;
     --color-on-primary:     #1c1d1f;
-    --color-secondary:      #888;
+    --color-secondary:      #949494;
     --color-on-secondary:   #1c1d1f;
     --color-success:        #5ba679;
     --color-on-success:     #1c1d1f;
@@ -116,7 +116,7 @@
 [data-theme="dark"] {
   --color-text:    #e6e6e6;
   --color-bg:      #1c1d1f;
-  --color-muted:   #888;
+  --color-muted:   #949494;
   --color-link:    #e0a857;
   --color-accent:  #e0a857;
   --color-rule:    rgba(255, 255, 255, 0.1);
@@ -125,7 +125,7 @@
 
   --color-primary:        #e0a857;
   --color-on-primary:     #1c1d1f;
-  --color-secondary:      #888;
+  --color-secondary:      #949494;
   --color-on-secondary:   #1c1d1f;
   --color-success:        #5ba679;
   --color-on-success:     #1c1d1f;
@@ -149,6 +149,25 @@
    values. Everything else (mono headings, dense body, code/pre mono, paper
    background, ochre accents) is driven by the tokens above.
    ========================================================================== */
+
+/* Nav, pagination, and buttons in mono — carries the docs/terminal
+   voice through the page chrome. Without this only headings and meta
+   were mono and the nav was indistinguishable from minimal's; the
+   nav is the most persistent identity surface a theme has. */
+nav[aria-label="Primary"],
+.pagination,
+.btn,
+.folio-button {
+  font-family: var(--font-mono);
+}
+
+/* Buttons squared to 2px — the same corner treatment as the tag
+   chips, so interactive elements read as terminal-style labels
+   rather than the engine's default rounded rectangles. */
+.btn,
+.folio-button {
+  border-radius: 2px;
+}
 
 /* Section dividers — dashed, in the notebook docs idiom. */
 hr,

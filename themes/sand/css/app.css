@@ -1,12 +1,24 @@
-/* Sand — warm, earth-toned palette for prose-led sites (memoirs,
-   travel writing, fiction). Merriweather body + Merriweather Sans
-   for UI, brand red accent. Inherits structural CSS from
-   `_common.css`. This file just sets:
+/* Sand — sun-bleached earth for prose-led sites (memoirs, travel
+   writing, fiction). Merriweather body + Merriweather Sans headings,
+   brand-red accents, brick links, olive-charcoal dark mode. Inherits
+   structural CSS from `_common.css`. This file just sets:
 
      1. Theme tokens (palette + typography) for both light and dark
      2. Light/dark mode overrides
      3. Theme-specific aesthetic refinements
-*/
+
+   Identity notes (vs the other warm theme, magazine): sand's light
+   surface is sandier/yellower than magazine's pinkish cream, its
+   accent family is brick/crimson rather than rust/orange, headings
+   are SANS (Merriweather Sans) against the serif body, and dark mode
+   is an olive-charcoal "desert night" rather than magazine's warm
+   brown-black. Links carry a real hue in both modes — the previous
+   grey `#444` links were nearly indistinguishable from body text.
+
+   The Merriweather faces are webfonts — scaffolds created with
+   `abqari new --theme sand` carry the matching `fonts:` block; see
+   docs/theming.md "Webfonts per shipped theme" if adopting sand on
+   an existing site. Without them the body falls back to Georgia. */
 
 
 /* ============================================================
@@ -24,34 +36,36 @@
  * ============================================================ */
 
 :root {
-  /* Base palette — warm-beige light mode */
-  --color-text:    #212529;
-  --color-bg:      #f3f0ee;
-  --color-muted:   #6c757d;
-  --color-link:    #444;
-  --color-rule:    rgba(60, 40, 30, 0.18);
-  --color-card-bg: #fff;
-  --color-code-bg: #ece6dd;
+  /* Base palette — sun-bleached sand */
+  --color-text:    #2a2521;
+  --color-bg:      #f4efe6;
+  --color-muted:   #6f6656;
+  --color-link:    #8f2f21;            /* brick — kin to the brand red, real affordance */
+  --color-rule:    rgba(90, 70, 40, 0.22);
+  --color-card-bg: #fffdf7;
+  --color-code-bg: #eae3d2;
 
   /* Component palette */
   --color-primary:        #990000;             /* brand red */
   --color-on-primary:     #fff;
-  --color-secondary:      #6c757d;
+  --color-secondary:      #6f6656;
   --color-on-secondary:   #fff;
   --color-success:        #2d6a4f;
   --color-on-success:     #fff;
   --color-danger:         #c1121f;
   --color-on-danger:      #fff;
   --color-warning:        #e6a700;
-  --color-on-warning:     #212529;
+  --color-on-warning:     #2a2521;
   --color-info:           #4a6fa5;
   --color-on-info:        #fff;
-  --color-light:          #f3f0ee;
-  --color-on-light:       #212529;
-  --color-dark:           #212529;
-  --color-on-dark:        #f3f0ee;
+  --color-light:          #f4efe6;
+  --color-on-light:       #2a2521;
+  --color-dark:           #2a2521;
+  --color-on-dark:        #f4efe6;
 
-  /* Typography */
+  /* Typography — serif prose under sans display. The sans headings
+     are sand's clearest structural difference from magazine (serif
+     over serif); both faces are webfonts, see the header comment. */
   --font-body:    "Merriweather", Georgia, serif;
   --font-heading: "Merriweather Sans", system-ui, sans-serif;
   --font-meta:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -61,59 +75,75 @@
      and `.btn` / `.folio-button`. */
   --font-sans:    var(--font-heading);
 
+  /* Tag chip — soft filled chip with a small radius: quieter than
+     minimal/magazine's pills, softer than notebook's outlined
+     rectangles. Set in the meta sans so chips read as UI, not prose. */
+  --tag-bg:       var(--color-code-bg);
+  --tag-padding:  0.125rem 0.5rem;
+  --tag-radius:   var(--radius-1);
+  --tag-font:     var(--font-meta);
+
   /* Shadow tokens — warm tints for light mode */
-  --shadow-card:  0 2px 8px rgba(60, 40, 30, 0.10);
+  --shadow-card:  0 2px 8px rgba(70, 55, 30, 0.10);
 }
 
-/* Dark deltas — only redeclare values that differ from `:root`.
-   Tokens whose light value already works in dark (e.g.
-   --color-on-primary: #fff, --color-warning: #e6a700) are
-   intentionally omitted. Both blocks must stay in sync — pure CSS
-   can't share rule bodies across selectors. */
+/* Dark deltas — "desert night": olive-charcoal ground, bone text,
+   dry-grass gold links. Alert accents flip to dark-text-on-brighter-
+   accent (the usual dark-mode inversion; white-on-deep fails 4.5:1
+   here). Only values that differ from `:root` are redeclared; tokens
+   whose light value already works in dark (e.g. --color-on-primary:
+   #fff, --color-warning: #e6a700) are omitted. Both blocks must stay
+   in sync — pure CSS can't share rule bodies across selectors. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-text:    #ece6dd;
-    --color-bg:      #1a1410;
-    --color-muted:   #a8a098;
-    --color-link:    #d4c4b0;
-    --color-rule:    rgba(220, 200, 180, 0.15);
-    --color-card-bg: #2a201a;
-    --color-code-bg: #261d18;
+    --color-text:    #eae4d3;
+    --color-bg:      #1b1a12;
+    --color-muted:   #a29a84;
+    --color-link:    #cdb380;          /* dry-grass gold */
+    --color-rule:    rgba(205, 190, 150, 0.16);
+    --color-card-bg: #252217;
+    --color-code-bg: #211f14;
 
-    --color-primary:        #c14545;          /* brighter red for dark contrast */
-    --color-secondary:      #a8a098;
-    --color-on-secondary:   #1a1410;
-    --color-success:        #4a8c6e;
-    --color-danger:         #d8453a;
-    --color-on-warning:     #1a1410;
-    --color-info:           #6189ba;
-    --color-light:          #2a201a;
-    --color-on-light:       #ece6dd;
-    --color-dark:           #ece6dd;
-    --color-on-dark:        #1a1410;
+    --color-primary:        #c14545;   /* brighter red for dark contrast */
+    --color-secondary:      #a29a84;
+    --color-on-secondary:   #1b1a12;
+    --color-success:        #5aa07e;
+    --color-on-success:     #1b1a12;
+    --color-danger:         #e0685e;
+    --color-on-danger:      #1b1a12;
+    --color-on-warning:     #1b1a12;
+    --color-info:           #7a9cc6;
+    --color-on-info:        #1b1a12;
+    --color-light:          #252217;
+    --color-on-light:       #eae4d3;
+    --color-dark:           #eae4d3;
+    --color-on-dark:        #1b1a12;
   }
 }
 
 [data-theme="dark"] {
-  --color-text:    #ece6dd;
-  --color-bg:      #1a1410;
-  --color-muted:   #a8a098;
-  --color-link:    #d4c4b0;
-  --color-rule:    rgba(220, 200, 180, 0.15);
-  --color-card-bg: #2a201a;
-  --color-code-bg: #261d18;
+  --color-text:    #eae4d3;
+  --color-bg:      #1b1a12;
+  --color-muted:   #a29a84;
+  --color-link:    #cdb380;
+  --color-rule:    rgba(205, 190, 150, 0.16);
+  --color-card-bg: #252217;
+  --color-code-bg: #211f14;
 
   --color-primary:        #c14545;
-  --color-secondary:      #a8a098;
-  --color-on-secondary:   #1a1410;
-  --color-success:        #4a8c6e;
-  --color-danger:         #d8453a;
-  --color-on-warning:     #1a1410;
-  --color-info:           #6189ba;
-  --color-light:          #2a201a;
-  --color-on-light:       #ece6dd;
-  --color-dark:           #ece6dd;
-  --color-on-dark:        #1a1410;
+  --color-secondary:      #a29a84;
+  --color-on-secondary:   #1b1a12;
+  --color-success:        #5aa07e;
+  --color-on-success:     #1b1a12;
+  --color-danger:         #e0685e;
+  --color-on-danger:      #1b1a12;
+  --color-on-warning:     #1b1a12;
+  --color-info:           #7a9cc6;
+  --color-on-info:        #1b1a12;
+  --color-light:          #252217;
+  --color-on-light:       #eae4d3;
+  --color-dark:           #eae4d3;
+  --color-on-dark:        #1b1a12;
 }
 
 
@@ -121,31 +151,29 @@
  * Theme-specific aesthetic refinements
  * ============================================================ */
 
-/* Anchor decoration — a hint of warm brown rather than the default
-   neutral rule color. Only override when the theme looks better with
-   a deliberate undertone. */
+/* Anchor decoration — a translucent tint of the link colour rather
+   than the default neutral rule colour, so underlines read warm
+   without shouting. One declaration serves both modes: the tint
+   follows `--color-link` wherever the mode takes it. */
 a {
-  text-decoration-color: rgba(60, 40, 30, 0.4);
+  text-decoration-color: color-mix(in srgb, var(--color-link) 45%, transparent);
 }
-@media (prefers-color-scheme: dark) {
-  a { text-decoration-color: rgba(220, 200, 180, 0.4); }
-}
-[data-theme="dark"]  a { text-decoration-color: rgba(220, 200, 180, 0.4); }
-[data-theme="light"] a { text-decoration-color: rgba(60, 40, 30, 0.4); }
 
-/* Buttons inherit `--font-sans` (set to var(--font-heading) above),
-   so they read in Merriweather Sans. Bump the weight to match the
-   theme's overall display feel. */
+/* Buttons — pill-shaped, in the display sans (via --font-sans above)
+   with a bumped weight. The pill silhouette is sand's button
+   signature; minimal/magazine keep the engine's rounded rectangle
+   and notebook squares its corners. */
 .btn,
 .folio-button {
+  border-radius: var(--radius-pill);
   font-weight: 500;
 }
 
-/* Nav-link hover: deepen to body text rather than light up brand red.
-   Matches the footer social icons' muted→text treatment — a low-key
-   pointer affordance that doesn't compete with the page content.
-   The active-page indicator (`[aria-current="page"]`) keeps brand red
-   for a clear "you are here" cue. */
+/* Nav-link hover: deepen to body text rather than light up in the
+   link colour. Matches the footer social icons' muted→text treatment
+   — a low-key pointer affordance that doesn't compete with the page
+   content. The active-page indicator (`[aria-current="page"]`) keeps
+   its stronger treatment for a clear "you are here" cue. */
 .nav__links a:hover {
   color: var(--color-text);
 }

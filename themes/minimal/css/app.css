@@ -69,6 +69,12 @@
   --tag-padding:  0.125rem 0.5rem;
   --tag-bg:       var(--color-code-bg);
   --tag-radius:   var(--radius-pill);
+
+  /* Minimal's primary IS its link blue, so a blue price reads as a
+     link. Prices render in body text instead; weight and heading
+     font (from `_common.css`) keep them prominent. The var()
+     indirection follows `--color-text` into dark mode on its own. */
+  --color-price:  var(--color-text);
 }
 
 /* Dark deltas — only values that differ from `:root`. */

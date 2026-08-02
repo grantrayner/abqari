@@ -1,13 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Themes: picking a visual language">
+  <!-- Fixture hero. Muted duotone + motif only: the page h1 carries
+       the title, so the artwork doesn't repeat it (and doesn't bake
+       a typeface that fights the active theme). The three tinted
+       discs read as palette swatches. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4338ca"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+      <stop offset="0" stop-color="#4e5570"/>
+      <stop offset="1" stop-color="#767d95"/>
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#bg)"/>
+  <g opacity="0.35">
+    <circle cx="660" cy="430" r="110" fill="#c9b28a"/>
+    <circle cx="800" cy="430" r="110" fill="#a8907e" fill-opacity="0.85"/>
+    <circle cx="940" cy="430" r="110" fill="#8a9a94" fill-opacity="0.85"/>
+  </g>
   <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#fff" text-anchor="middle">
-    <text x="800" y="420" font-size="110" font-weight="700" letter-spacing="-2">Themes</text>
-    <text x="800" y="540" font-size="44" opacity="0.85">picking a visual language</text>
+    <text x="800" y="700" font-size="40" opacity="0.85">picking a visual language</text>
   </g>
 </svg>

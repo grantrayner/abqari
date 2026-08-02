@@ -5,6 +5,74 @@ All notable changes to Abqari will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+A theme-quality pass: dark mode finally gets dark code blocks, the
+decorative cover tiles join the theme's colour world, and each shipped
+theme leans harder into its own identity.
+
+### Added
+
+- **Dark-mode syntax highlighting.** The syntax layer now renders a
+  dark Rouge theme under the same two dark-mode scopes every theme's
+  token file uses — previously dark pages showed light-mode tokens on
+  Rouge's hardcoded near-white background. New `syntax_theme_dark:`
+  config key: a Rouge theme name (`github.dark` style names work),
+  `false` to opt out, or unset to derive from `syntax_theme`.
+- **`--color-price` token** — price text on publication cards/headers.
+  Defaults to `--color-primary`; minimal points it at `--color-text`
+  so prices stop rendering in the link blue.
+- **Per-theme webfont manifests** (`Abqari::ThemeFonts`). `abqari new
+  --theme <name>` scaffolds the matching `fonts:` block and
+  `abqari theme eject` prints it — magazine and sand previously
+  declared faces (Playfair Display, Merriweather) that no scaffold
+  ever downloaded, so their typography silently fell back to system
+  serifs on every new site.
+- **Theme-keyed cover-tile palettes.** The decorative SVG title cards
+  draw from a palette tuned to the active theme (magazine, notebook,
+  sand) instead of the neutral set, so slug-hashed teal/violet tiles
+  stop landing on warm pages. Tile titles also render in the theme's
+  `--font-heading` (the SVG's baked-in sans stays as a no-CSS
+  fallback).
+- **Theme-derived auto OG cards.** With `og_images.auto: true` and no
+  explicit `manifest.theme_color`, share cards now use a gradient
+  matched to the active theme instead of the one-size slate pair. An
+  explicit `theme_color` still wins.
+
+### Changed
+
+- **Code-block backgrounds now belong to the theme.** `.highlight`
+  backgrounds come from `--color-code-bg` in both modes; Rouge
+  supplies token colours only. Sites that relied on the Rouge theme's
+  own background should set `--color-code-bg` (or
+  `syntax_theme_dark: false`) to taste.
+- **Sand redesigned.** Sandier light surface, brick links (the old
+  `#444` grey links were nearly indistinguishable from body text),
+  olive-charcoal "desert night" dark mode (the old warm black was a
+  near-duplicate of magazine's), tag-chip tokens, pill buttons.
+- **Notebook** carries its mono voice through the chrome: nav,
+  pagination, and buttons render in `--font-mono`, buttons squared
+  to 2px corners (matching its tag chips).
+- **Magazine** buttons render in the display serif with slight
+  tracking, matching its nav and pagination.
+- **Fixture heroes quieted.** The hand-authored post/workshop hero
+  SVGs no longer bake large titles in a generic sans (the page h1
+  already carries the title) and use muted duotones that sit on any
+  theme; the fixture config now downloads every shipped theme's
+  webfonts so each theme demos at full character.
+
+### Fixed
+
+- **WCAG-AA contrast across all shipped themes.** A token-level
+  contrast pass found seven sub-4.5:1 pairs: magazine's light info
+  banner, notebook's light muted/warning and dark muted, and sand's
+  dark success/danger/info (now dark-text-on-brighter-accent). All
+  measured pairs pass in both modes.
+- **Magazine's drop cap was dead CSS on every post.** The selector
+  targeted `article > p:first-of-type`, but body paragraphs live
+  inside the `e-content` wrapper — the only direct `<p>` child of
+  `<article>` is the back-link. Now anchored to `.e-content`.
+
 ## [1.1.0] — 2026-08-02
 
 Ordered-series navigation and a CSP that can be extended without

@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Crisis Response Foundations">
+  <!-- Fixture hero. Muted duotone + date/location line only: the page
+       h1 carries the title, so the artwork doesn't repeat it (and
+       doesn't bake a typeface that fights the active theme). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#1a3a52"/>
@@ -6,9 +9,12 @@
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#bg)"/>
+  <g fill="#fff" opacity="0.12">
+    <circle cx="800" cy="450" r="170" fill="none" stroke="#fff" stroke-width="6"/>
+    <circle cx="800" cy="450" r="110" fill="none" stroke="#fff" stroke-width="6"/>
+    <circle cx="800" cy="450" r="14"/>
+  </g>
   <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#fff" text-anchor="middle">
-    <text x="800" y="420" font-size="92" font-weight="700" letter-spacing="-1">Crisis Response</text>
-    <text x="800" y="540" font-size="92" font-weight="300" letter-spacing="-1">Foundations</text>
-    <text x="800" y="640" font-size="32" opacity="0.75">15–16 June 2026 · Singapore</text>
+    <text x="800" y="740" font-size="40" opacity="0.85">15–16 June 2026 · Singapore</text>
   </g>
 </svg>

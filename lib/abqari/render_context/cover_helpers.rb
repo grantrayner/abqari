@@ -34,8 +34,15 @@ module Abqari
     module CoverHelpers
       # Muted two-tone gradients. Slug-hashed so each post consistently
       # gets the same tile across builds, but adjacent posts in a
-      # listing tend to draw different tones (8 palette entries × hash
+      # listing tend to draw different tones (palette entries × hash
       # distribution = reasonably even spread on any one page).
+      #
+      # The default set is hue-neutral, tuned for `minimal` (and any
+      # custom theme). The warm themes get their own sets in
+      # `THEME_COVER_PALETTES` below — a slug-hashed teal or violet
+      # tile on magazine's cream or notebook's paper page injects a
+      # saturated hue the theme never uses anywhere else, so each
+      # warm theme constrains its tiles to its own colour world.
       COVER_PALETTES = [
         ['#1e3a5f', '#4a78a8'].freeze,  # deep blue → mid blue
         ['#5b3a8a', '#8a6abf'].freeze,  # violet
@@ -46,6 +53,43 @@ module Abqari
         ['#6a2a3a', '#a05a6a'].freeze,  # burgundy
         ['#5a5a3a', '#8a8a6a'].freeze   # olive
       ].freeze
+
+      # Theme-keyed tile palettes for the shipped warm themes. Every
+      # pair keeps the tile dark enough that the near-white title
+      # text stays legible. Themes not listed (minimal, custom,
+      # bootstrap, none) fall back to the neutral COVER_PALETTES.
+      THEME_COVER_PALETTES = {
+        # Cream, rust, editorial — warm browns and rusts, one muted
+        # navy (the theme's info hue) so grids don't go monochrome.
+        'magazine' => [
+          ['#8a4a2a', '#bf7a4a'].freeze,  # rust
+          ['#6a2a3a', '#a05a6a'].freeze,  # burgundy
+          ['#4a3226', '#7a5a42'].freeze,  # deep umber
+          ['#5a5a3a', '#8a8a6a'].freeze,  # olive
+          ['#3a4a5f', '#68809a'].freeze,  # muted navy
+          ['#9a5230', '#c07a50'].freeze   # terracotta
+        ].freeze,
+        # Paper + ochre + graphite — the ochre family carries the
+        # signature, dusty navy echoes `--color-info`.
+        'notebook' => [
+          ['#8a5c14', '#c4811f'].freeze,  # ochre
+          ['#33353a', '#5c6066'].freeze,  # graphite
+          ['#2a5d8f', '#5580ab'].freeze,  # dusty navy
+          ['#565046', '#847c6e'].freeze,  # warm grey
+          ['#6e4a12', '#a06419'].freeze,  # deep ochre
+          ['#4a5a3a', '#75866a'].freeze   # moss
+        ].freeze,
+        # Sun-bleached earth — brick, clay, olive; dusty blue echoes
+        # `--color-info`.
+        'sand' => [
+          ['#7a2018', '#a84438'].freeze,  # brick
+          ['#8a5138', '#b57952'].freeze,  # clay
+          ['#4f5233', '#7a7d55'].freeze,  # olive
+          ['#6e5a3a', '#9a825c'].freeze,  # sand brown
+          ['#4a342a', '#755446'].freeze,  # deep umber
+          ['#3f5a80', '#6d88a8'].freeze   # dusty blue
+        ].freeze
+      }.freeze
 
       COVER_MODES = %w[photo photo_or_svg svg none].freeze
       DEFAULT_COVER_MODE = 'photo'
@@ -137,7 +181,8 @@ module Abqari
         # between builds, scrambling the tile colours each time.
         key      = page.respond_to?(:slug) && page.slug ? page.slug.to_s : title
         crc      = Zlib.crc32(key)
-        bg_a, bg_b = COVER_PALETTES[crc % COVER_PALETTES.size]
+        palette  = cover_palette
+        bg_a, bg_b = palette[crc % palette.size]
         grad_id  = "cover-grad-#{crc.to_s(36)}"
 
         lines       = svg_wrap_title(display_title)
@@ -175,6 +220,12 @@ module Abqari
             </g>
           </svg>
         SVG
+      end
+
+      # The tile palette for the active theme — theme-keyed when the
+      # theme ships one, the neutral default set otherwise.
+      def cover_palette
+        THEME_COVER_PALETTES.fetch(site.config['theme'].to_s, COVER_PALETTES)
       end
 
       # Word-wrap a title into 1-3 lines for the SVG title-card. SVG

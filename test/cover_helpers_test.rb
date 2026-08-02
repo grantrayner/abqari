@@ -154,7 +154,45 @@ class CoverHelpersTest < Minitest::Test
     assert_equal 7, rect_count, "expected 7 <rect> elements, got #{rect_count}"
   end
 
+  # --- Theme-aware palettes --------------------------------------------
+
+  def test_default_theme_uses_the_neutral_palette
+    # Fixture theme is `minimal` — no entry in THEME_COVER_PALETTES.
+    assert_equal Abqari::RenderContext::CoverHelpers::COVER_PALETTES,
+                 @ctx.cover_palette
+  end
+
+  def test_warm_theme_tiles_draw_from_that_themes_palette
+    with_theme('notebook') do
+      allowed = Abqari::RenderContext::CoverHelpers::THEME_COVER_PALETTES['notebook'].flatten
+      svg     = @ctx.cover_svg_for(stub_page(title: 'Test', slug: 'test'))
+      stops   = svg.scan(/stop-color="(#[0-9a-f]{6})"/i).flatten
+      assert_equal 2, stops.size
+      stops.each { |hex| assert_includes allowed, hex }
+    end
+  end
+
+  def test_every_shipped_theme_palette_is_two_tone_hex_pairs
+    Abqari::RenderContext::CoverHelpers::THEME_COVER_PALETTES.each do |theme, palette|
+      palette.each do |pair|
+        assert_equal 2, pair.size, "#{theme} palette entry should be a two-tone pair"
+        pair.each { |hex| assert_match(/\A#[0-9a-f]{6}\z/i, hex, "#{theme} palette colour #{hex}") }
+      end
+    end
+  end
+
   private
+
+  # Temporarily point the shared fixture site at another theme.
+  # `cover_palette` only reads `config['theme']`, so a config swap is
+  # enough — no rebuild needed.
+  def with_theme(name)
+    previous = @site.config['theme']
+    @site.config['theme'] = name
+    yield
+  ensure
+    @site.config['theme'] = previous
+  end
 
   # Minimal page-like stub. Defaults match a top-level page (no
   # collection); pass `collection:` to opt into collection-config

@@ -1,7 +1,7 @@
 ---
 title: Last Light
 published: true
-excerpt: Companion to *First Light* — short pieces on the final hours of the day, when the work is mostly done and the listening starts.
+excerpt: Companion to First Light — short pieces on the final hours of the day, when the work is mostly done and the listening starts.
 cover_url: /publications/last-light/cover.svg
 price: $16.00
 isbn: 978-981-94-0000-5
