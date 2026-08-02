@@ -5,7 +5,7 @@ All notable changes to Abqari will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] — 2026-08-02
 
 Ordered-series navigation and a CSP that can be extended without
 being replaced. Both came out of building a course-shaped site — a
@@ -55,6 +55,21 @@ existing series taxonomies.
   within one series (warn), and a page in a series with no position
   (info). Each of these builds cleanly and renders correctly in
   isolation while dropping out of the prev/next chain.
+- `article:published_time` / `article:modified_time` / `article:tag`
+  OG meta on posts. `og:type: article` was already emitted, but the
+  dates lived only in JSON-LD — Facebook and LinkedIn read the
+  OG-level properties, not schema.org.
+- The site skeleton now ships `content/404.md` (`permalink:
+  /404.html`, `sitemap: false`, `robots: noindex`), so every new site
+  starts with a not-found page in both default and `--blank` modes.
+- The skeleton's `config/site.yml` gained a commented "SEO + social
+  sharing" section (`share_image`, `og_images.auto`, `twitter`,
+  `og_locale`) and now discloses the `block_ai_scraping: true`
+  default — the knobs existed but new sites had no way to discover
+  them from their own config file.
+- `deploy` added to `SiteConfig::KNOWN_KEYS` — configuring
+  `bin/deploy`'s `deploy:` block no longer warns as an unknown key
+  (and no longer errors under `ABQARI_STRICT_CONFIG=true`).
 
 ### Changed
 
@@ -103,6 +118,53 @@ existing series taxonomies.
   breadcrumb linked into the posts series index. Now resolved from the
   page's own collection, and rendered as plain text when the
   collection has no series taxonomy configured. Posts are unaffected.
+
+- **Auto OG cards: generated pages advertised og:image files that
+  don't exist.** With `og_images.auto: true`, the head emitted an
+  `<page-url>og.svg` og:image for any page without a hero — but
+  `OgImageGenerator` only writes cards for real content pages with
+  directory URLs. Tag indexes, pagination shards, related indexes,
+  and flat-URL pages (`/404.html` — which produced the mangled
+  `/404.htmlog.svg`) all pointed social validators at 404s. The head
+  and the generator now share one eligibility predicate
+  (`OgImageGenerator.auto_card?`), so they can't drift apart again.
+
+- Slug-aliased posts feeds carried the wrong `<title>`. The head's
+  autodiscovery link says "Site — Stories" for a `posts.slug:
+  stories` site, but `Feed#feed_title` tested the internal collection
+  name instead of the effective slug and emitted just "Site". The
+  comment claimed they matched; now they do.
+
+- The skeleton config's commented social-links example used the wrong
+  key (`social_links:` — the engine reads `social:`) and bare handles
+  where the engine expects full URLs. Uncommenting it produced an
+  unknown-key warning and, with the key corrected, broken footer
+  links. A scaffold test now validates both templates' keys — real
+  AND commented examples — against `KNOWN_KEYS`.
+
+- The skeleton config claimed posts feeds render at `/posts/feed.xml`;
+  they render at the root `/feed.xml` (deliberately, for subscriber
+  back-compat). The footer signature also baked in the scaffold-time
+  year — it now uses the `{year}` build-time token, so it can't go
+  stale.
+
+- The dev server showed WEBrick's stock error page for unknown URLs
+  instead of the site's own `/404.html` — the one page an author
+  could never preview with `bin/serve`. Static hosts (Cloudflare
+  Pages, Netlify, GitHub Pages) serve the custom page in production;
+  the dev server now mirrors them. The status stays 404, only the
+  body changes, and WEBrick's default page still appears if the
+  build produced no `404.html`.
+
+- The no-libvips regression test failed on any machine with the
+  `vips`/`magick` CLIs installed: the subprocess inherited PATH, so
+  the pipeline (correctly) picked the shell backend instead of the
+  no-backend state under test. The subprocess now runs with an empty
+  PATH.
+
+- `abqari new --engine git` scaffolded a placeholder URL
+  (`your-handle`) that failed `bundle install` as-is; it now defaults
+  to the canonical repo.
 
 ## [1.0.0] — 2026-07-14
 
@@ -304,5 +366,11 @@ run a real working author / publisher site.
     first serve.
   - New `docs/theming.md`: the theming guide and full token reference,
     drift-tested against `_common.css`.
+- Ruby 4.0 supported and now the development Ruby (`.ruby-version`
+  4.0.2); CI tests 3.3 / 3.4 / 4.0. The gemspec floor stays `>= 3.3`.
+  Full suite green on 4.0 with the same locked dependencies —
+  commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
+  the `~> 2.4` floor bought.
 
+[1.1.0]: https://github.com/grantrayner/abqari/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

@@ -59,6 +59,26 @@ module Abqari
       end
     end
 
+    # WEBrick's stock FileHandler, with one change: an unknown URL
+    # serves the site's own `/404.html` (when the build produced one)
+    # instead of WEBrick's default error page. Static hosts —
+    # Cloudflare Pages, Netlify, GitHub Pages — all do this in
+    # production, so without it the 404 page is the one page an
+    # author can never preview with `bin/serve`. The status stays
+    # 404; only the body changes.
+    class NotFoundFileHandler < WEBrick::HTTPServlet::FileHandler
+      def service(req, res)
+        super
+      rescue WEBrick::HTTPStatus::NotFound
+        custom = File.join(@root, '404.html')
+        raise unless File.file?(custom)
+
+        res.status = 404
+        res.content_type = 'text/html; charset=utf-8'
+        res.body = File.read(custom)
+      end
+    end
+
     def initialize(site, port: DEFAULT_PORT, bind: nil, logger: nil)
       @site = site
       @port = port
@@ -86,13 +106,16 @@ module Abqari
       server_opts = {
         BindAddress: @bind,
         Port: @port,
-        DocumentRoot: @site.output_dir,
         AccessLog: [],
         DirectoryIndex: ['index.html']
       }
       server_opts[:Logger] = @logger
       server = WEBrick::HTTPServer.new(server_opts)
 
+      # No :DocumentRoot — that would auto-mount the stock FileHandler.
+      # Mount the 404-aware subclass at the root instead; it inherits
+      # DirectoryIndex and the rest of the server config.
+      server.mount('/', NotFoundFileHandler, @site.output_dir)
       server.mount_proc('/__reload__', &method(:handle_reload_endpoint))
 
       # Shutdown choreography is delicate:

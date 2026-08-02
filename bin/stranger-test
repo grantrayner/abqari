@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# The "stranger test": install the built gem in a CLEAN Linux container
+# and follow the README quickstart verbatim — the environment a real
+# first-time user has, which no amount of local testing reproduces.
+# Every packaging bug this project has shipped (gemspec require chain,
+# missing skeleton dotfiles, commonmarker ABI gap) was invisible on the
+# dev machine and instant in a clean environment.
+#
+# The containers are deliberately minimal (ruby:X-slim): no Rust, no
+# libvips, no build-essential. A native gem that silently falls back to
+# compiling from source fails here — which is the point. The image
+# pipeline degrades to passthrough, exercising that documented path.
+#
+# Host mode (default):   bin/stranger-test [--published]
+#   Builds the gem from the working tree, then runs the container leg
+#   for each Ruby line the gem supports. Needs a docker CLI (colima,
+#   Docker Desktop, ...).
+#
+# Container mode:        driven by host mode / CI; not run by hand.
+#   Set STRANGER_INNER=1 with the gem at /stranger/abqari.gem.
+#
+# --published: once abqari is on rubygems.org, resolve it from there
+#   like a real user, instead of satisfying it from the local artifact.
+set -euo pipefail
+
+RUBIES=("3.4" "4.0")
+PUBLISHED="${STRANGER_PUBLISHED:-0}"
+[ "${1:-}" = "--published" ] && PUBLISHED=1
+
+# ---------------------------------------------------------------------
+# Container leg: runs INSIDE ruby:X-slim.
+# ---------------------------------------------------------------------
+if [ "${STRANGER_INNER:-0}" = "1" ]; then
+  echo "== stranger test on $(ruby -v) =="
+  work=/stranger/work
+  mkdir -p "$work" && cd "$work"
+
+  echo '-- gem install (runtime deps resolve from rubygems.org)'
+  gem install --no-document /stranger/abqari.gem
+
+  echo '-- abqari version'
+  abqari version
+
+  echo '-- abqari new mysite (quickstart, bundle deferred one step)'
+  abqari new mysite --skip-bundle
+  cd mysite
+
+  if [ "$PUBLISHED" = "1" ]; then
+    echo '-- bundle install (abqari from rubygems.org — published mode)'
+  else
+    # Not on rubygems.org yet, so the scaffolded `gem 'abqari', '~> 1.0'`
+    # can't resolve remotely. Substitute a path source built from the
+    # ARTIFACT (unpacked .gem + its regenerated gemspec) — byte-faithful
+    # to what a published install would contain. The ONLY deviation from
+    # the stranger path is this source line; drop it via --published.
+    echo '-- bundle install (abqari satisfied from the local artifact)'
+    # `gem unpack` names the output dir after the FILE basename
+    # (`abqari.gem` → /opt/unpack/abqari), not the gem's name-version —
+    # detect rather than assume.
+    mkdir -p /opt/unpack
+    gem unpack /stranger/abqari.gem --target /opt/unpack >/dev/null
+    unpacked=$(find /opt/unpack -mindepth 1 -maxdepth 1 -type d | head -1)
+    [ -n "$unpacked" ] || { echo 'gem unpack produced nothing'; exit 1; }
+    gem spec /stranger/abqari.gem --ruby > "$unpacked/abqari.gemspec"
+    ruby -e 'g = File.read("Gemfile")
+             g.sub!(/^gem .abqari.*$/, %(gem "abqari", path: "'"$unpacked"'")) or abort "Gemfile line not found"
+             File.write("Gemfile", g)'
+  fi
+  bundle install
+
+  echo '-- bin/build (no libvips: image pipeline must degrade, not die)'
+  bin/build
+  test -f _site/index.html
+  test -f _site/.abqari-build-ok
+  grep -q 'stylesheet' _site/index.html
+
+  echo '-- bin/new post + rebuild'
+  bin/new post "Stranger Post" >/dev/null
+  bin/build
+  ls _site/posts/*/index.html | grep -q stranger-post
+
+  echo '-- bin/serve boots and answers HTTP'
+  bin/serve &
+  serve_pid=$!
+  ruby -rnet/http -e '
+    deadline = Time.now + 30
+    begin
+      res = Net::HTTP.get_response(URI("http://127.0.0.1:4000/"))
+      raise "HTTP #{res.code}" unless res.code == "200"
+      raise "no title" unless res.body.include?("<title>")
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, EOFError
+      abort "bin/serve never answered" if Time.now > deadline
+      sleep 0.5
+      retry
+    end
+    puts "   serve: HTTP 200"'
+  kill "$serve_pid" 2>/dev/null || true
+  wait "$serve_pid" 2>/dev/null || true
+
+  echo "== PASS: $(ruby -v | cut -d' ' -f1-2) =="
+  exit 0
+fi
+
+# ---------------------------------------------------------------------
+# Host leg: build the artifact, run the container leg per Ruby.
+# ---------------------------------------------------------------------
+cd "$(dirname "$0")/.."
+
+command -v docker >/dev/null || {
+  echo 'stranger-test needs a docker CLI (e.g. `brew install colima docker && colima start`).' >&2
+  exit 1
+}
+
+# Stage under $HOME, not mktemp's /var/folders: VM-backed docker hosts
+# (colima, Docker Desktop) only share the home directory by default,
+# and an unshared mount source silently becomes an empty directory
+# inside the container.
+staging=$(mktemp -d "${HOME}/.cache/abqari-stranger.XXXXXX")
+trap 'rm -rf "$staging"' EXIT
+
+echo '== building the gem from the working tree =='
+gem build abqari.gemspec --output "$staging/abqari.gem" | tail -1
+
+failed=0
+for ruby_line in "${RUBIES[@]}"; do
+  echo
+  echo "===== ruby:${ruby_line}-slim ====="
+  if docker run --rm \
+      -v "$staging/abqari.gem":/stranger/abqari.gem:ro \
+      -v "$PWD/bin/stranger-test":/stranger/run:ro \
+      -e STRANGER_INNER=1 -e STRANGER_PUBLISHED="$PUBLISHED" \
+      "ruby:${ruby_line}-slim" bash /stranger/run; then
+    echo "===== ruby:${ruby_line}-slim PASS ====="
+  else
+    echo "===== ruby:${ruby_line}-slim FAIL ====="
+    failed=1
+  fi
+done
+
+exit "$failed"

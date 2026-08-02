@@ -18,6 +18,41 @@ author: <%= author %>
 # Languages in security.txt. Single-locale only.
 locale: <%= locale %>
 
+# SEO + social sharing ───────────────────────────────────────────────────
+# Solid SEO ships as standard: page titles, meta descriptions,
+# canonical URLs, Open Graph + Twitter cards, JSON-LD structured data,
+# sitemap.xml, robots.txt, and RSS feeds all render automatically once
+# `environments.production.url` (bottom of this file) is set. The
+# knobs below are optional refinements — uncomment to use.
+
+# Default share image — used as og:image / twitter:image for pages
+# without their own image (home page, tag pages). A site-relative
+# path (put the file in app/assets/images/) or a full URL.
+# share_image: /assets/images/share-default.png
+
+# Auto-generated share cards — when enabled, every page without a
+# hero image gets a themed SVG card at <page-url>og.svg, so links
+# shared to social networks always show something on-brand.
+# og_images:
+#   auto: true
+
+# Twitter / X identity on share cards. Both optional; per-post
+# `twitter_creator:` frontmatter overrides the site default.
+# twitter:
+#   site:    "@yourhandle"
+#   creator: "@yourhandle"
+
+# og:locale override, in <lang>_<region> format (Facebook prefers
+# it). Falls back to `locale` when unset.
+# og_locale: en_US
+
+# AI training crawlers (GPTBot, ClaudeBot, CCBot, Google-Extended, …)
+# are blocked in robots.txt BY DEFAULT. Regular search engines
+# (Googlebot, Bingbot) are unaffected — this does not touch your
+# search ranking. Set false if you want AI training to use your
+# content.
+# block_ai_scraping: true
+
 # Theme ──────────────────────────────────────────────────────────────────
 # Visual styling. Each theme is one CSS file in themes/<name>/ inside
 # the engine gem. Switch freely — none of the theme files are in this
@@ -65,7 +100,8 @@ collections:
                                    # to enable the long-tail archive page
 
     feeds:
-      enabled: true                # RSS + JSON Feed at /posts/feed.xml + .json
+      enabled: true                # RSS + JSON Feed at /feed.xml + /feed.json
+                                   # (root paths — subscribers expect them there)
 
   # Photo galleries. Scaffold enabled with `abqari new ... --with photos`,
   # or flip `enabled:` later — create `content/photos/index.md` too (the
@@ -112,18 +148,23 @@ home:
 #                                 # (defaults to site title)
 
 # Footer ────────────────────────────────────────────────────────────────
+# `{year}` is replaced with the current year at build time, so the
+# signature never goes stale. Set `signature: false` to omit the line.
 footer:
-  signature: "Built with Abqari · <%= year %>"
+  signature: "Built with Abqari · {year}"
 
-# Social handles (footer icons + meta tags) — uncomment what applies.
-# social_links:
-#   github:    your-handle
-#   mastodon:  https://mastodon.social/@your-handle
-#   bluesky:   your-handle.bsky.social
-#   x:         your-handle
-#   linkedin:  your-handle
-#   rss:       /posts/feed.xml
-#   mail:      hello@example.com
+# Social links — one footer icon per entry. Each key must match an SVG
+# in app/icons/<key>.svg (shipped: github, rss, mail, x, mastodon,
+# bluesky, linkedin). Values are used verbatim as the link target, so
+# give full URLs, not bare handles. Uncomment what applies.
+# social:
+#   github:   https://github.com/your-handle
+#   mastodon: https://mastodon.social/@your-handle
+#   bluesky:  https://bsky.app/profile/your-handle.bsky.social
+#   x:        https://x.com/your-handle
+#   linkedin: https://linkedin.com/in/your-handle
+#   rss:      /feed.xml
+#   mail:     mailto:hello@example.com
 
 # Contact button ────────────────────────────────────────────────────────
 # Spam-resistant mailto button. Off by default; populate `email` to opt in.

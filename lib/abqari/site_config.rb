@@ -57,6 +57,7 @@ module Abqari
       collections
       contact
       csp
+      deploy
       description
       drafts
       environments

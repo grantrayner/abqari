@@ -56,7 +56,7 @@ home:
   contact:              false
 
 footer:
-  signature: "Built with Abqari · <%= year %>"
+  signature: "Built with Abqari · {year}"   # {year} is substituted at build time
 
 environments:
   development:

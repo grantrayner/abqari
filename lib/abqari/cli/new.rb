@@ -79,10 +79,10 @@ module Abqari
       # Engine-source line in the scaffolded Gemfile, one per --engine
       # option. The default pins to the running engine's major.minor so
       # a scaffolded site tracks patch releases but not breaking ones.
-      # The git line is a placeholder URL — the operator edits it to
-      # point at their fork.
+      # The git line defaults to the canonical repo so it bundles
+      # out of the box — operators tracking a fork edit the URL.
       DEFAULT_RUBYGEMS_GEMFILE_LINE = "gem 'abqari', '~> #{Abqari::VERSION.split('.').first(2).join('.')}'"
-      DEFAULT_GIT_GEMFILE_LINE      = "gem 'abqari', git: 'https://github.com/your-handle/abqari.git'"
+      DEFAULT_GIT_GEMFILE_LINE      = "gem 'abqari', git: 'https://github.com/grantrayner/abqari.git'"
       DEFAULT_PATH_GEMFILE_LINE     = "gem 'abqari', path: '../abqari'"
 
       def self.run(argv)

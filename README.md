@@ -11,7 +11,7 @@ optional overrides), while the engine — layouts, themes, helpers, asset
 pipeline — lives in the dependency. Forking the engine is also
 supported for users who want to own all the code.
 
-> **Status:** v1.0.0 — see [CHANGELOG.md](CHANGELOG.md). Distributed
+> **Status:** v1.1.0 — see [CHANGELOG.md](CHANGELOG.md). Distributed
 > via RubyGems (`gem install abqari`) and as a Bundler path/git
 > source. The API follows [semver](https://semver.org/) from this
 > release onward — breaking changes bump the major version, every
@@ -109,9 +109,11 @@ sudo apt install libvips42       # Ubuntu/Debian
 apk add vips                     # Alpine
 ```
 
-This step is technically optional — Abqari falls back to plain
-`<img>` tags if libvips is missing — but the optimised pipeline cuts
-image bytes by 60–80%, so install it once and forget about it.
+This step is technically optional — if libvips is missing, Abqari
+falls back to the `vips` / `magick` command-line tools (slower), and
+if neither is available it copies images through unmodified — but the
+optimised pipeline cuts image bytes by 60–80%, so install it once and
+forget about it.
 
 **Git** — for downloading Abqari and (eventually) deploying.
 
@@ -246,10 +248,32 @@ bin/new post "My new post title"
 ```
 
 This creates `content/posts/<today's date>-my-new-post-title/index.md`
-with the right frontmatter already filled in. Drop images
-(`hero.jpg`, `photo.jpg`, etc.) into the same folder as the post,
-reference them by relative name in the Markdown (`![alt](hero.jpg)`),
-and Abqari's image pipeline takes care of responsive variants.
+with the right frontmatter already filled in. ("Frontmatter" is the
+settings block between the `---` lines at the top of the file — it
+tells Abqari the post's title, date, and other details, and everything
+below it is the post itself.) A freshly scaffolded post looks like:
+
+```markdown
+---
+title: My new post title
+date: 2026-08-02
+description:
+tags: []
+---
+
+Your post starts here. Plain Markdown.
+```
+
+Fill in `description:` (one sentence — it shows up in listings,
+search results, and social shares), add tags like
+`tags: [travel, writing]`, write below the second `---`, and save. Drop images (`hero.jpg`,
+`photo.jpg`, etc.) into the same folder as the post, reference them by
+relative name in the Markdown (`![alt](hero.jpg)`), and Abqari's image
+pipeline takes care of responsive variants.
+
+To add a standalone page (say, a contact page) and put it in the top
+navigation, run `bin/new page "Contact"`, then add a `nav:` block to
+its frontmatter — the scaffolded `content/about.md` shows the shape.
 
 ### Step 6 — Build for production
 
@@ -263,17 +287,23 @@ This writes the finished HTML to a folder called `_site/`. Upload
 the contents of `_site/` to any static host:
 
 - **Cloudflare Pages / Netlify / Vercel**: point the host at your
-  site's git repository, set the build command to `bin/build`, and
-  the output directory to `_site`. Push to the repo and the host
-  takes care of the rest.
+  site's git repository, set the build command to
+  `bundle install && bin/build` (the host's build machine needs the
+  gems installed first), and the output directory to `_site`. Push to
+  the repo and the host takes care of the rest.
 - **GitHub Pages**: same shape, with a workflow file in
   `.github/workflows/`.
 - **Your own server**: `rsync -av _site/ user@server:/var/www/site/`
   or similar.
 
-Pre-built deploy scripts for Cloudflare Pages and Netlify ship as
-`bin/deploy` in your scaffolded site — see the comments inside for
-the env vars they expect.
+Your scaffolded site ships ready-made GitHub Actions workflows in
+`.github/workflows/` for Cloudflare Pages, GitHub Pages, and Render —
+open the one for your host and follow the comments at the top to
+activate it. There's also a one-command `bin/deploy` script for
+Cloudflare Pages and Netlify in the [engine
+repo](https://github.com/grantrayner/abqari/blob/main/bin/deploy) you
+can copy into your site's `bin/`; it's configured with a `deploy:`
+block in `config/site.yml` (see the comments inside the script).
 
 ### Troubleshooting
 
@@ -305,7 +335,7 @@ active one.
 Gemfile already includes `listen` in the `:development` group.
 
 **`ERROR Errno::ECONNRESET ... io_fillbuf` in the `bin/serve` output**
-Harmless, and filtered out as of 1.0.1 — if you still see it, you're
+Harmless, and filtered out as of 1.1.0 — if you still see it, you're
 on 1.0.0 or have `ABQARI_VERBOSE_LOG=true` set. It means a browser
 closed a connection without a clean shutdown, which happens
 every time you navigate: each tab holds a live-reload stream open, and
@@ -339,11 +369,18 @@ my-site/
 ├── Gemfile                 # Ruby dependencies; Bundler reads this
 ├── README.md               # Your site's README (overwrite to taste)
 ├── .gitignore
+├── .ruby-version           # Pinned to the Ruby that scaffolded the site
+├── .github/
+│   ├── workflows/          # Ready-made deploy workflows (Cloudflare,
+│   │                       # GitHub Pages, Render) — opt-in, no-ops
+│   │                       # until you enable them (see Deploying)
+│   └── dependabot.yml      # Automated engine-update PRs
 ├── config/
 │   └── site.yml            # Site identity, theme, collections, env URLs
 ├── content/
 │   ├── index.md            # Home page
 │   ├── about.md            # About page
+│   ├── 404.md              # Not-found page (served by your host)
 │   └── posts/
 │       ├── index.md        # Posts landing
 │       └── welcome/        # Example post (omit with --blank)
@@ -747,8 +784,9 @@ abqari/
 │       │                               bundle | series | workshop | …
 │       └── partials/                   head | nav | footer | post_list |
 │                                       publication_card | newsletter_subscribe | …
-├── bin/                                build | serve | audit | new | fetch-fonts |
-│                                       fetch-folio | index | deploy | upgrade | test
+├── bin/                                build | serve | audit | new | check | console |
+│                                       fetch-fonts | fetch-folio | icons | import |
+│                                       index | deploy | upgrade | test
 ├── config/site.yml                     Engine fixture's site config (= the reference)
 ├── content/                            Engine fixture content
 ├── lib/
@@ -1070,7 +1108,7 @@ published: false
 ---
 ```
 
-When you're ready to publish, change `published: false` to `published: true` (or remove the line — published is the default). The banner disappears, the post starts appearing on `/stories/` (or `/posts/` if you've removed the starter's `slug: stories`), in feeds, and in the sitemap.
+When you're ready to publish, change `published: false` to `published: true` (or remove the line — published is the default). The banner disappears, the post starts appearing on `/posts/` (or your aliased URL prefix if you've set `slug:` on the collection), in feeds, and in the sitemap.
 
 **Hide drafts in dev too.** If you'd rather see what production will look like during preview — e.g. right before deploying — set `drafts.show_in_development: false` in `config/site.yml`:
 
@@ -1337,7 +1375,7 @@ pagination:
   per_page: 20
 ```
 
-The source page becomes `/posts/` (or `/stories/` if `posts.slug: stories` is set, as in the starter), with overflow at `/posts/page/2/`, `/posts/page/3/`, etc. In templates, `page.paginator` is non-nil when pagination is active and exposes:
+The source page becomes `/posts/` (or `/stories/` if you set `posts.slug: stories`), with overflow at `/posts/page/2/`, `/posts/page/3/`, etc. In templates, `page.paginator` is non-nil when pagination is active and exposes:
 
 - `paginator.posts` — this page's slice
 - `paginator.page` / `paginator.total_pages`
@@ -1442,7 +1480,7 @@ syntax stylesheet, and your `site.css`.
 ### Building your own theme
 
 The full guide — including the complete token reference — is in
-[docs/theming.md](docs/theming.md). The short version: copy a theme
+[docs/theming.md](https://github.com/grantrayner/abqari/blob/main/docs/theming.md). The short version: copy a theme
 into your site with
 
 ```bash
@@ -1671,7 +1709,10 @@ Every build emits the files a static host needs to serve a real site:
 | `robots.txt` | Per-environment — `Disallow: /` in dev/staging, real one in production |
 | `_headers` | Security headers (CSP, HSTS, Permissions-Policy, etc.) + asset cache-control. Read by Cloudflare Pages and Netlify |
 | `_redirects` | 301 mappings for any post with `redirect_from:` |
+| `manifest.json` | Web app manifest, populated from your site title + locale. Override colours/names under `manifest:` in `site.yml` |
 | `/.well-known/security.txt` | Generated when `security_contact:` is set |
+| `/llms.txt` | Curated machine-readable content index for AI readers — opt-in via `llms.enabled: true` (see [SEO and social sharing](#seo-and-social-sharing)) |
+| `<page-url>og.svg` | Auto-generated social share cards — opt-in via `og_images.auto: true` (see [SEO and social sharing](#seo-and-social-sharing)) |
 
 **Redirects** — add `redirect_from:` to a post's front matter:
 
@@ -1708,6 +1749,86 @@ Both are **additive**: `'self'`, the pinned inline-script hashes, and every feat
 
 To weaken a hardening directive (`object-src`, `frame-ancestors`, `base-uri`, `default-src`) or use a non-http scheme, take over the whole header with a `headers:` block in `site.yml` — that replaces the computed policy entirely, pinned hashes included, so reach for it last.
 
+## SEO and social sharing
+
+Solid SEO ships as standard — there is nothing to install and no
+plugin to configure. Once `environments.production.url` is set in
+`config/site.yml`, every page automatically gets:
+
+- A unique `<title>` (`Page title · Site title`) and a meta
+  description (frontmatter `description:`, falling back to the page's
+  first paragraph).
+- A canonical URL, plus `rel="prev"/"next"` on paginated pages.
+- Open Graph and Twitter card tags — including `og:image` with
+  dimensions, and `article:published_time` / `article:modified_time` /
+  `article:tag` on posts.
+- JSON-LD structured data: `Article` on posts, `WebSite` on the home
+  page, `Person` on the about page, `BreadcrumbList` site-wide, and
+  `Book` / `Event` / `Course` / `ImageObject` for publications,
+  workshops, and photos.
+- An entry in `sitemap.xml` (with image extensions and `lastmod`),
+  feed autodiscovery links, and a correct `robots.txt`.
+
+Pages can opt out of indexing with `robots: noindex` in frontmatter —
+that also drops them from the sitemap.
+
+**Share images.** The image on a social share resolves per page:
+frontmatter `share_image:` → the page's own `image:`/cover → the
+site-wide `share_image:` config. And if you'd rather never think about
+it, turn on auto-generated cards:
+
+```yaml
+og_images:
+  auto: true
+```
+
+Every page without its own hero then gets a themed 1200×630 SVG card
+(site title, page title, author, date, your theme's colours) at
+`<page-url>og.svg`, wired into `og:image` automatically. Skip a
+specific page with `og_image: false` in its frontmatter.
+
+**Twitter / X identity** for share-card attribution:
+
+```yaml
+twitter:
+  site:    "@yourhandle"
+  creator: "@yourhandle"   # per-post override: `twitter_creator:` frontmatter
+```
+
+**AI crawlers — blocked by default, welcomed by choice.** Out of the
+box, `robots.txt` blocks the major AI *training* crawlers (GPTBot,
+ClaudeBot, CCBot, Google-Extended, Applebot-Extended, PerplexityBot,
+and friends). Regular search engines are unaffected — blocking
+Google-Extended does not touch your Google ranking. Two knobs:
+
+```yaml
+block_ai_scraping: false   # allow AI training on your content (default: true)
+
+llms:
+  enabled: true            # emit /llms.txt — a curated content index
+                           # for AI/LLM readers (default: false)
+```
+
+The two are independent: you can block training crawlers while still
+publishing an `/llms.txt` roadmap for AI search tools, or any other
+combination that matches how you want machines to read your work.
+
+**Near-instant navigation.** Modern browsers prerender the post links
+a reader is about to click via [Speculation
+Rules](https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API),
+on by default and strict-CSP friendly. It steps aside automatically
+for readers on slow or data-saving connections. Tune or disable:
+
+```yaml
+speculation_rules:
+  enabled: true          # false to omit entirely
+  eagerness: moderate    # conservative / moderate / eager
+```
+
+Run `bin/audit` after building — it checks every page for missing
+descriptions, broken links, missing alt text, and other SEO and
+accessibility problems before you deploy.
+
 ## Deploying
 
 Abqari produces a plain `_site/` directory of static files — deploy it anywhere that serves static HTML.
@@ -1724,7 +1845,7 @@ Gate variables live in **Settings → Secrets and variables → Actions → Vari
 
 ### Step-by-step setup
 
-**See [`docs/deploying.md`](docs/deploying.md) for the full walkthrough**, including:
+**See [`docs/deploying.md`](https://github.com/grantrayner/abqari/blob/main/docs/deploying.md) for the full walkthrough**, including:
 
 - Per-host one-time setup with exact button labels and field values
 - Whether to use Render's dashboard auto-deploy or the Actions-driven path
@@ -1740,12 +1861,15 @@ If you just want a site live quickly, the simplest path is Render's dashboard. N
 
 1. Sign in at [dashboard.render.com](https://dashboard.render.com), click **New +** → **Static Site**, connect your repo.
 2. Build command: `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d && bundle install && bundle exec bin/build`
+   (It looks long, but it's just three steps: install the image
+   library on Render's build machine, install the Ruby gems, build
+   the site. Copy it verbatim.)
 3. Publish directory: `_site`. Environment variable: `ABQARI_ENV=production`.
 4. Click **Create Static Site**. Wait ~3-5 minutes for the first build.
 
 The site is live at `<name>.onrender.com`. Add a custom domain via **Settings → Custom Domains** — Render gives you a CNAME target to add at your registrar.
 
-For everything else (Cloudflare Pages, GitHub Pages, Actions-gated Render, DNS, troubleshooting), see [`docs/deploying.md`](docs/deploying.md).
+For everything else (Cloudflare Pages, GitHub Pages, Actions-gated Render, DNS, troubleshooting), see [`docs/deploying.md`](https://github.com/grantrayner/abqari/blob/main/docs/deploying.md).
 
 ### Other hosts
 
@@ -1813,6 +1937,52 @@ That's it. The button appears at the bottom of `/about/` on the next build.
 
 The partial honours the same config and renders nothing when `email` is unset, so dropping it into a shared layout is safe.
 
+## Newsletter signup
+
+A provider-agnostic subscription form — works with any service that
+accepts an HTML form POST (Mailchimp, Buttondown, ConvertKit / Kit,
+Substack, Cogent Notes, …). Configure the provider in `site.yml`:
+
+```yaml
+newsletter:
+  action: https://your-provider.example/subscribe   # required
+  email_field: email               # the provider's email input name
+  title: Subscribe to the newsletter
+  description: One short email a month — no spam.
+  button: Subscribe
+  # hidden_fields:                 # provider-specific extras (tags,
+  #   - { name: tags, value: blog }   # honeypots, list ids)
+```
+
+Then render the form wherever you want it — a layout, the footer, a
+dedicated page:
+
+```erb
+<%= render 'partials/newsletter_subscribe' %>
+```
+
+Per-call overrides (`title:`, `description:`, `button:`) let one site
+run different pitches in different places. When `newsletter.action` is
+unset the partial renders nothing, so it's safe to leave the call in
+place before you've picked a provider. The provider's origin is added
+to the CSP `form-action` automatically.
+
+## Analytics with Plausible
+
+Privacy-friendly analytics with no cookies and no consent banner
+(~1 KB tracker). Off by default; both keys are required to enable:
+
+```yaml
+plausible:
+  enabled: true
+  key: pa-your-script-key   # the slug in https://plausible.io/js/<key>.js
+```
+
+Abqari injects the tracker into `<head>` and extends the CSP for
+`plausible.io` automatically — no manual header work. Because both
+`enabled:` and `key:` must be set, you can keep the key in config with
+`enabled: false` and tracking stays off.
+
 ## IndieWeb & federation
 
 Off by default. When `indieweb.enabled: true`, the build adds:
@@ -1825,7 +1995,7 @@ Off by default. When `indieweb.enabled: true`, the build adds:
 
 ### Setup
 
-1. Visit [webmention.io](https://webmention.io) and sign in with your domain. The login flow uses `rel="me"` verification — make sure `social_links:` in `config/site.yml` carries at least one social profile that links back to your domain.
+1. Visit [webmention.io](https://webmention.io) and sign in with your domain. The login flow uses `rel="me"` verification — make sure `social:` in `config/site.yml` carries at least one social profile that links back to your domain.
 2. Copy the API token from your webmention.io account page.
 3. (Optional) Visit [fed.brid.gy](https://fed.brid.gy) and complete its setup (same `rel="me"` pattern).
 4. Add to `config/site.yml`:
@@ -2071,7 +2241,7 @@ If you build your own layout or partial, the audit catches the common mistakes. 
 
 1. Don't put text inside `<button>` as an icon-only graphic — the button needs text or `aria-label`.
 2. Form inputs need `<label>` elements (Pagefind's search UI handles this internally).
-3. Color contrast is the theme's responsibility — the four shipped themes meet WCAG AA in both light and dark modes; verify yours if you customise.
+3. Color contrast is the theme's responsibility — the built-in themes are designed to meet WCAG AA in both light and dark modes; verify yours if you customise.
 4. If you add motion (animations, parallax), gate it behind `@media (prefers-reduced-motion: no-preference)`.
 
 To remove any of the baseline pieces (e.g. you don't want the skip link), edit the relevant partial or layout. Everything is yours after `git clone`.
@@ -2143,36 +2313,33 @@ Use both: Dependabot (or similar) for continuous monitoring and PR creation; `bi
 bin/test
 ```
 
-```
-Run options: --seed 61864
-
-# Running:
-
-...................................................
-
-Finished in 5.14s, 27.62 runs/s, 75.48 assertions/s.
-
-142 runs, 388 assertions, 0 failures, 0 errors, 1 skips
-```
-
-The engine ships with a Minitest suite under `test/` covering helpers,
-paginator logic, full site builds, deploy artifacts, SEO meta, the
-audit run, Folio integration, and theme resolution. ~140 tests, ~5
-seconds. The only test dependency is `minitest` itself — declared
-under `group :development` in the Gemfile, so production deploys
-don't pull it.
+The engine ships with a Minitest suite under `test/` — roughly 60
+test files and 800 tests, running in about half a minute. Coverage
+spans helpers, paginator logic, full site builds, deploy artifacts,
+SEO meta (canonicals, OG cards, feeds, sitemap escaping), the audit
+run, the CLI scaffolder, content importers, IndieWeb/syndication,
+security hardening, and theme resolution. Test dependencies
+(`minitest`, plus `ostruct`/`rexml` for stubs and XML validation,
+`listen` for the watcher, and opt-in `simplecov` for coverage) are
+declared under `group :development` in the Gemfile, so production
+deploys don't pull them.
 
 Tests only ship with the engine fork (Path B). For consuming sites
 (Path A), the engine's test suite isn't relevant — the gem itself is
 tested upstream; your site has its own tests if you write them.
 
+A few orientation points in the tree:
+
 ```
 test/
-├── test_helper.rb        Shared bootstrap; builds the site once per run to a tmpdir
+├── test_helper.rb        Shared bootstrap; builds the fixture site once per run to a tmpdir
 ├── helpers_test.rb       truncate / pluralize / slugify / time / link_to / excerpt
 ├── paginator_test.rb     prev/next URL generation across edge cases
 ├── site_test.rb          Full-build integration: pages, pagination, tags, theme, SEO, deploy artifacts
-└── audit_test.rb         Audit runs cleanly and writes a report
+├── audit_test.rb         Audit runs cleanly and writes a report
+├── cli_new_test.rb       `abqari new` scaffolding, --with/--blank modes, config drift guards
+├── importers/            Substack / Ghost / Jekyll import pipelines
+└── …                     One topic per file — grep for the feature name
 ```
 
 Tests build to `$TMPDIR/abqari-test-site/` so they never clobber `_site/`; the temp dir is removed automatically when the run ends.
@@ -2219,7 +2386,7 @@ Abqari::Hooks.register(:post_process) do |html, _site, page|
 end
 ```
 
-Lifecycle events: `:before_build`, `:after_load_pages`, `:after_generate`, `:after_build`. Filters: `:post_process(html, site, page)`. Full reference in [`docs/plugins.md`](docs/plugins.md).
+Lifecycle events: `:before_build`, `:after_load_pages`, `:after_generate`, `:after_build`. Filters: `:post_process(html, site, page)`. Full reference in [`docs/plugins.md`](https://github.com/grantrayner/abqari/blob/main/docs/plugins.md).
 
 ## Performance
 

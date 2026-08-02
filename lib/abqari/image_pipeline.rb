@@ -238,7 +238,14 @@ module Abqari
     # cold-start codec init for HEIF/AVIF can take a second or two —
     # repeating it per-test would be slow.
     def prune_unsupported_formats(formats)
-      return formats unless defined?(::Vips)
+      # `vips_loaded?`, NOT `defined?(::Vips)`: ruby-vips installs fine
+      # without the libvips C library, and its require defines the Vips
+      # module BEFORE the FFI bind fails — so after our rescued
+      # LoadError the constant exists but Vips::Image/Vips::Error do
+      # not. The weak check sent the probe straight into a NameError
+      # and killed every build on a machine without libvips (the
+      # passthrough fallback's whole audience).
+      return formats unless vips_loaded?
       formats.select do |fmt|
         if format_writable?(fmt)
           true
@@ -259,6 +266,11 @@ module Abqari
     # The actual probe — a tiny in-memory write. Run at most once per
     # format per process via the class-level memo above.
     def probe_format(format)
+      # Belt-and-braces for the partial-load state described in
+      # prune_unsupported_formats: without real bindings, even this
+      # method's `rescue ::Vips::Error` clause raises NameError.
+      return true unless vips_loaded?
+
       probe = ::Vips::Image.black(2, 2)
       probe.write_to_buffer(".#{format}")
       true

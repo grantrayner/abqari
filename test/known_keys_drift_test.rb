@@ -136,7 +136,11 @@ class KnownKeysDriftTest < Minitest::Test
       # `raw.delete('environments')` — it never appears as a
       # `config['environments']` reference, but the validator still
       # has to allow it as a known top-level key.
-      'environments'
+      'environments',
+      # `deploy:` is read by the site-level bin/deploy script
+      # (site.config.dig('deploy', ...)), which lives outside the
+      # lib/ + app/views scan roots.
+      'deploy'
     ]
   end
 end

@@ -43,6 +43,7 @@ class CliNewTest < Minitest::Test
     assert File.exist?('mysite/config/site.yml')
     assert File.exist?('mysite/content/index.md')
     assert File.exist?('mysite/content/about.md')
+    assert File.exist?('mysite/content/404.md')
     assert File.exist?('mysite/content/posts/index.md')
     assert File.exist?('mysite/app/assets/css/site.css')
     assert File.exist?('mysite/bin/build')
@@ -157,6 +158,37 @@ class CliNewTest < Minitest::Test
     YAML.safe_load_file("#{project}/config/site.yml")
   end
 
+  # --- Config template drift ------------------------------------------
+
+  def test_scaffolded_config_validates_strict
+    run_new('mysite')
+    Abqari::SiteConfig.validate!(config_yaml, strict: true)
+  end
+
+  def test_blank_scaffolded_config_validates_strict
+    run_new('mysite', '--blank')
+    Abqari::SiteConfig.validate!(config_yaml, strict: true)
+  end
+
+  def test_commented_config_examples_use_known_keys
+    # YAML-level validation can't see commented examples, but they
+    # teach users keys to uncomment — a key the engine doesn't read
+    # silently no-ops (the `social_links:` regression). Scan `# key:`
+    # lines at comment-root level in both config templates.
+    skeleton_config = File.expand_path('../lib/abqari/templates/site_skeleton/config', __dir__)
+    Dir.glob(File.join(skeleton_config, '*.yml.tt')).each do |path|
+      File.readlines(path, encoding: 'UTF-8').each_with_index do |line, i|
+        match = line.match(/^# (?<key>[a-z_][a-z0-9_]*):(\s|$)/)
+        next unless match
+
+        key = match[:key]
+        assert Abqari::SiteConfig::KNOWN_KEYS.include?(key) || key.start_with?('x_'),
+               "#{File.basename(path)}:#{i + 1} documents `#{key}:` — not in SiteConfig::KNOWN_KEYS, " \
+               'so uncommenting it warns as an unknown key'
+      end
+    end
+  end
+
   def test_default_scaffold_is_posts_only
     run_new('mysite')
     collections = config_yaml['collections']
@@ -257,6 +289,12 @@ class CliNewTest < Minitest::Test
   end
 
   # --- Blank mode --------------------------------------------------
+
+  def test_blank_mode_still_ships_404_page
+    run_new('mysite', '--blank')
+    assert File.exist?('mysite/content/404.md'),
+           'every site needs a 404 page, blank scaffolds included'
+  end
 
   def test_blank_mode_skips_example_post
     run_new('mysite', '--blank')

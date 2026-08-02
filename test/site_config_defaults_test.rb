@@ -69,6 +69,13 @@ class SiteConfigDefaultsTest < Minitest::Test
     assert_match(/unknown/i, err.message)
   end
 
+  def test_deploy_key_is_known
+    # `deploy:` is read by the site-level bin/deploy script, not by
+    # lib/ — easy to lose from KNOWN_KEYS since the drift scan can't
+    # see it. A site configuring its deploy target must not warn.
+    Abqari::SiteConfig.validate!({ 'title' => 'T', 'deploy' => { 'default' => 'cloudflare' } }, strict: true)
+  end
+
   def test_x_prefixed_user_extension_keys_are_tolerated
     require 'stringio'
     original = $stderr

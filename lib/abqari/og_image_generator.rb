@@ -48,46 +48,43 @@ module Abqari
       @site.config.dig('og_images', 'auto') == true
     end
 
+    # Single source of truth for "does this page get an auto card?".
+    # The head partial calls this before emitting the `<page-url>og.svg`
+    # og:image URL, and `write` below calls it before generating the
+    # file — sharing the predicate is what keeps the two from drifting
+    # (drift means pages advertising og:image files that 404).
+    #
+    # Only real content Pages qualify. Generated pages (TaxonomyPage,
+    # PaginatedShard, RelatedIndexPage, PublisherShowPage) don't carry
+    # their own titles the same way and mostly shouldn't be SHARED
+    # directly; flat-file URLs (`/404.html`) can't host a sibling
+    # og.svg because their path isn't a directory. Pages opt out with
+    # `og_image: false`, and a page with its own `share_image:` or
+    # `image:` hero doesn't need a card (the hero IS the share image).
+    def self.auto_card?(page)
+      return false unless page.is_a?(Abqari::Page)
+      return false unless page.url.to_s.end_with?('/')
+      return false if page.title.to_s.empty?
+
+      fm = page.frontmatter
+      return false if fm['og_image'] == false
+      return false unless fm['share_image'].to_s.empty?
+      return false unless fm['image'].to_s.empty?
+
+      true
+    end
+
     def write
       return unless enabled?
 
-      eligible_pages.each do |page|
-        next if skip?(page)
+      Array(@site.pages).each do |page|
+        next unless self.class.auto_card?(page)
         svg = render_svg(page)
         write_file(page, svg)
       end
     end
 
     private
-
-    def eligible_pages
-      # All real Pages with URLs. Filters out generated pages
-      # (PublisherShowPage, PaginatedShard, RelatedIndexPage,
-      # TaxonomyPage) — they don't carry their own titles in the
-      # same way, and most of them shouldn't be SHARED directly
-      # anyway. Pages can opt out with `og_image: false`.
-      Array(@site.pages).select do |p|
-        p.respond_to?(:url) && p.url && p.respond_to?(:title) && !p.title.to_s.empty?
-      end
-    end
-
-    def skip?(page)
-      # `respond_to?` instead of a blanket `rescue {}` — generated pages
-      # may not expose frontmatter, but a real error reading it shouldn't
-      # be silently swallowed.
-      fm = page.respond_to?(:frontmatter) ? page.frontmatter : {}
-      # Explicit opt-out OR explicit share_image set OR page hero set
-      # (in which case the head template uses the hero, not the auto
-      # image — no point generating one that won't be used).
-      return true if fm['og_image'] == false
-      return true if fm['share_image']
-      return true if fm['image']
-      # Only emit for pretty-URL pages (trailing slash). Flat-file
-      # URLs like `/404.html`, `/sitemap.xml`, `/robots.txt` can't
-      # have a sibling `og.svg` because their path isn't a directory.
-      return true unless page.url.to_s.end_with?('/')
-      false
-    end
 
     def render_svg(page)
       title    = page.title.to_s
