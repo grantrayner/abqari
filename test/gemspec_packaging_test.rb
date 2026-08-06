@@ -2,6 +2,8 @@
 
 require_relative 'test_helper'
 require 'open3'
+require 'tmpdir'
+require 'fileutils'
 
 # The gemspec's `spec.files` globs decide what actually ships in the
 # published gem. `Dir.glob` skips dotfiles by default, which once
@@ -98,6 +100,52 @@ class GemspecPackagingTest < Minitest::Test
     refute_match(/^\s*require/, src,
                  'lib/abqari/version.rb must not require anything')
     assert_includes GemspecPackagingTest.spec_files, 'lib/abqari/version.rb'
+  end
+
+  # The other half of the same invariant. Keeping `version.rb`
+  # dependency-free is pointless if the things that read VERSION load
+  # the whole engine to get at it — which is exactly how the release
+  # workflow broke: `ruby -Ilib -r abqari -e 'puts Abqari::VERSION'`,
+  # with no `bundle exec` and gems installed to vendor/bundle where a
+  # bare ruby can't see them, died on "cannot load such file -- erubi"
+  # before reaching the constant. Same trap as the gemspec's, one step
+  # out, and it only shows up on a clean runner.
+  def test_workflows_read_version_without_loading_the_engine
+    Dir.glob(File.join(ENGINE_ROOT, '.github', 'workflows', '*.yml')).sort.each do |path|
+      body = File.read(path, encoding: 'UTF-8')
+      name = File.basename(path)
+
+      body.scan(/ruby\s+[^\n|]*-r\s+(\S+)/) do |(required)|
+        next unless required.start_with?('abqari')
+
+        assert_equal 'abqari/version', required,
+                     "#{name} requires #{required.inspect} to read VERSION — use " \
+                     "'abqari/version', which has no dependencies, or the step " \
+                     'fails on a runner without the bundle activated'
+      end
+    end
+  end
+
+  # Reading VERSION must work with NOTHING installed — the condition on
+  # a fresh runner before `bundle exec` is in play.
+  def test_version_is_readable_with_no_gems_available
+    empty = Dir.mktmpdir('abqari-no-gems')
+    # RUBYOPT carries `-rbundler/setup` when the suite runs under
+    # `bundle exec`; inherited into a gem-less subprocess it fails on
+    # Bundler itself, before the thing under test.
+    env = { 'GEM_HOME' => empty, 'GEM_PATH' => empty,
+            'BUNDLE_GEMFILE' => nil, 'RUBYOPT' => nil }
+
+    out, status = Open3.capture2e(
+      env, RbConfig.ruby, '--disable-gems', '-Ilib',
+      '-r', 'abqari/version', '-e', 'puts Abqari::VERSION',
+      chdir: ENGINE_ROOT
+    )
+
+    assert status.success?, "reading VERSION needs a populated bundle:\n#{out}"
+    assert_equal Abqari::VERSION, out.strip
+  ensure
+    FileUtils.rm_rf(empty) if empty
   end
 
   def test_site_specific_trees_do_not_ship

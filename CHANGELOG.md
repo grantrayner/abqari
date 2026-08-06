@@ -428,6 +428,21 @@ alter what your site publishes.
   gained it; the scaffolded copy never did — the only real behavioural
   drift across the eight script pairs.
 
+- **The release workflow's tag check loaded the whole engine to read one
+  constant.** `ruby -Ilib -r abqari -e 'puts Abqari::VERSION'` ran
+  without `bundle exec`, and `bundler-cache` installs to `vendor/bundle`
+  where a bare `ruby` can't see it — so the step died on "cannot load
+  such file -- erubi" before reaching the constant, failing every
+  release at the first gate.
+
+  It now requires `abqari/version`, which has no dependencies. This is
+  the same trap that split `lib/abqari/version.rb` out of the engine in
+  the first place (its comment explains the gemspec version), one step
+  removed — and like that one, it only appears on a clean runner. Two
+  tests now pin both halves: workflows may only require
+  `abqari/version` to read VERSION, and reading it must work with no
+  gems installed at all.
+
 - **`bin/check`'s CVE step broke whenever the active Ruby changed.**
   `bundler-audit` was expected as a global `gem install`, and a global
   install belongs to exactly one Ruby — so switching the development

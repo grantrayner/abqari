@@ -126,7 +126,18 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           expected="${TAG#v}"
-          actual=$(ruby -Ilib -r abqari -e 'puts Abqari::VERSION')
+          # `abqari/version`, NOT `abqari`. The latter loads the whole
+          # engine — and with it erubi, commonmarker, rouge and webrick —
+          # so a bare `ruby` (no `bundle exec`, and `bundler-cache`
+          # installs to vendor/bundle where bare ruby can't see it) dies
+          # with "cannot load such file -- erubi" before ever reaching
+          # the constant.
+          #
+          # This is the same trap `lib/abqari/version.rb` was split out
+          # to avoid for the gemspec; its comment is worth reading. The
+          # version file has no requires, so this works with nothing
+          # installed at all.
+          actual=$(ruby -Ilib -r abqari/version -e 'puts Abqari::VERSION')
           if [ "$actual" != "$expected" ]; then
             echo "Tag $TAG (=> version $expected) doesn't match lib/abqari/version.rb VERSION ($actual)" >&2
             exit 1
