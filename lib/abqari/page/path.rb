@@ -32,9 +32,25 @@ module Abqari
       # can't form), no backslash.
       LAYOUT_ALLOWED = %r{\A[A-Za-z0-9][A-Za-z0-9_\-/]*\z}.freeze
 
+      # Site-relative URL for this page, derived by removing the output
+      # root from the absolute output path.
+      #
+      # The strip is ANCHORED. An unanchored `sub` removes the first
+      # occurrence anywhere in the string, so it silently did nothing
+      # when `output_dir` wasn't a prefix (a relative
+      # `ABQARI_OUTPUT_DIR`) and left an absolute filesystem path as the
+      # "URL". `Site#output_dir` now guarantees an absolute path, so
+      # that specific case can't recur — but anchoring makes the
+      # assumption explicit rather than incidental, and a mismatch fails
+      # loudly instead of shipping local paths to production.
       def url
+        root = site.output_dir.chomp('/')
+        unless output_path.start_with?("#{root}/")
+          raise "output path #{output_path.inspect} is not under output_dir #{root.inspect}"
+        end
+
         output_path
-          .sub(site.output_dir, '')
+          .sub(/\A#{Regexp.escape(root)}/, '')
           .sub(%r{/index\.html\z}, '/')
       end
 

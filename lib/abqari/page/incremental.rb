@@ -41,7 +41,13 @@ module Abqari
 
         output_mtime = File.mtime(output_path)
         return true if File.mtime(source_path) > output_mtime
-        return true if post? && bundle_assets.any? { |a| File.mtime(a) > output_mtime }
+        # Gated on having a bundle, not on being a post. Photos are
+        # bundle-style too, so `post?` meant a photo page went stale
+        # whenever only its colocated image changed — while `lastmod`
+        # (which does include bundle assets) still advertised the page
+        # as updated in the sitemap. Any bundle-style collection a user
+        # defines had the same gap.
+        return true if bundle_dir && bundle_assets.any? { |a| File.mtime(a) > output_mtime }
         return true if site.shared_deps_mtime > output_mtime
         return true if site.layout_deps_mtime(layout_name) > output_mtime
 

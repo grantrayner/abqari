@@ -33,7 +33,7 @@ module Abqari
         def self.convert(html, strip_selectors: [])
           return '' if html.to_s.empty?
 
-          require 'reverse_markdown'
+          require_reverse_markdown!
           html = pre_clean(html, strip_selectors) unless strip_selectors.empty?
 
           md = ReverseMarkdown.convert(
@@ -45,6 +45,37 @@ module Abqari
           # `reverse_markdown` sometimes emits 3+ consecutive blank
           # lines around block elements. Collapse to a single blank.
           md.gsub(/\n{3,}/, "\n\n").strip + "\n"
+        end
+
+        # `reverse_markdown` is an OPTIONAL dependency, loaded only here.
+        #
+        # It isn't in the gemspec's runtime dependencies because it pulls
+        # nokogiri, which pulls racc — a chain that costs every install a
+        # native-extension gem for a one-time migration feature most
+        # sites never run. On Ruby 3.3 that chain is worse than heavy:
+        # 3.3 bundles racc 1.7.3, Bundler resolves to 1.8.1, and 1.8.1
+        # ships no precompiled Linux binary, so a toolchain-free image
+        # (ruby:3.3-slim, most deploy bases) fails `bundle install`
+        # outright — on the version the gemspec advertises as its floor.
+        #
+        # So: importing asks for the gem at the moment it's needed,
+        # rather than every user paying for it up front.
+        def self.require_reverse_markdown!
+          require 'reverse_markdown'
+        rescue LoadError
+          raise Abqari::UserError, <<~MSG
+            Content importing needs the `reverse_markdown` gem, which Abqari
+            doesn't install by default (it pulls in nokogiri, which most
+            sites never need).
+
+            Install it, then re-run this import:
+
+                gem install reverse_markdown
+
+            Or add it to your site's Gemfile:
+
+                gem 'reverse_markdown', '~> 2.1'
+          MSG
         end
 
         # Remove DOM subtrees matching any of `selectors`. We use a

@@ -5,7 +5,9 @@ README has the bigger picture.
 
 ## Quick orientation
 
-- Engine code lives in `lib/abqari/`. ~20 small files, each one focused.
+- Engine code lives in `lib/abqari/` — around 50 focused files plus a
+  few subdirectories (`audit/`, `cli/`, `importers/`, `page/`,
+  `render_context/`, `templates/`).
 - Tests are in `test/` (Minitest, no extra gems).
 - The example site at the project root is also the test fixture.
 - Read the README's **How it works**, **Posts and bundles**, and
@@ -14,10 +16,10 @@ README has the bigger picture.
 ## Setup
 
 ```bash
-git clone https://github.com/your-handle/abqari
+git clone https://github.com/grantrayner/abqari
 cd abqari
 bundle install
-bin/test          # should report 680+ runs, 0 failures
+bin/test          # should report 900+ runs, 0 failures
 bin/build         # should produce _site/
 bin/audit         # should report 0 errors, 0 warnings
 ```
@@ -69,12 +71,86 @@ an explicit conversation in an issue first:
 7. **Single-locale only.** No multilingual support. (Set the locale, write
    in any language, but one site, one locale.)
 
+## Releasing (maintainers)
+
+Releases are automated and authenticated with **trusted publishing** —
+there is no RubyGems API key in this repository. The workflow exchanges
+GitHub's OIDC token for a credential that RubyGems accepts only for this
+repo and this workflow file, and that expires in minutes.
+
+### One-time setup on rubygems.org
+
+Done once per gem, in the RubyGems web UI (nothing to configure in this
+repo):
+
+1. Sign in to rubygems.org.
+2. Go to **[pending trusted publishers](https://rubygems.org/settings/pending_trusted_publishers)**
+   if the gem has never been published, or the gem's own **Trusted
+   publishers** page if it exists.
+3. Create a publisher:
+
+   | Field | Value |
+   | --- | --- |
+   | RubyGem name | `abqari` *(pending publishers only)* |
+   | Owner | `grantrayner` |
+   | Repository | `abqari` |
+   | Workflow | `release.yml` |
+   | Environment | *leave blank* |
+
+   Leave **Environment** blank unless you also add `environment:` to the
+   `publish` job. The two must match exactly, and a mismatch shows up as
+   an opaque authentication failure partway through a release.
+
+4. Keep MFA enabled on the account. `rubygems_mfa_required` is set in the
+   gemspec, and trusted publishing doesn't replace it.
+
+A pending publisher becomes a normal one after the first successful push,
+and makes you the gem's owner — so this works for a gem that hasn't been
+released yet.
+
+### Cutting a release
+
+```bash
+bin/check                     # tests + strict audit + CVE scan
+bin/stranger-test             # clean-container install on every supported Ruby
+```
+
+Then update `lib/abqari/version.rb`, move the `[Unreleased]` changelog
+entries under a dated `## [X.Y.Z]` heading, commit, and tag:
+
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+The tag triggers `.github/workflows/release.yml`, which runs two jobs:
+
+- **verify** — holds no credential and cannot mint one. Re-runs the full
+  suite, checks the tag matches `Abqari::VERSION`, checks the changelog
+  has a section for that version, runs the strict audit and a
+  bundler-audit CVE scan.
+- **publish** — runs only if `verify` passes. The single job with
+  `id-token: write`. Builds the gem, pushes it, archives the `.gem` as a
+  workflow artifact.
+
+If `verify` fails, nothing is published and the tag can be deleted and
+re-cut. Once a version is on rubygems.org it cannot be replaced — only
+yanked — so the gates exist to make that irreversible step the last one.
+
 ## Reporting security issues
 
 For security-sensitive issues, please **don't** open a public issue.
-Email the maintainer directly using the address in
-[`/.well-known/security.txt`](https://example.com/.well-known/security.txt)
-(once a deployed site exists), or open a private security advisory on GitHub.
+
+Use GitHub's private reporting instead:
+[**Report a vulnerability**](https://github.com/grantrayner/abqari/security/advisories/new).
+It's private to you and the maintainer, and it gives us a place to
+coordinate a fix and an advisory before anything is public.
+
+If that's unavailable to you, email the address published at
+[`https://www.abqari.dev/.well-known/security.txt`](https://www.abqari.dev/.well-known/security.txt).
+
+Please include the version (`abqari version`), what you did, what
+happened, and what you expected. If a proof of concept is short, paste
+it inline. We'll acknowledge within a few days.
 
 ## Code of conduct
 

@@ -195,6 +195,75 @@ class HttpSafeGuardsTest < Minitest::Test
     # 8.8.8.8 is public — no raise (pure IP classification, no network call).
     Abqari::HttpSafe.send(:assert_public_host!, URI('http://8.8.8.8/'))
   end
+
+  # --- Guard bypasses ------------------------------------------------
+  #
+  # These all reach 127.0.0.1 (or otherwise non-public space) but slipped
+  # past the guard when it resolved with `Resolv` + `IPAddr` instead of
+  # the resolver `Net::HTTP` actually connects with. Every form below is
+  # numeric, so `getaddrinfo` parses it locally — no DNS, no network.
+
+  # `0.0.0.0` is not loopback, private or link-local by IPAddr's
+  # predicates, but connecting to it reaches localhost.
+  def test_block_private_rejects_unspecified_address
+    assert_raises(Abqari::HttpSafe::BlockedHostError) do
+      Abqari::HttpSafe.send(:assert_public_host!, URI('http://0.0.0.0:8080/x'))
+    end
+  end
+
+  # Legacy inet_aton forms: decimal, hex and octal integers, plus the
+  # abbreviated dotted forms. `IPAddr.new` rejects all of them; the OS
+  # resolver expands every one to 127.0.0.1.
+  def test_block_private_rejects_legacy_inet_aton_loopback_forms
+    %w[
+      http://2130706433/x
+      http://0x7f000001/x
+      http://017700000001/x
+      http://127.1/x
+      http://127.0.1/x
+    ].each do |url|
+      assert_raises(Abqari::HttpSafe::BlockedHostError,
+                    "#{url} should be blocked — it resolves to 127.0.0.1") do
+        Abqari::HttpSafe.send(:assert_public_host!, URI(url))
+      end
+    end
+  end
+
+  def test_block_private_rejects_ipv4_mapped_loopback
+    assert_raises(Abqari::HttpSafe::BlockedHostError) do
+      Abqari::HttpSafe.send(:assert_public_host!, URI('http://[::ffff:127.0.0.1]/x'))
+    end
+  end
+
+  def test_block_private_rejects_ipv6_loopback_and_unspecified
+    ['http://[::1]/x', 'http://[::]/x'].each do |url|
+      assert_raises(Abqari::HttpSafe::BlockedHostError, "#{url} should be blocked") do
+        Abqari::HttpSafe.send(:assert_public_host!, URI(url))
+      end
+    end
+  end
+
+  def test_block_private_rejects_cgnat_multicast_and_reserved
+    %w[
+      http://100.64.0.1/x
+      http://224.0.0.1/x
+      http://255.255.255.255/x
+    ].each do |url|
+      assert_raises(Abqari::HttpSafe::BlockedHostError, "#{url} should be blocked") do
+        Abqari::HttpSafe.send(:assert_public_host!, URI(url))
+      end
+    end
+  end
+
+  # A host that doesn't resolve falls through rather than raising a
+  # misleading "refusing to fetch" — it can't connect either way,
+  # because the guard and the connection share one resolver.
+  def test_unresolvable_host_falls_through_to_the_natural_error
+    Abqari::HttpSafe.send(
+      :assert_public_host!,
+      URI('http://abqari-nonexistent-host.invalid/x')
+    )
+  end
 end
 
 class CoverImagePathTest < Minitest::Test

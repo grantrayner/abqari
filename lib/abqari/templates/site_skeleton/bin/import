@@ -15,11 +15,17 @@
 
 ENV['ABQARI_ENV']       ||= 'development'
 ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+# Resolve the bundle from this site, not from cwd — `bundler/setup`
+# finds its Gemfile relative to the current directory, so running this
+# from elsewhere would load an unrelated bundle (or none) and fail.
+ENV['BUNDLE_GEMFILE']   ||= File.expand_path('../Gemfile', __dir__)
 
 require 'bundler/setup'
 require 'abqari'
 require 'abqari/importers'
 require 'abqari/importers/cli'
 
-ok = Abqari::Importers::CLI.run(ARGV, site_root: ENV['ABQARI_SITE_ROOT'])
-exit(ok ? 0 : 1)
+Abqari.run_cli do
+  ok = Abqari::Importers::CLI.run(ARGV, site_root: ENV['ABQARI_SITE_ROOT'])
+  exit(ok ? 0 : 1)
+end

@@ -141,4 +141,110 @@ class IndiewebFetcherTest < Minitest::Test
     dates = list.map { |m| m['published'] }
     assert_equal dates.sort.reverse, dates, 'mentions should be sorted newest first'
   end
+
+  # --- URL sanitisation ----------------------------------------------
+  #
+  # Webmention payloads are attacker-controlled: anyone can send one, and
+  # the author URL, avatar and source URL are copied from the SENDER's
+  # markup into `href`/`src` attributes by `partials/_webmentions`.
+  # Erubi escapes the values but not their scheme, so `javascript:...`
+  # would survive escaping and stay a working link. The fetcher scrubs
+  # every URL to an absolute http(s) URL before the data is exposed.
+
+  def hostile_payload(author_url: nil, photo: nil, url: nil)
+    {
+      'children' => [
+        { 'wm-target' => 'https://example.com/posts/foo/',
+          'wm-property' => 'in-reply-to',
+          'author' => { 'name' => 'Attacker', 'url' => author_url, 'photo' => photo },
+          'published' => '2024-03-15T10:00:00Z',
+          'url' => url }
+      ]
+    }
+  end
+
+  def fetch_hostile(**kwargs)
+    stub_http_safe(response: fake_response(status: 200,
+                                            body: JSON.dump(hostile_payload(**kwargs))))
+    Fetcher.new(@site).fetch
+    @site.data['webmentions']['/posts/foo/'].first
+  end
+
+  def test_javascript_scheme_urls_are_dropped
+    mention = fetch_hostile(
+      author_url: "javascript:fetch('//evil.example')",
+      photo: 'javascript:alert(1)',
+      url: 'javascript:alert(2)'
+    )
+
+    assert_nil mention['author']['url']
+    assert_nil mention['author']['photo']
+    assert_nil mention['url']
+  end
+
+  def test_data_and_vbscript_scheme_urls_are_dropped
+    mention = fetch_hostile(
+      author_url: 'vbscript:msgbox(1)',
+      photo: 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='
+    )
+
+    assert_nil mention['author']['url']
+    assert_nil mention['author']['photo']
+  end
+
+  def test_protocol_relative_and_same_origin_urls_are_dropped
+    # `//evil.example/x` inherits the page's scheme — a cross-origin
+    # link wearing a same-origin costume. A bare path is a stranger's
+    # "profile" pointing into the reader's own site.
+    mention = fetch_hostile(author_url: '//evil.example/x', photo: '/admin/secret.png')
+
+    assert_nil mention['author']['url']
+    assert_nil mention['author']['photo']
+  end
+
+  def test_mailto_is_dropped_from_third_party_urls
+    # Valid for site-authored content, but a remote profile link that
+    # silently opens a mail client is not what the reader expects.
+    mention = fetch_hostile(author_url: 'mailto:someone@example.com')
+    assert_nil mention['author']['url']
+  end
+
+  def test_legitimate_http_urls_survive_untouched
+    mention = fetch_hostile(
+      author_url: 'https://reply.example/profile?a=1&b=2',
+      photo: 'http://reply.example/me.jpg',
+      url: 'https://reply.example/post#comment'
+    )
+
+    assert_equal 'https://reply.example/profile?a=1&b=2', mention['author']['url']
+    assert_equal 'http://reply.example/me.jpg', mention['author']['photo']
+    assert_equal 'https://reply.example/post#comment', mention['url']
+  end
+
+  def test_sanitisation_preserves_non_url_fields
+    # Scrubbing URLs must not drop the rest of the mention — the name
+    # and body still render (escaped) and the grouping key still works.
+    mention = fetch_hostile(author_url: 'javascript:alert(1)')
+
+    assert_equal 'Attacker', mention['author']['name']
+    assert_equal 'in-reply-to', mention['wm-property']
+    assert_equal '2024-03-15T10:00:00Z', mention['published']
+  end
+
+  def test_sanitisation_applies_to_cached_payloads_too
+    # A cache written by an older version holds raw upstream data, so
+    # the scrub has to happen on load, not only on fetch.
+    stub_http_safe(response: fake_response(status: 200,
+                                            body: JSON.dump(hostile_payload(
+                                                              author_url: 'javascript:alert(1)'
+                                                            ))))
+    Fetcher.new(@site).fetch
+
+    # Second run: upstream is down, so the on-disk cache is what renders.
+    stub_http_safe(response: fake_response(status: 503))
+    Fetcher.new(@site).fetch
+
+    mention = @site.data['webmentions']['/posts/foo/'].first
+    assert_nil mention['author']['url']
+  end
 end

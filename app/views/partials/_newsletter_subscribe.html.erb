@@ -9,7 +9,7 @@
 
   Schema:
       newsletter:
-        action: https://www.cogentnotes.app/s/MWAsQKqFXcs   # required — POST target
+        action: https://your-provider.example/s/FORM_ID      # required — POST target
         email_field: email                                   # default 'email'
                                                              #   Mailchimp: EMAIL
                                                              #   ConvertKit: email_address
@@ -19,10 +19,10 @@
         hidden_fields:                                       # optional — extra inputs
           - { name: tags,   value: blog }                    #   e.g. Buttondown tags
           - { name: b_abc1, value: '' }                      #   e.g. Mailchimp honeypot
-        script: https://www.cogentnotes.app/js/subscribe.js  # optional, loaded `defer`
+        script: https://your-provider.example/js/subscribe.js # optional, loaded `defer`
         attribution:                                         # optional — omit for none
-          text: Cogent Notes
-          url: https://www.cogentnotes.app
+          text: Your Provider
+          url: https://your-provider.example
           prefix: Powered by                                 # default
 
   Per-call overrides (any layout or markdown body with erb: true):

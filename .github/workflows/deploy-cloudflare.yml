@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 (the
@@ -56,7 +56,7 @@ jobs:
                                    libheif-plugin-dav1d
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           bundler-cache: true   # caches Gemfile.lock-pinned gems between runs
 
@@ -79,7 +79,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload audit report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
           name: audit-report
@@ -87,8 +87,20 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+      # Fail here with a sentence rather than inside wrangler with a
+      # cryptic one: an unset variable makes the deploy command read
+      # `--project-name=` and the error doesn't say which knob is missing.
+      - name: Check deploy configuration
+        env:
+          PROJECT_NAME: ${{ vars.CLOUDFLARE_PROJECT_NAME }}
+        run: |
+          if [ -z "$PROJECT_NAME" ]; then
+            echo "::error::CLOUDFLARE_PROJECT_NAME variable is not set. Add it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

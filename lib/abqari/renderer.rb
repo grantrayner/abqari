@@ -136,11 +136,36 @@ module Abqari
     # Generators
     # ----------------------------------------------------------------
 
+    # Two phases, and the order between them is load-bearing.
+    #
+    # CONTRIBUTE — generators that add pages which JOIN a collection.
+    # `PublisherShowPage` is the case that exists today: Folio
+    # publications, bundles and series expose `#collection`, so
+    # `Site#collection` merges them with the manual content pages.
+    #
+    # DERIVE — generators that READ collections and freeze what they
+    # find. Pagination slices a collection into `Paginator` objects at
+    # generation time; whatever isn't in the collection when that runs
+    # is absent from the archive and every shard, permanently.
+    #
+    # Pagination used to run before publisher pages, so on a Folio site
+    # with more manual publications than `per_page`, every Folio-sourced
+    # publication silently vanished from the archive — no warning, no
+    # error, just missing entries. `Site#finalise_collections!` makes a
+    # repeat of that a hard failure instead of a silent one: after the
+    # barrier, adding a page that joins a collection raises.
+    #
+    # Tag pages sit in DERIVE for ordering hygiene, though they read
+    # `@pages` (source pages only, see `Site#taxonomy_pages`) and so
+    # were never affected by this.
     def generate_all
+      generate_publisher_pages
+
+      @site.finalise_collections!
+
       generate_tag_pages
       generate_paginated_pages
       generate_visualizations
-      generate_publisher_pages
       generate_related_pages
     end
 

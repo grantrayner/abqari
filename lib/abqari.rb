@@ -10,6 +10,42 @@ require_relative 'abqari/version'
 module Abqari
   ROOT = File.expand_path('..', __dir__)
 
+  # An expected, actionable failure: the user mistyped a config key,
+  # left invalid YAML in a file, passed a bad flag. NOT an engine bug.
+  #
+  # The distinction is the whole point. Entry points print these as a
+  # plain message and exit 1; everything else keeps its backtrace,
+  # because an unexpected exception is a defect and hiding its trace
+  # makes it unreportable. Raising `UserError` is therefore a claim:
+  # "the message alone tells the user what to fix."
+  class UserError < StandardError; end
+
+  # Wrap a CLI entry point so failures are presented rather than dumped.
+  #
+  # A malformed `config/site.yml` used to greet the user with ten frames
+  # of Psych internals; the useful part (file, line, column) was there,
+  # just buried at the top. Same for a typo'd flag. Set ABQARI_DEBUG=1
+  # to get the backtrace back when a UserError is hiding something real.
+  #
+  # Interrupt is handled here too: Ctrl-C during a build printed a stack
+  # trace through the render pool, which reads like a crash rather than
+  # "you pressed Ctrl-C". Exit 130 is the shell convention for SIGINT.
+  def self.run_cli
+    yield
+  rescue UserError => e
+    warn e.message
+    warn '' if debug?
+    warn e.backtrace.join("\n") if debug?
+    exit 1
+  rescue Interrupt
+    warn "\nInterrupted."
+    exit 130
+  end
+
+  def self.debug?
+    %w[1 true yes].include?(ENV['ABQARI_DEBUG'].to_s.strip.downcase)
+  end
+
   # Classes the engine accepts from any YAML input — site config,
   # data files, frontmatter, Folio cache, audit whitelists. Date +
   # Time so naked dates like `date: 2026-06-15` and ISO timestamps

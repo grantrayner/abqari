@@ -143,6 +143,7 @@ module Abqari
             unless system('unzip', '-q', @source, '-d', tmp)
               raise "Failed to unzip #{@source}. Is `unzip` on PATH?"
             end
+            assert_extraction_contained!(tmp)
             yield resolve_root(tmp)
           end
         else
@@ -151,6 +152,42 @@ module Abqari
       end
 
       # The zip sometimes nests everything under a single top-level
+      # Verify the extraction actually stayed inside the tempdir.
+      #
+      # Defence in depth, not a known hole: the `unzip` call is argv-form
+      # so there's no shell injection, and modern Info-ZIP already
+      # refuses `../` entries and strips leading slashes. But an export
+      # zip is the least-trusted input this engine accepts, and we're
+      # delegating containment to a third-party binary whose behaviour
+      # varies by build — busybox's unzip has had traversal bugs, and
+      # "whatever `unzip` is on PATH" is not a guarantee we control.
+      # Cheap to check, so check.
+      #
+      # Symlinks are refused outright rather than resolved: a Substack
+      # export has no legitimate use for one, and refusing avoids having
+      # to reason about multi-hop chains where an intermediate link
+      # points outside.
+      def assert_extraction_contained!(tmp)
+        root = File.realpath(tmp)
+
+        Dir.glob(File.join(tmp, '**', '*'), File::FNM_DOTMATCH).each do |entry|
+          next if %w[. ..].include?(File.basename(entry))
+
+          if File.symlink?(entry)
+            raise "Refusing to import #{@source}: the archive contains a symlink " \
+                  "(#{entry.sub("#{tmp}/", '')}). Extract it yourself and import the " \
+                  'directory if you trust its contents.'
+          end
+
+          begin
+            PathSafe.assert_under(root, File.realpath(entry))
+          rescue PathSafe::Error, Errno::ENOENT
+            raise "Refusing to import #{@source}: the archive extracted a path outside " \
+                  "the temporary directory (#{entry}). This archive is not safe to import."
+          end
+        end
+      end
+
       # directory; sometimes it dumps `posts.csv` + `posts/` directly
       # at the root. Detect by looking for `posts.csv` at each level.
       def resolve_root(root)

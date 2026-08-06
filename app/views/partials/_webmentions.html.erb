@@ -18,6 +18,17 @@
   conversational; likes/reposts/bookmarks are facepiled because the
   content (when present) is just "X liked Y" — the signal is the count
   + avatars, not the body text.
+
+  TRUST NOTE — this is the least-trusted data the engine renders.
+  Anyone can send a webmention, and the author name, avatar, URLs and
+  body text all come from the SENDER. Indieweb::Fetcher#sanitise_mention
+  scrubs every URL to an absolute http(s) URL (or nil) BEFORE the data
+  reaches this template, and that is what makes the href/src sinks
+  below safe. Erubi's auto-escaping alone would NOT be: it stops a value
+  breaking out of the attribute, but leaves the URL scheme untouched, so
+  a javascript: URL escapes to itself and stays a working link.
+  If you add a new URL sink here it must come from that sanitised data —
+  do not reach around it.
 -->
 <%
   all = site.webmentions_for(page.url)
@@ -61,9 +72,16 @@
               <% end %>
               <%= kind %>
               <% if !published.empty? %>
-                <a class="webmention__permalink" rel="nofollow ugc" href="<%= src %>">
-                  <time datetime="<%= published %>"><%= local_time(Time.parse(published)) rescue published %></time>
-                </a>
+                <%# `src` is nil when the sender's source URL failed
+                    sanitisation — render the timestamp unlinked rather
+                    than emitting an empty href. %>
+                <% if src %>
+                  <a class="webmention__permalink" rel="nofollow ugc" href="<%= src %>">
+                    <time datetime="<%= published %>"><%= local_time(Time.parse(published)) rescue published %></time>
+                  </a>
+                <% else %>
+                  <time class="webmention__permalink" datetime="<%= published %>"><%= local_time(Time.parse(published)) rescue published %></time>
+                <% end %>
               <% end %>
             </p>
             <% if !text.empty? %>
@@ -80,9 +98,9 @@
       <% if likes.any? %>
         <p class="webmentions__facepile-label"><%= pluralize(likes.size, 'like') %></p>
         <ul class="webmentions__facepile-list">
-          <% likes.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+          <% likes.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s; src = m['url'] || m['wm-source'] %>
             <% if !photo.empty? %>
-              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+              <li><% if src %><a rel="nofollow ugc" href="<%= src %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a><% else %><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"><% end %></li>
             <% end %>
           <% end %>
         </ul>
@@ -90,9 +108,9 @@
       <% if reposts.any? %>
         <p class="webmentions__facepile-label"><%= pluralize(reposts.size, 'repost') %></p>
         <ul class="webmentions__facepile-list">
-          <% reposts.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+          <% reposts.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s; src = m['url'] || m['wm-source'] %>
             <% if !photo.empty? %>
-              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+              <li><% if src %><a rel="nofollow ugc" href="<%= src %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a><% else %><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"><% end %></li>
             <% end %>
           <% end %>
         </ul>
@@ -100,9 +118,9 @@
       <% if bookmarks.any? %>
         <p class="webmentions__facepile-label"><%= pluralize(bookmarks.size, 'bookmark') %></p>
         <ul class="webmentions__facepile-list">
-          <% bookmarks.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s %>
+          <% bookmarks.each do |m| %><% photo = (m['author'] || {})['photo'].to_s; name = (m['author'] || {})['name'].to_s; src = m['url'] || m['wm-source'] %>
             <% if !photo.empty? %>
-              <li><a rel="nofollow ugc" href="<%= m['url'] || m['wm-source'] %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a></li>
+              <li><% if src %><a rel="nofollow ugc" href="<%= src %>"><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"></a><% else %><img src="<%= photo %>" alt="<%= name %>" loading="lazy" width="32" height="32"><% end %></li>
             <% end %>
           <% end %>
         </ul>

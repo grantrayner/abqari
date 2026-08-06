@@ -145,6 +145,14 @@ class CollectionMergeTest < Minitest::Test
     # restore it EXACTLY — these tests inject pages into the shared
     # instance, and a partial cleanup leaks them into later tests.
     @generated_snapshot = @site.instance_variable_get(:@generated_pages).dup
+    # These tests exercise Site#collection's merge logic by injecting a
+    # PublisherShowPage — which the real build does during the CONTRIBUTE
+    # phase of Renderer#generate_all. The shared fixture site has already
+    # finished building, so that phase is closed and `add_generated_page`
+    # correctly refuses. Reopen it for the duration: we're standing in
+    # for the contribute phase, not violating the ordering it protects.
+    @collections_final_snapshot = @site.collections_final?
+    @site.instance_variable_set(:@collections_final, false)
     @baseline = @site.collection('publications').map(&:slug)
   end
 
@@ -157,6 +165,7 @@ class CollectionMergeTest < Minitest::Test
     # it) leaked into later tests (e.g. PublicationsIndexTest saw an
     # extra publication and failed nondeterministically by order).
     @site.instance_variable_set(:@generated_pages, @generated_snapshot)
+    @site.instance_variable_set(:@collections_final, @collections_final_snapshot)
     memos = @site.instance_variable_get(:@memos)
     if memos
       memos.delete(:collection_cache)

@@ -59,11 +59,28 @@ module Abqari
 
     # Incremental rendering — re-render when shared deps change or any post
     # on this shard was modified more recently than the output.
+    # Mirror the source page's layout resolution — `layout_name` falls
+    # back to the collection's default layout before `application`, so
+    # shards render through the same layout as page 1. Shared by
+    # `render` and `needs_render?` so the staleness check can't drift
+    # from what's actually rendered.
+    def layout_name
+      if @source.respond_to?(:layout_name)
+        @source.layout_name
+      else
+        @source.frontmatter['layout'] || 'application'
+      end
+    end
+
     def needs_render?
       return true unless File.exist?(output_path)
 
       output_mtime = File.mtime(output_path)
       return true if @site.shared_deps_mtime > output_mtime
+      # Layouts are tracked per-page rather than in GLOBAL_DEP_GLOBS, and
+      # only Page consulted them — so editing an archive layout left
+      # every shard stale on the dev server.
+      return true if @site.layout_deps_mtime(layout_name) > output_mtime
 
       @paginator.posts.any? { |post| (post.lastmod || Time.now) > output_mtime }
     end
@@ -84,12 +101,9 @@ module Abqari
     end
 
     def render
-      # Mirror the source page's layout resolution — `layout_name` falls
-      # back to the collection's default layout before `application`, so
-      # a paginating page inside a collection renders pages 2+ with the
-      # same layout as page 1 (previously they diverged to `application`).
-      layout = @source.respond_to?(:layout_name) ? @source.layout_name : (@source.frontmatter['layout'] || 'application')
-      RenderContext.new(self, @site).render_layout(layout)
+      # See `layout_name` — pages 2+ render through the same layout as
+      # page 1. (Historically these diverged to `application`.)
+      RenderContext.new(self, @site).render_layout(layout_name)
     end
   end
 end

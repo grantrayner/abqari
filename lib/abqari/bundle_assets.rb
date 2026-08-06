@@ -59,6 +59,33 @@ module Abqari
 
           FileUtils.cp(source, dest)
         end
+
+        warn_unpublishable(page)
+      end
+    end
+
+    # Tell the author about bundle files that didn't ship. Publishing is
+    # an allow-list (see `Page::Bundle::PUBLISHABLE_EXTENSIONS`), so a
+    # file with an unrecognised extension is left behind — and a file
+    # that quietly fails to appear is exactly the kind of thing someone
+    # discovers weeks later via a broken link. Name it, and say both
+    # ways out.
+    def warn_unpublishable(page)
+      page.unpublishable_bundle_files.each do |path|
+        ext = File.extname(path).downcase
+        # Markdown in a bundle is already reported by SiteLoader, with
+        # the right advice. Repeating it here would both double the noise
+        # and suggest the one fix that must never be taken — adding `.md`
+        # to `bundle_assets.extensions:` would republish the very file
+        # (`published: false` and all) that the allow-list exists to hold
+        # back.
+        next if Page::Bundle::CONTENT_EXTENSIONS.include?(ext)
+
+        rel = path.sub("#{@site.site_root}/", '')
+        Log.warn "Not published: #{rel} — #{ext.empty? ? 'no extension' : "`#{ext}`"} " \
+                 'is not a publishable bundle asset. Add it to `bundle_assets.extensions:` ' \
+                 'in site.yml to publish it, or rename the file with a leading dot ' \
+                 "(`.#{File.basename(path)}`) to keep it local and silence this."
       end
     end
 

@@ -50,6 +50,9 @@ Gem::Specification.new do |spec|
     'README*',
     'LICENSE*',
     'CHANGELOG*',
+    # Ships so someone auditing the installed gem finds the reporting
+    # channel and the trust model without going back to GitHub.
+    'SECURITY*',
     'THIRD_PARTY_NOTICES*'
   ] + Dir.glob(
     # The skeleton ships dotfiles — `.gitignore`, the `vendor/*/.gitkeep`
@@ -83,9 +86,6 @@ Gem::Specification.new do |spec|
   # pinned explicitly so the gem still works under Bundler's frozen mode.
   spec.add_dependency 'csv',             '~> 3.3'
   spec.add_dependency 'erubi',           '~> 1.13'
-  # reverse_markdown: lazy-loaded by the content importers (bin/import).
-  # Normal builds never pull it into memory; the gem is small pure Ruby.
-  spec.add_dependency 'reverse_markdown', '~> 2.1'
   spec.add_dependency 'rouge',           '~> 4.0'
   # ruby-vips: native libvips bindings for the image pipeline. The gem
   # is small pure-FFI Ruby; the install footprint is the libvips C
@@ -95,6 +95,21 @@ Gem::Specification.new do |spec|
   # work — just slower per image.
   spec.add_dependency 'ruby-vips',    '~> 2.2'
   spec.add_dependency 'webrick',      '~> 1.8'
+
+  # NOT a runtime dependency, deliberately: `reverse_markdown`.
+  #
+  # It's needed only by the content importers (`bin/import`), which are
+  # a one-time migration step most sites never run — and it pulls in
+  # nokogiri, which pulls in racc. On Ruby 3.3 (this gem's declared
+  # floor) that chain BREAKS installation on a toolchain-free image:
+  # 3.3 bundles racc 1.7.3, Bundler resolves to 1.8.1, and 1.8.1 ships
+  # no precompiled Linux binary, so `bundle install` tries to compile
+  # and fails for want of `make`. Verified in ruby:3.3-slim.
+  #
+  # `Importers::Support::HtmlToMarkdown` requires it at point of use and
+  # raises an actionable error if it's absent. Adding it back here would
+  # make every install pay for a feature almost nobody uses, and would
+  # re-break the floor.
 
   spec.post_install_message = <<~MSG
     Abqari's image pipeline uses libvips for responsive image

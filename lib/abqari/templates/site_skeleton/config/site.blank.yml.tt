@@ -2,12 +2,12 @@
 # See the engine's reference config (or run `abqari new <other>` without
 # --blank) for the full surface with documentation.
 
-title: <%= title %>
-description: <%= description %>
-author: <%= author %>
-locale: <%= locale %>
-theme: <%= theme %>
-
+title: <%= yaml.call(title) %>
+description: <%= yaml.call(description) %>
+author: <%= yaml.call(author) %>
+locale: <%= yaml.call(locale) %>
+theme: <%= yaml.call(theme) %>
+<%= fonts_block_blank %>
 collections:
   posts:
     enabled: true

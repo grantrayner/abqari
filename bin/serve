@@ -1,12 +1,21 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Serves the engine's own fixture site, for working on Abqari itself.
+# Takes no arguments; ABQARI_PORT and ABQARI_BIND are the two knobs.
+
 ENV['ABQARI_ENV']        ||= 'development'
 ENV['ABQARI_SITE_ROOT']  ||= File.expand_path('..', __dir__)
 
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 require 'abqari'
 
-site = Abqari::Site.new
-site.build
-Abqari::Server.new(site).start
+Abqari.run_cli do
+  # Check ABQARI_PORT before the build — a typo shouldn't cost a full
+  # site build before you're told about it.
+  Abqari::Server.validate_env!
+
+  site = Abqari::Site.new
+  site.build
+  Abqari::Server.new(site).start
+end

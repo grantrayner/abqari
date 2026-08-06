@@ -4,13 +4,27 @@
 # Dev server with file-watcher + SSE live reload. Builds the site,
 # starts WEBrick on localhost:4000, watches content/, config/, data/,
 # app/ for changes and incrementally rebuilds.
+#
+# Takes no arguments on purpose. Both knobs are environment variables:
+#   ABQARI_PORT=4001    — when 4000 is taken by another site's dev server
+#   ABQARI_BIND=0.0.0.0 — to preview on a phone over LAN
 
 ENV['ABQARI_ENV']       ||= 'development'
 ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+# Resolve the bundle from this site, not from cwd — `bundler/setup`
+# finds its Gemfile relative to the current directory, so running this
+# from elsewhere would load an unrelated bundle (or none) and fail.
+ENV['BUNDLE_GEMFILE']   ||= File.expand_path('../Gemfile', __dir__)
 
 require 'bundler/setup'
 require 'abqari'
 
-site = Abqari::Site.new
-site.build
-Abqari::Server.new(site).start
+Abqari.run_cli do
+  # Check ABQARI_PORT before the build — a typo shouldn't cost a full
+  # site build before you're told about it.
+  Abqari::Server.validate_env!
+
+  site = Abqari::Site.new
+  site.build
+  Abqari::Server.new(site).start
+end

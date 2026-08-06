@@ -30,7 +30,7 @@ jobs:
       matrix:
         ruby: ['3.3', '3.4', '4.0']
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
@@ -50,7 +50,7 @@ jobs:
                                    libheif-plugin-dav1d
 
       - name: Set up Ruby ${{ matrix.ruby }}
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
@@ -65,7 +65,7 @@ jobs:
         # matrix entry produces duplicate artifacts under the same
         # name, which the upload-artifact action rejects.
         if: always() && matrix.ruby == '3.3'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-report
           path: coverage/
@@ -74,7 +74,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
@@ -94,7 +94,7 @@ jobs:
                                    libheif-plugin-dav1d
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           bundler-cache: true
 
@@ -111,7 +111,7 @@ jobs:
         run: bundle exec bin/audit --strict
 
       - name: Upload audit report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
           name: audit-report
@@ -121,7 +121,7 @@ jobs:
   bundle-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install libvips with AVIF support
         # libvips powers the image pipeline. On Ubuntu 24.04 the apt
@@ -141,7 +141,7 @@ jobs:
                                    libheif-plugin-dav1d
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           bundler-cache: true
 
@@ -163,12 +163,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # Keep in step with `RUBIES` in bin/stranger-test and the `ruby:`
+      # matrix in the test job above — this list is duplicated rather
+      # than derived, and it HAS drifted: 3.3 was missing here while the
+      # gemspec advertised `>= 3.3`, so a clean-container break on the
+      # declared floor could not be caught. It was, in fact, broken —
+      # `reverse_markdown` pulled nokogiri → racc, and racc has no
+      # precompiled Linux binary for 3.3, so `bundle install` tried to
+      # compile in an image with no `make`.
       matrix:
-        image: ['ruby:3.4-slim', 'ruby:4.0-slim']
+        image: ['ruby:3.3-slim', 'ruby:3.4-slim', 'ruby:4.0-slim']
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Build the gem and run the quickstart
         run: |

@@ -90,6 +90,43 @@ end
       uri.to_s
     end
 
+    # The stricter sibling of `sanitized_url`, for URLs that arrive from
+    # a third party rather than from the site's own content — webmention
+    # authors, syndication payloads, anything a stranger can put on the
+    # wire. Returns the URL when it is an absolute `http`/`https` URL
+    # with a host, and `nil` otherwise.
+    #
+    # Two differences from `sanitized_url`, both deliberate:
+    #
+    #   * `mailto:` is rejected. A remote profile link or avatar has no
+    #     business being a mail link, and it renders as a clickable
+    #     `href` the reader can't distinguish from a web link.
+    #   * Same-origin forms (`/path`, `#frag`) are rejected. A stranger's
+    #     "profile URL" resolving into YOUR site is either a mistake or
+    #     an attempt to borrow your origin's credibility.
+    #
+    # What both reject, and the reason this exists at all: HTML-escaping
+    # does nothing to a URL scheme. `javascript:alert(1)` survives
+    # `CGI.escapeHTML` unchanged and stays executable inside an `href`,
+    # so escaping alone is not a defence for attacker-supplied URLs.
+    def external_http_url(url)
+      return nil if url.nil?
+
+      s = url.to_s.strip
+      return nil if s.empty?
+
+      begin
+        uri = URI.parse(s)
+      rescue URI::InvalidURIError
+        return nil
+      end
+
+      return nil unless uri.is_a?(URI::HTTP) # URI::HTTPS subclasses this
+      return nil if uri.host.to_s.empty?
+
+      uri.to_s
+    end
+
     # Truncate `text` so the visible result (kept content + omission)
     # is at most `length` characters. When `omission` is longer than
     # `length` the budget for content is zero — falling back to a

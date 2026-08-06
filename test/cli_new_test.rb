@@ -164,7 +164,7 @@ class CliNewTest < Minitest::Test
 
   def test_gemfile_uses_rubygems_source_by_default
     run_new('mysite')
-    gemfile = File.read('mysite/Gemfile')
+    gemfile = File.read('mysite/Gemfile', encoding: 'UTF-8')
     major_minor = Abqari::VERSION.split('.').first(2).join('.')
     assert_match(/^gem 'abqari', '~> #{Regexp.escape(major_minor)}'$/, gemfile)
     refute_match(/gem 'abqari', git:/, gemfile)
@@ -173,14 +173,14 @@ class CliNewTest < Minitest::Test
 
   def test_engine_git_writes_git_source_in_gemfile
     run_new('mysite', '--engine', 'git')
-    gemfile = File.read('mysite/Gemfile')
+    gemfile = File.read('mysite/Gemfile', encoding: 'UTF-8')
     assert_match(/gem 'abqari', git:/, gemfile)
     refute_match(/gem 'abqari', path:/, gemfile)
   end
 
   def test_engine_path_writes_path_source_in_gemfile
     run_new('mysite', '--engine', 'path')
-    gemfile = File.read('mysite/Gemfile')
+    gemfile = File.read('mysite/Gemfile', encoding: 'UTF-8')
     assert_match(%r{gem 'abqari', path: '../abqari'}, gemfile)
     refute_match(/gem 'abqari', git:/, gemfile)
   end
@@ -382,5 +382,204 @@ class CliNewTest < Minitest::Test
     home = File.read('mysite/content/index.md', encoding: 'UTF-8')
     assert_match(/Where to next/, home)
     assert Dir.exist?('mysite/content/posts/welcome')
+  end
+
+  # --- YAML-hostile option values -------------------------------------
+  #
+  # `--name` / `--description` / `--author` are free text that lands in
+  # `config/site.yml` and in frontmatter. Before these values were
+  # emitted as YAML scalars, `--name "My Site: A Story"` scaffolded
+  # with exit 0 and produced a config Psych couldn't parse — so the
+  # scaffold reported success and `bin/build` died on the first run.
+  # A `#` was quieter and worse: the value was silently truncated.
+
+  # Every frontmatter-bearing file the scaffold writes, so a regression
+  # in one template can't hide behind another passing.
+  FRONTMATTER_FILES = [
+    'content/index.md',
+    'content/about.md',
+    'content/posts/welcome/index.md'
+  ].freeze
+
+  def assert_scaffold_parses(project = 'mysite')
+    YAML.safe_load_file("#{project}/config/site.yml")
+
+    FRONTMATTER_FILES.each do |rel|
+      path = "#{project}/#{rel}"
+      body = File.read(path, encoding: 'UTF-8')
+      match = body.match(Abqari::FRONTMATTER_RE)
+      refute_nil match, "#{rel} should have parseable frontmatter"
+      YAML.safe_load(match[1], permitted_classes: Abqari::YAML_PERMITTED_CLASSES)
+    end
+  end
+
+  def test_title_containing_a_colon_produces_parseable_yaml
+    assert run_new('mysite', '--name', 'My Site: A Story')
+    assert_scaffold_parses
+    assert_equal 'My Site: A Story', config_yaml['title']
+  end
+
+  def test_description_containing_a_hash_is_not_truncated
+    # The silent-failure case: `#` starts a YAML comment, so an
+    # unquoted value lost everything after it without any error.
+    assert run_new('mysite', '--description', 'Notes # on stuff')
+    assert_scaffold_parses
+    assert_equal 'Notes # on stuff', config_yaml['description']
+  end
+
+  def test_yaml_hostile_values_round_trip_through_every_sink
+    assert run_new('mysite',
+                   '--name', 'Site: "quoted" & odd',
+                   '--description', "Trailing colon: yes # and a hash",
+                   '--author', '@handle')
+    assert_scaffold_parses
+
+    config = config_yaml
+    assert_equal 'Site: "quoted" & odd', config['title']
+    assert_equal 'Trailing colon: yes # and a hash', config['description']
+    assert_equal '@handle', config['author']
+
+    home = File.read('mysite/content/index.md', encoding: 'UTF-8')
+    front = YAML.safe_load(home.match(Abqari::FRONTMATTER_RE)[1])
+    assert_equal 'Site: "quoted" & odd', front['title']
+  end
+
+  def test_values_that_yaml_would_coerce_stay_strings
+    # `yes` loads back as `true` and `1.0` as a Float unless quoted —
+    # a plain quote-the-special-characters filter misses both, because
+    # neither string contains a special character.
+    assert run_new('mysite', '--name', 'yes', '--description', '1.0', '--author', 'null')
+    assert_scaffold_parses
+
+    config = config_yaml
+    assert_equal 'yes', config['title']
+    assert_equal '1.0', config['description']
+    assert_equal 'null', config['author']
+  end
+
+  def test_blank_mode_also_quotes_yaml_hostile_values
+    # The blank scaffold renders different templates for the same
+    # sinks; it needs the same protection.
+    assert run_new('mysite', '--blank', '--name', 'My Site: A Story')
+    YAML.safe_load_file('mysite/config/site.yml')
+    assert_equal 'My Site: A Story', config_yaml['title']
+
+    %w[content/index.md content/about.md].each do |rel|
+      body = File.read("mysite/#{rel}", encoding: 'UTF-8')
+      YAML.safe_load(body.match(Abqari::FRONTMATTER_RE)[1])
+    end
+  end
+
+  # --- Argument validation -------------------------------------------
+  #
+  # `abqari new <projectname>` creates a directory in the CURRENT
+  # directory; the argument is a name, not a path. Nothing checked that,
+  # so `""` scaffolded into the cwd and `..` / absolute paths wrote ~40
+  # files wherever they pointed, overwriting same-named files.
+
+  def test_empty_projectname_is_rejected
+    _out, err = capture_io { refute Abqari::CLI::New.run(['', '--skip-bundle']) }
+    assert_match(/empty/i, err)
+    assert_empty Dir.children('.'), 'nothing should be written into the cwd'
+  end
+
+  def test_traversing_projectname_is_rejected
+    _out, err = capture_io { refute Abqari::CLI::New.run(['../evil', '--skip-bundle']) }
+    assert_match(/looks like a path/, err)
+    refute Dir.exist?('../evil')
+  end
+
+  def test_absolute_projectname_is_rejected
+    _out, err = capture_io { refute Abqari::CLI::New.run(['/tmp/abqari-abs-evil', '--skip-bundle']) }
+    assert_match(/looks like a path/, err)
+    refute Dir.exist?('/tmp/abqari-abs-evil')
+  end
+
+  def test_dot_projectname_is_rejected
+    _out, err = capture_io { refute Abqari::CLI::New.run(['.', '--skip-bundle']) }
+    assert_match(/not a usable directory name/, err)
+  end
+
+  def test_extra_positional_arguments_are_reported
+    # An unquoted two-word name silently lost everything after the first
+    # word — the user got a site called "my" and no indication why.
+    _out, err = capture_io { Abqari::CLI::New.run(%w[my blog site --skip-bundle]) }
+    assert_match(/Ignoring extra argument/, err)
+    assert_match(/Quote the name/, err)
+  end
+
+  def test_force_refuses_to_overwrite_an_existing_git_repository
+    FileUtils.mkdir_p('someproject/.git')
+    File.write('someproject/README.md', 'existing work')
+
+    _out, err = capture_io do
+      refute Abqari::CLI::New.run(['someproject', '--force', '--skip-bundle'])
+    end
+
+    assert_match(/\.git directory/, err)
+    assert_equal 'existing work', File.read('someproject/README.md'),
+                 '--force must not clobber an unrelated repository'
+  end
+
+  def test_target_that_is_a_file_is_reported_cleanly
+    File.write('notadir', 'x')
+    _out, err = capture_io { refute Abqari::CLI::New.run(['notadir', '--skip-bundle']) }
+    assert_match(/is a file, not a directory/, err)
+  end
+
+  # --- Flag errors ----------------------------------------------------
+
+  def test_unknown_flag_reports_without_a_backtrace
+    # `OptionParser#parse` raises on an unknown flag and nothing caught
+    # it, so a one-character typo met the user with a six-frame trace.
+    _out, err = capture_io { refute Abqari::CLI.run(%w[new --bloank mysite]) }
+
+    assert_match(/invalid option/, err)
+    refute_match(/\.rb:\d+:in/, err, 'no backtrace frames should reach the user')
+    assert_match(/--help/, err, 'and it should point at the help')
+  end
+
+  # --- Encoding -------------------------------------------------------
+
+  def test_non_ascii_name_works_when_argv_arrives_as_binary
+    # Under a C/POSIX locale (Docker, cron, `env -i`) Ruby tags ARGV as
+    # US-ASCII/BINARY. Rendering a UTF-8 template against it raised
+    # Encoding::CompatibilityError PART WAY THROUGH scaffolding, leaving
+    # a half-written directory that then blocked a corrected retry.
+    binary_name = 'café'.dup.force_encoding(Encoding::ASCII_8BIT)
+
+    capture_io { assert Abqari::CLI.run([('new'), binary_name, '--skip-bundle']) }
+
+    assert Dir.exist?('café')
+    assert_equal 'Café', config_yaml('café')['title']
+  end
+
+  # --- Blank mode + fonts ---------------------------------------------
+
+  def test_blank_mode_still_scaffolds_fonts_for_a_font_dependent_theme
+    # Blank mode emitted no fonts section while next-steps still told
+    # the user to run bin/fetch-fonts — which then reported "No fonts
+    # configured", and magazine silently fell back to system serifs.
+    run_new('mysite', '--blank', '--theme', 'magazine')
+
+    fonts = config_yaml['fonts']
+    refute_nil fonts, 'magazine needs its webfonts declared even in blank mode'
+    assert_includes fonts.map { |f| f['family'] }, 'Playfair Display'
+  end
+
+  def test_blank_mode_omits_fonts_for_a_system_font_theme
+    run_new('mysite', '--blank', '--theme', 'minimal')
+    assert_nil config_yaml['fonts'], 'minimal uses system fonts — nothing to declare'
+  end
+
+  def test_ordinary_values_are_not_gratuitously_quoted
+    # The quoting is Psych's, so it only fires when YAML needs it —
+    # a plain scaffold should still read as plain YAML.
+    run_new('mysite', '--name', 'My Site', '--author', 'Ada Lovelace')
+    config = File.read('mysite/config/site.yml', encoding: 'UTF-8')
+    assert_match(/^title: My Site$/, config)
+    assert_match(/^author: Ada Lovelace$/, config)
+    assert_match(/^locale: en$/, config)
+    assert_match(/^theme: minimal$/, config)
   end
 end

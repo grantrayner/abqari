@@ -37,13 +37,13 @@ module Abqari
         # Warn loudly (and let ABQARI_STRICT_CONFIG make it fatal).
         msg = "config/site.yml not found at #{path} — building with defaults only " \
               '(no title, no url). Are you in the site directory?'
-        raise ArgumentError, msg if ENV['ABQARI_STRICT_CONFIG'] == 'true'
+        raise UserError, msg if ENV['ABQARI_STRICT_CONFIG'] == 'true'
 
         Log.warn msg
         return {}
       end
 
-      raw = YAML.safe_load_file(path, permitted_classes: Abqari::YAML_PERMITTED_CLASSES) || {}
+      raw = load_yaml_file(path) || {}
       envs = raw.delete('environments') || {}
       env  = @site.env.to_s
       overrides = envs[env] || {}
@@ -51,6 +51,21 @@ module Abqari
       warn_on_unknown_env(env, envs)
 
       deep_merge(raw, overrides)
+    end
+
+    # `YAML.safe_load_file` with the engine-wide permitted classes, and
+    # a syntax error turned into something a person can act on.
+    #
+    # Psych's own message already names the file, line and column — the
+    # problem was that it arrived at the top of a ten-frame trace
+    # through Psych internals, which reads as an engine crash rather
+    # than "line 12 of your config has a stray colon". Keep Psych's
+    # detail, drop the frames (ABQARI_DEBUG=1 brings them back).
+    def load_yaml_file(path)
+      YAML.safe_load_file(path, permitted_classes: Abqari::YAML_PERMITTED_CLASSES)
+    rescue Psych::SyntaxError => e
+      rel = path.sub("#{@site.site_root}/", '')
+      raise UserError, "#{rel}:#{e.line}:#{e.column} — invalid YAML: #{e.problem} #{e.context}".strip
     end
 
     # Walk `content/**/*.md`. For each markdown file:
@@ -70,6 +85,7 @@ module Abqari
       Dir.glob(pattern).sort.each do |path|
         next if disabled_collection_path?(path)
         next if @site.external_symlink?(path)
+        next if stray_bundle_markdown?(path)
 
         page = Page.new(path, @site)
         next if page.disabled?
@@ -80,6 +96,47 @@ module Abqari
       end
 
       pages
+    end
+
+    # True for a markdown file sitting INSIDE a bundle directory that
+    # isn't that bundle's `index.md` — e.g.
+    # `content/posts/my-post/notes.md`.
+    #
+    # A bundle is one content file plus its assets, so a second `.md`
+    # has no defined role and used to get two contradictory ones: it was
+    # copied verbatim into the output as a "bundle asset" (frontmatter
+    # and all, even when marked `published: false`), AND loaded here as
+    # a stray page rendering at `/posts/my-post/notes/` — because
+    # `Page#collection` rejects it for not being an index, leaving it
+    # uncollected rather than dropping it. Published twice, in two
+    # forms, neither intended.
+    #
+    # The asset half is fixed by the publishable-extension allow-list.
+    # This is the page half. Warn rather than skip silently: the author
+    # put the file there for a reason and needs to know it does nothing.
+    def stray_bundle_markdown?(path)
+      return false if File.basename(path) == 'index.md'
+
+      @site.collections.each do |_name, cfg|
+        next unless cfg.fetch('enabled', true)
+        next if cfg['bundle'] == false # flat collections: `<slug>.md` IS the page
+
+        source = File.join(@site.site_root, cfg['source'].to_s)
+        next unless path.start_with?(source + File::SEPARATOR)
+
+        # Depth >= 2 means it's nested inside a slug directory rather
+        # than sitting at the collection root.
+        next unless path.sub("#{source}/", '').split('/').length >= 2
+
+        rel = path.sub("#{@site.site_root}/", '')
+        Log.warn "Skipping #{rel} — only `index.md` is rendered inside a bundle " \
+                 'directory, so this file is neither published nor rendered. Move it ' \
+                 'out to publish it, or rename it with a leading dot ' \
+                 "(`.#{File.basename(path)}`) to keep it local and silence this."
+        return true
+      end
+
+      false
     end
 
     # Read every `data/**/*.{yml,yaml,json}` file into a hash keyed by
@@ -101,11 +158,15 @@ module Abqari
       Dir.glob(File.join(data_dir, '**', '*.{yml,yaml,json}')).sort.each do |path|
         rel = path.sub("#{data_dir}/", '')
         key = rel.sub(/\.(yml|yaml|json)\z/, '').tr('/', '_')
-        raw = File.read(path, encoding: 'UTF-8')
         result[key] = if path.end_with?('.json')
-                        JSON.parse(raw)
+                        begin
+                          JSON.parse(File.read(path, encoding: 'UTF-8'))
+                        rescue JSON::ParserError => e
+                          raise UserError,
+                                "data/#{rel} — invalid JSON: #{e.message.lines.first.to_s.strip}"
+                        end
                       else
-                        YAML.safe_load(raw, permitted_classes: Abqari::YAML_PERMITTED_CLASSES)
+                        load_yaml_file(path)
                       end
       end
       result

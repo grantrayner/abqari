@@ -16,7 +16,10 @@ require 'net/http'
 # `abqari new` user's first command.
 class SkeletonBinsTest < Minitest::Test
   ENGINE_ROOT = File.expand_path('..', __dir__)
-  SERVE_PORT  = 4000   # skeleton bin/serve hardcodes the engine default
+  # Was 4000 with a skip when something else held it — which on a machine
+  # running other Abqari sites meant this test almost never ran. ABQARI_PORT
+  # lets it claim a free port instead, so the one test that proves the
+  # skeleton's bin/serve actually boots stops being optional.
 
   def setup
     @tmpdir   = Dir.mktmpdir('abqari-skeleton-bins')
@@ -52,6 +55,63 @@ class SkeletonBinsTest < Minitest::Test
       out, status = Open3.capture2e(RbConfig.ruby, '-c', script)
       assert status.success?, "#{File.basename(script)} has a syntax error:\n#{out}"
     end
+  end
+
+  # Every script that uses Bundler must pin BUNDLE_GEMFILE to its own
+  # site BEFORE requiring bundler/setup.
+  #
+  # The scripts pin ABQARI_SITE_ROOT to the script's parent precisely so
+  # they work from any directory — but `bundler/setup` resolves its
+  # Gemfile from the CURRENT directory, which silently undid that. Run
+  # `/path/to/site/bin/build` from a directory holding any other Gemfile
+  # and it died with `cannot load such file -- abqari`, naming neither
+  # the site nor the cause. Cron jobs, deploy hooks and editor task
+  # runners all hit this.
+  def test_bundler_scripts_pin_bundle_gemfile_before_requiring_bundler
+    scripts = Dir.glob(File.join(@site_dir, 'bin', '*')).sort
+    refute_empty scripts
+
+    using_bundler = scripts.select { |s| File.read(s, encoding: 'UTF-8').include?("require 'bundler/setup'") }
+    refute_empty using_bundler, 'expected some scripts to use bundler/setup'
+
+    using_bundler.each do |script|
+      body = File.read(script, encoding: 'UTF-8')
+      name = File.basename(script)
+
+      assert_match(/ENV\['BUNDLE_GEMFILE'\]\s*\|\|=/, body,
+                   "bin/#{name} must set BUNDLE_GEMFILE (with ||= so an explicit value wins)")
+
+      pin     = body.index("ENV['BUNDLE_GEMFILE']")
+      require = body.index("require 'bundler/setup'")
+      assert pin < require,
+             "bin/#{name} sets BUNDLE_GEMFILE after requiring bundler/setup — too late to matter"
+    end
+  end
+
+  # The regression itself: run a scaffolded script from a directory that
+  # holds an unrelated Gemfile.
+  def test_bin_build_works_from_a_directory_with_a_foreign_gemfile
+    foreign = File.join(@tmpdir, 'foreign')
+    FileUtils.mkdir_p(foreign)
+    File.write(File.join(foreign, 'Gemfile'), "source 'https://rubygems.org'\n")
+
+    env = bin_env
+    # Drop the harness's explicit pin — that's the thing under test.
+    env.delete('BUNDLE_GEMFILE')
+    # The scaffolded Gemfile points at the released gem, which isn't
+    # installed here; point the site's own bundle at this checkout so
+    # the script has something resolvable to find.
+    File.write(File.join(@site_dir, 'Gemfile'),
+               "source 'https://rubygems.org'\ngem 'abqari', path: '#{ENGINE_ROOT}'\n")
+
+    out, status = Open3.capture2e(env, RbConfig.ruby,
+                                  File.join(@site_dir, 'bin', 'build'),
+                                  chdir: foreign)
+    out = out.force_encoding('UTF-8')
+
+    refute_match(/cannot load such file -- abqari/, out,
+                 "bin/build must resolve its own bundle, not the cwd's:\n#{out}")
+    assert status.success?, "bin/build failed when run from a foreign Gemfile dir:\n#{out}"
   end
 
   def test_bin_build_builds_the_site
@@ -98,11 +158,13 @@ class SkeletonBinsTest < Minitest::Test
   end
 
   def test_bin_serve_boots_and_serves_http
-    skip "port #{SERVE_PORT} in use" unless port_free?(SERVE_PORT)
+    port = free_port
+    # bin_env clears every ABQARI_* var, so this has to go in after it.
+    env = bin_env.merge('ABQARI_PORT' => port.to_s)
 
-    pid = Process.spawn(bin_env, RbConfig.ruby, File.join(@site_dir, 'bin', 'serve'),
+    pid = Process.spawn(env, RbConfig.ruby, File.join(@site_dir, 'bin', 'serve'),
                         %i[out err] => File::NULL)
-    response = poll_http("http://127.0.0.1:#{SERVE_PORT}/", timeout: 15)
+    response = poll_http("http://127.0.0.1:#{port}/", timeout: 15)
     assert response, 'bin/serve did not answer HTTP within 15s'
     assert_equal '200', response.code
     assert_includes response.body, '<title>'
@@ -138,12 +200,14 @@ class SkeletonBinsTest < Minitest::Test
 
   private
 
-  def port_free?(port)
-    server = TCPServer.new('127.0.0.1', port)
+  # Bind port 0, let the OS choose, and hand back what it picked. There's an
+  # unavoidable race between closing this and the child binding it, but it's
+  # far smaller than the certainty of colliding on a fixed 4000.
+  def free_port
+    server = TCPServer.new('127.0.0.1', 0)
+    port = server.addr[1]
     server.close
-    true
-  rescue Errno::EADDRINUSE, Errno::EACCES
-    false
+    port
   end
 
   def poll_http(url, timeout:)

@@ -12,4 +12,9 @@ source 'https://rubygems.org'
 
 group :development do
   gem 'listen', '~> 3.8'    # FS events for the dev-server watcher (optional)
+
+  # Uncomment to import content from Substack / Ghost / Jekyll with
+  # `bin/import`. Kept optional because it pulls in nokogiri, which most
+  # sites never need — `bin/import` tells you if it's missing.
+  # gem 'reverse_markdown', '~> 2.1'
 end

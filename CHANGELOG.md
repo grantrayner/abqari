@@ -7,12 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-A theme-quality pass: dark mode finally gets dark code blocks, the
-decorative cover tiles join the theme's colour world, and each shipped
-theme leans harder into its own identity.
+_Nothing yet._
+
+## [1.1.0] — 2026-08-06
+
+First public release on RubyGems. 1.0.0 below was tagged in git but
+never published, so this is the first version installable with
+`gem install abqari`.
+
+Ordered-series navigation and a CSP that can be extended rather than
+replaced — both out of building a course-shaped site on top of the
+existing series taxonomies — plus a theme-quality pass: dark mode
+gets dark code blocks, the decorative cover tiles join the theme's
+colour world, and each shipped theme leans harder into its own
+identity.
+
+The Fixed and Security sections are longer than a first release usually
+warrants because this version went through a full pre-publication
+review. Those entries describe defects that existed in the git history
+and never reached a published gem — they're recorded because the
+reasoning is worth keeping, and because anyone running from a checkout
+or the `v1.0.0` tag *was* exposed to them. If you're coming from a
+checkout, the bundle-asset change under **Changed** is the one that can
+alter what your site publishes.
 
 ### Added
 
+- **`bundle_assets.extensions:`** — extra file extensions to publish
+  out of a page bundle, on top of the built-in media set:
+
+      bundle_assets:
+        extensions: [.gpx, .stl]
+
+  Additive rather than replacing, so adding one download type can't
+  silently drop an image format when the defaults grow. Accepts bare
+  (`gpx`), dotted (`.gpx`) and upper-case forms. Markdown cannot be
+  added — see the bundle-asset change below.
+
+- **`Abqari::UserError`** — the exception class for expected, actionable
+  failures: invalid YAML, an unknown config key under strict mode, a bad
+  `url:`, a malformed CLI argument. Entry points print these as a plain
+  message and exit 1; every other exception keeps its backtrace, because
+  an unexpected error is a defect and hiding its trace makes it
+  unreportable. Raising `UserError` is a claim that the message alone
+  tells the user what to fix.
+
+  Config and frontmatter validation previously raised `ArgumentError` /
+  `RuntimeError`; anything rescuing those specifically should rescue
+  `Abqari::UserError` instead.
+
+- **`ABQARI_DEBUG=1`** — restore the backtrace for a `UserError`, for
+  when a "user error" turns out to be hiding an engine one.
+
+- **`Abqari.run_cli`** — wraps a CLI entry point with that presentation,
+  plus clean `Interrupt` handling (Ctrl-C now prints `Interrupted.` and
+  exits 130 instead of unwinding a stack trace through the render pool).
+  Used by `exe/abqari` and every scaffolded `bin/*`.
+
+- **`Helpers#external_http_url`** — the stricter sibling of
+  `sanitized_url`, for URLs arriving from a third party rather than from
+  your own content. Accepts only absolute `http(s)` URLs; rejects
+  `mailto:` and same-origin paths, which a stranger's "profile URL" has
+  no business being.
+
+- `ABQARI_PORT` — dev-server port, alongside the existing `ABQARI_BIND`.
+  `bin/serve` takes no arguments by design, so a machine running several
+  Abqari sites had no way to move a second one off 4000 without editing
+  the script. Parsed strictly: anything that isn't a whole number in
+  1–65535 raises with the variable named, rather than going through
+  `String#to_i` — `"abc".to_i` is `0`, which WEBrick reads as "bind any
+  free port", so a typo would have started a server on a port the
+  operator can't guess, and `"4000x".to_i` is `4000`, so a typo would
+  have silently worked. Empty or whitespace-only means unset. Resolution
+  order is explicit argument → environment → default, matching `bind:`,
+  so an exported value can't hijack the test suite.
 - **Dark-mode syntax highlighting.** The syntax layer now renders a
   dark Rouge theme under the same two dark-mode scopes every theme's
   token file uses — previously dark pages showed light-mode tokens on
@@ -38,49 +106,6 @@ theme leans harder into its own identity.
   explicit `manifest.theme_color`, share cards now use a gradient
   matched to the active theme instead of the one-size slate pair. An
   explicit `theme_color` still wins.
-
-### Changed
-
-- **Code-block backgrounds now belong to the theme.** `.highlight`
-  backgrounds come from `--color-code-bg` in both modes; Rouge
-  supplies token colours only. Sites that relied on the Rouge theme's
-  own background should set `--color-code-bg` (or
-  `syntax_theme_dark: false`) to taste.
-- **Sand redesigned.** Sandier light surface, brick links (the old
-  `#444` grey links were nearly indistinguishable from body text),
-  olive-charcoal "desert night" dark mode (the old warm black was a
-  near-duplicate of magazine's), tag-chip tokens, pill buttons.
-- **Notebook** carries its mono voice through the chrome: nav,
-  pagination, and buttons render in `--font-mono`, buttons squared
-  to 2px corners (matching its tag chips).
-- **Magazine** buttons render in the display serif with slight
-  tracking, matching its nav and pagination.
-- **Fixture heroes quieted.** The hand-authored post/workshop hero
-  SVGs no longer bake large titles in a generic sans (the page h1
-  already carries the title) and use muted duotones that sit on any
-  theme; the fixture config now downloads every shipped theme's
-  webfonts so each theme demos at full character.
-
-### Fixed
-
-- **WCAG-AA contrast across all shipped themes.** A token-level
-  contrast pass found seven sub-4.5:1 pairs: magazine's light info
-  banner, notebook's light muted/warning and dark muted, and sand's
-  dark success/danger/info (now dark-text-on-brighter-accent). All
-  measured pairs pass in both modes.
-- **Magazine's drop cap was dead CSS on every post.** The selector
-  targeted `article > p:first-of-type`, but body paragraphs live
-  inside the `e-content` wrapper — the only direct `<p>` child of
-  `<article>` is the back-link. Now anchored to `.e-content`.
-
-## [1.1.0] — 2026-08-02
-
-Ordered-series navigation and a CSP that can be extended without
-being replaced. Both came out of building a course-shaped site — a
-module of ordered lessons with colocated audio — on top of the
-existing series taxonomies.
-
-### Added
 
 - `Site#prev_in_series` — the backwards counterpart to
   `next_in_series`. Both now delegate to a shared `series_sibling`
@@ -141,6 +166,113 @@ existing series taxonomies.
 
 ### Changed
 
+- **`reverse_markdown` is no longer a runtime dependency.**
+  *(Affects content importing only.)*
+
+  It's needed just by `bin/import` — a one-time migration step most
+  sites never run — and it pulls in nokogiri, which pulls in racc. That
+  chain broke installation outright on Ruby 3.3, the version this gem
+  advertises as its floor: 3.3 bundles racc 1.7.3, Bundler resolves to
+  1.8.1, and 1.8.1 ships no precompiled Linux binary, so `bundle
+  install` tried to compile it and failed for want of `make` on any
+  toolchain-free image (`ruby:3.3-slim` and most deploy bases). Ruby
+  3.4 and 4.0 were unaffected, which is why it went unnoticed — their
+  default racc already satisfies the constraint.
+
+  `bin/import` now asks for the gem at the moment it's needed and says
+  exactly how to install it. Every other command is unaffected: the
+  importers were already lazy-loaded and `require 'abqari'` never
+  reached them. Runtime dependencies drop from eight to seven, and a
+  normal install no longer carries a native-extension gem for a feature
+  it doesn't use.
+
+  To import: `gem install reverse_markdown`, or uncomment the line in
+  your site's Gemfile.
+
+- **Bundle assets are an allow-list.** *(Behaviour change — read this
+  if you're upgrading from a git checkout.)*
+
+  Files colocated with a post's `index.md` used to publish unless they
+  were a directory, a dotfile or `index.md` itself. That shipped
+  whatever an author left in the folder — including a `notes.md` marked
+  `published: false`, which went to production verbatim, frontmatter and
+  all, at a guessable URL. `published: false` has to be a promise, and a
+  rule that publishes the file anyway makes the flag lie.
+
+  Only known media extensions now publish: images, video, audio,
+  subtitles, and PDF/EPUB/ZIP. Anything else is left behind and named at
+  build time — a warning, never a silent skip, since silent omission is
+  the failure this closes. Extend with `bundle_assets.extensions:`, or
+  prefix a file with a dot (`.notes.md`) to keep it local with no
+  warning.
+
+  Excluding `.md` alone would have fixed the case and left the class:
+  the next `.psd`, `.sketch` or `.docx` would ship the same way. An
+  allow-list fails closed on everything nobody thought of, and it's the
+  direction that stays cheap to reverse — loosening it later is not a
+  breaking change; tightening it would be.
+
+  Note `copy_flat_collection_assets` has always excluded `.md` for flat
+  collections. Bundles simply never applied the same rule, and that
+  inconsistency is what let it through.
+
+- **Only `index.md` renders inside a bundle directory.** A second `.md`
+  in a bundle had no defined role and got two contradictory ones: copied
+  raw into the output as an "asset", *and* loaded as a stray page at
+  `/posts/my-post/notes/` (`Page#collection` rejects it for not being an
+  index, so it fell through uncollected rather than being dropped).
+  Published twice, in two forms, neither intended. It's now skipped with
+  a warning naming the file.
+
+- **Collections are finalised before the deriving generators run.**
+  `Renderer#generate_all` is now two phases: generators that ADD pages
+  to a collection (publisher pages) run first, then
+  `Site#finalise_collections!`, then generators that READ collections
+  (pagination, taxonomies, visualizations, related indexes). Adding a
+  collection-joining page after the barrier now raises, naming the page
+  — see the pagination fix below for what the silent version cost.
+
+- **CLI errors are presented, not dumped.** A malformed `config/site.yml`
+  used to answer with ten frames of Psych internals; the useful part
+  (file, line, column) was there, just buried. Same for a typo'd flag,
+  an unknown config key under strict mode, and a bad `url:`. These now
+  print one line. `ABQARI_DEBUG=1` brings the trace back.
+
+- **`abqari new` validates its argument.** The argument names a
+  directory created in the current directory — it isn't a path. Nothing
+  checked that, so `abqari new ""` scaffolded into the cwd with an empty
+  title, and `..` or an absolute path wrote ~40 files wherever they
+  pointed, overwriting same-named `Gemfile` / `README.md` /
+  `content/index.md`. Empty, path-like, `.`/`..` and leading-dash names
+  are now refused. Extra positional arguments are reported rather than
+  silently dropped (an unquoted two-word name used to lose everything
+  after the first word).
+
+- **`--force` refuses a target containing `.git`.** It skips the
+  non-empty check by design, but it never meant "write into an unrelated
+  repository", and a `.git` directory is the clearest signal of exactly
+  that.
+
+- **Code-block backgrounds now belong to the theme.** `.highlight`
+  backgrounds come from `--color-code-bg` in both modes; Rouge
+  supplies token colours only. Sites that relied on the Rouge theme's
+  own background should set `--color-code-bg` (or
+  `syntax_theme_dark: false`) to taste.
+- **Sand redesigned.** Sandier light surface, brick links (the old
+  `#444` grey links were nearly indistinguishable from body text),
+  olive-charcoal "desert night" dark mode (the old warm black was a
+  near-duplicate of magazine's), tag-chip tokens, pill buttons.
+- **Notebook** carries its mono voice through the chrome: nav,
+  pagination, and buttons render in `--font-mono`, buttons squared
+  to 2px corners (matching its tag chips).
+- **Magazine** buttons render in the display serif with slight
+  tracking, matching its nav and pagination.
+- **Fixture heroes quieted.** The hand-authored post/workshop hero
+  SVGs no longer bake large titles in a generic sans (the page h1
+  already carries the title) and use muted duotones that sit on any
+  theme; the fixture config now downloads every shipped theme's
+  webfonts so each theme demos at full character.
+
 - Auto OG cards carry a faint rub el hizb (۞) in the top-right
   corner — Abqari's mark, the eight-pointed star Arabic manuscripts
   use to structure text. Rendered at 12% opacity so it reads as
@@ -165,6 +297,166 @@ existing series taxonomies.
   production deploy changes.
 
 ### Fixed
+
+- **`abqari new --name "My Site: A Story"` produced a site that couldn't
+  build.** Template values were interpolated into YAML unquoted, so a
+  colon in a title — entirely ordinary — made `config/site.yml` and
+  every scaffolded frontmatter file unparseable. The scaffolder reported
+  success and exited 0; the failure surfaced on the user's first
+  `bin/build`, in a file they never wrote. A `#` was quieter and worse:
+  it silently truncated the value at the comment marker.
+
+  Values now emit as YAML scalars via Psych, which quotes only when
+  needed (so an ordinary scaffold still reads as plain YAML) and knows
+  the whole grammar — including the resolver traps where an unquoted
+  `yes` loads back as `true` and `1.0` as a Float. Applies to all seven
+  affected templates, not just `config/site.yml`.
+
+- **Folio-sourced entries went missing from paginated archives.**
+  Pagination ran before publisher pages and freezes its slices at
+  generation time, so on a site with more manual publications than
+  `per_page`, every Folio-sourced publication was absent from the
+  archive and all its shards — no warning, no error, just missing
+  entries against a green build. (The archive layout's own comment
+  promised the merged list would paginate automatically.)
+
+- **A relative `ABQARI_OUTPUT_DIR` put local filesystem paths in the
+  published sitemap.** `Page#url` strips the output root off an absolute
+  output path; an unanchored `sub` with a relative root stripped nothing
+  and left the developer's full path as the URL —
+  `<loc>https://example.com/Users/me/dev/mysite//about/</loc>` — while
+  files still landed correctly, so the build reported success. A
+  trailing slash was the mirror image, eating the leading `/`.
+  `Site#output_dir` now expands (matching what `reset_output` already
+  did before deleting — the two had drifted), and the strip is anchored.
+
+- **Generated pages ignored layout edits in incremental builds.**
+  Layouts are deliberately outside `GLOBAL_DEP_GLOBS` and tracked
+  per-page, but only `Page` consulted them — so editing
+  `taxonomy.html.erb`, an archive layout, `publications_index.html.erb`
+  or `visualization.html.erb` with the dev server running rebuilt
+  nothing and the browser reloaded to stale HTML. All generated page
+  classes now check `layout_deps_mtime`, sharing one `layout_name` with
+  their own `render` so the two can't drift.
+
+- **Folio series pages never noticed a changed cache.** The cache path
+  was built by pluralising `kind`, giving `vendor/folio/seriess.yml` — a
+  file that never exists. Series show pages therefore never re-rendered
+  when Folio data changed, and fell through to a `Time.now` lastmod that
+  restamped every series entry in the sitemap on every build. The
+  determinism test couldn't catch it: both builds run on the same day.
+
+- **Scaffolded `bin/*` failed when run from another directory.** The
+  scripts pin `ABQARI_SITE_ROOT` to their own location precisely so
+  they're cwd-independent, but `require 'bundler/setup'` resolves its
+  Gemfile from the current directory, undoing it. Running
+  `/path/to/site/bin/build` from a directory holding any other Gemfile
+  died with `cannot load such file -- abqari`, naming neither the site
+  nor the cause — hitting cron jobs, deploy hooks and editor task
+  runners. All seven bundler-using scripts now pin `BUNDLE_GEMFILE`
+  first (with `||=`, so an explicit value still wins).
+
+- **`--blank` dropped the `fonts:` block for font-dependent themes.**
+  Blank mode emitted no fonts section while the next-steps text still
+  told the user to run `bin/fetch-fonts`, which then reported "No fonts
+  configured" — leaving magazine and sand on system serifs, exactly the
+  silent typography downgrade the fonts machinery exists to prevent.
+  System-font themes still get nothing, since there's nothing to
+  declare.
+
+- **A non-ASCII project name crashed mid-scaffold under a C locale.**
+  Ruby tags ARGV with the locale encoding, so under `LC_ALL=C` (Docker,
+  cron, `env -i`) `abqari new café` raised
+  `Encoding::CompatibilityError` partway through writing files — and the
+  half-written directory then blocked a corrected retry as "non-empty".
+  ARGV is now normalised to UTF-8 when the bytes are valid.
+
+- **A typo'd flag printed a backtrace.** `OptionParser#parse` raises on
+  an unknown option and nothing caught it, so `abqari new --bloank
+  mysite` met a new user with six frames of trace. Caught centrally in
+  the dispatcher, so future subcommands inherit it.
+
+- **The strict-config error told you to enable strict config.** The
+  unknown-key message ended "…or set `ABQARI_STRICT_CONFIG=true` to make
+  this a hard error" in both branches — including the one raised
+  *because* it was already set. The advice now differs by mode.
+
+- **A non-Latin tag overwrote the taxonomy index.** A term with no
+  URL-safe characters slugifies to "", collapsing `/tags/:slug/` to
+  `/tags/` — so the term page was written over `_site/tags/index.html`.
+  With two such terms the build did fail, via the output-collision
+  check, but named colliding paths rather than the tag responsible.
+  Now refused up front, naming the term (and rendered raw rather than
+  through `inspect`, which turns a CJK tag into escape sequences the
+  author can't match to anything).
+
+- **Photo bundles went stale in incremental builds.** The bundle-asset
+  mtime check was gated on `post?`, so changing only a photo's image
+  didn't re-render its page — while `lastmod`, which does include bundle
+  assets, still advertised the page as updated. Now gated on having a
+  bundle, covering photos and any bundle-style collection you define.
+
+- **Bundle image filenames weren't URL-encoded in the sitemap.** A file
+  named `my photo.jpg` produced an `<image:loc>` containing a literal
+  space, which is invalid — XML escaping is a different layer and
+  doesn't help. Filesystem-derived basenames are now percent-encoded;
+  frontmatter values are left alone, since they're author-written URLs
+  that may already be encoded.
+
+- **Importer frontmatter could be split by a newline in a title.**
+  `yaml_scalar` quoted on a documented character list that didn't
+  include control characters — and a literal newline ends the line even
+  inside a double-quoted scalar, so a title of `"Hello\npermalink: …"`
+  from a third-party export became two mapping entries. Control
+  characters are now escaped to their YAML forms.
+
+- **`bin/import` with no arguments exited 0.** It printed help and
+  reported success, out of step with every other command (`abqari new`
+  and `abqari theme` both exit 1 for the same mistake) and a trap for
+  any script checking the status. An explicit `--help` is still a
+  success.
+
+- **`abqari new` exited 0 when `bundle install` failed.** The scaffold
+  is complete at that point, but the site can't build, so a script
+  running `abqari new … && cd … && bin/build` had no way to detect it.
+
+- **`bin/serve` validated `ABQARI_PORT` only after building the site.**
+  A typo cost a full build before the error appeared. `Server.validate_env!`
+  now runs first.
+
+- **The skeleton's `bin/audit` had no `--verbose`.** The engine's copy
+  gained it; the scaffolded copy never did — the only real behavioural
+  drift across the eight script pairs.
+
+- **The clean-container test skipped the Ruby version the gemspec
+  advertises.** Both `bin/stranger-test` and CI's `stranger` job ran
+  3.4 and 4.0 while `required_ruby_version` is `>= 3.3`, leaving the
+  floor unproven in the environment the test exists to simulate — and
+  the floor is where a native gem is likeliest to have no precompiled
+  binary and fall back to a source build these images can't perform.
+  That gap hid a real installation break (see the `reverse_markdown`
+  entry under **Changed**).
+
+  3.3 is now in all three matrices — the test suite, the local
+  stranger script, and CI's clean-container job. The three lists are
+  duplicated rather than derived and had already drifted, so each now
+  carries a comment pointing at the others.
+
+- **A scheme-less `url:` reported the wrong mistake.**
+  `URI.parse('example.com')` puts the whole string in `path`, so the
+  path check fired and reported that `url` "has a path component
+  (\"example.com\")" — technically true, humanly baffling. Missing
+  schemes are now detected first and suggest the corrected value.
+
+- **WCAG-AA contrast across all shipped themes.** A token-level
+  contrast pass found seven sub-4.5:1 pairs: magazine's light info
+  banner, notebook's light muted/warning and dark muted, and sand's
+  dark success/danger/info (now dark-text-on-brighter-accent). All
+  measured pairs pass in both modes.
+- **Magazine's drop cap was dead CSS on every post.** The selector
+  targeted `article > p:first-of-type`, but body paragraphs live
+  inside the `e-content` wrapper — the only direct `<p>` child of
+  `<article>` is the back-link. Now anchored to `.e-content`.
 
 - **The CSS minifier silently deleted every theme token in production
   builds.** `Minifier.css` stashed quoted strings before stripping
@@ -239,9 +531,102 @@ existing series taxonomies.
   (`your-handle`) that failed `bundle install` as-is; it now defaults
   to the canonical repo.
 
+### Security
+
+- **Webmention URLs are sanitised before any template sees them.**
+  Webmentions are the least-trusted data the engine renders — anyone on
+  the internet can send one, and the author name, avatar and source URL
+  are copied from the *sender's* markup into `href` and `src`
+  attributes. Erubi's auto-escaping stops a value breaking out of the
+  attribute but leaves the URL scheme untouched, so an author URL of
+  `javascript:…` escaped to itself and stayed a working link: stored
+  XSS on a published site, one reader click away.
+
+  `Indieweb::Fetcher` now scrubs `url`, `wm-source`, `author.url` and
+  `author.photo` to absolute `http(s)` URLs (or `nil`) as mentions are
+  indexed — so anything reading `site.data['webmentions']` gets clean
+  data by construction, rather than every template having to remember.
+  Sanitising at index time covers the cached path too, so a
+  `vendor/webmentions/mentions.json` written by an older version is
+  scrubbed on load. Dropped URLs degrade to unlinked text.
+
+  Only affects sites with `indieweb.enabled` and a webmention.io token.
+
+- **The importer's SSRF guard resolves through the same resolver that
+  connects.** `HttpSafe`'s `block_private` check used `Resolv` plus
+  `IPAddr` parsing while the request used `getaddrinfo`, and the gap
+  between them was a bypass: `http://2130706433/`, `http://0x7f000001/`,
+  `http://017700000001/`, `http://127.1/` and `http://127.0.1/` all
+  reach 127.0.0.1, but `Resolv` returned nothing and `IPAddr.new`
+  raised, so the guard skipped the host and let the request through.
+  `0.0.0.0` passed too — it isn't loopback, private or link-local by
+  any of `IPAddr`'s predicates, yet connecting to it reaches localhost.
+
+  Resolution now goes through `Addrinfo.getaddrinfo`, closing the whole
+  class of parse mismatch rather than enumerating the forms. Added
+  coverage for CGNAT (`100.64/10`), multicast, reserved/broadcast, the
+  unspecified addresses, and IPv4-mapped IPv6 (`::ffff:127.0.0.1`).
+  A host that doesn't resolve still falls through to its natural "no
+  such host" error — safe now that the guard and the connection share
+  one resolver.
+
+  Reachable only when importing an attacker-supplied export
+  (`bin/import`), the one place `block_private` is enabled.
+
+- **Substack zip extraction is verified after unzipping.** Extraction
+  shells out to `unzip` (argv-form, so no shell injection), and modern
+  Info-ZIP already refuses traversing entries — but an export zip is the
+  least-trusted input the engine accepts, and containment was being
+  delegated to whichever `unzip` happens to be on PATH. Every extracted
+  path is now checked to resolve inside the tempdir, and archives
+  containing symlinks are refused outright (an export has no legitimate
+  use for one, and refusing avoids reasoning about multi-hop chains).
+
+- **`Site#memo` is mutex-guarded.** Templates call memoised accessors
+  from the parallel render pool. Most memos are warm before rendering
+  starts and MRI's GVL makes a torn Hash unlikely, but `Renderer`
+  already takes this precaution for its own caches. Re-entrant by
+  design: the fast path reads without the lock and the block runs
+  outside it, so a memo that calls another memo can't deadlock.
+
+- **Deploy workflow templates are SHA-pinned.** The scaffolded
+  `.github/workflows/` used floating tags (`actions/checkout@v5`,
+  `cloudflare/wrangler-action@v3`) while this changelog claimed they
+  were pinned. A repointed tag on a third-party action holding
+  `CLOUDFLARE_API_TOKEN` would have been a credential leak replicated
+  across every site scaffolded from the template. All actions in the
+  templates — and in this repo's own workflows — are now pinned to a
+  commit SHA with the version in a trailing comment; the shipped
+  `dependabot.yml` keeps them current as reviewable PRs.
+
+- **Releases authenticate with trusted publishing — there is no RubyGems
+  API key in this repository.** The `publish` job exchanges GitHub's
+  OIDC token for a credential RubyGems accepts only for this repo and
+  this workflow file, valid for minutes. Nothing to store as a repo
+  secret, nothing to rotate, and a credential that leaked into a log is
+  expired before anyone could read it.
+
+  `id-token: write` is granted at JOB level, so the `verify` job — which
+  runs the test suite, the audit, and a `curl | bash` installer — cannot
+  request a token at all. The setup steps live in CONTRIBUTING.md; the
+  gem's `rubygems_mfa_required` still applies, since trusted publishing
+  doesn't replace account MFA.
+
+- **The release workflow no longer runs a third-party installer beside
+  the RubyGems key.** `release.yml` piped `curl … | bash` from
+  pagefind.app in the same job as `GEM_HOST_API_KEY`, so a compromised
+  or hijacked host could have read the key and published a malicious
+  release. The workflow is now two jobs: `verify` runs the gate and
+  holds no secrets, `publish` sees the key and does nothing but
+  checkout, build and push. Workflow permissions dropped from
+  `contents: write` to `contents: read`, and the `workflow_dispatch`
+  tag input is bound through `env` and shape-validated instead of being
+  interpolated into a shell line.
+
 ## [1.0.0] — 2026-07-14
 
-Initial public release. The engine is feature-complete for the
+Tagged in git, never published to RubyGems — see 1.1.0 for the first
+installable release. The engine is feature-complete for the
 four content types it targets — long-form writing, photo
 galleries, publications, and workshops — with the safety
 primitives, IndieWeb integration, and POSSE syndication needed to
@@ -252,8 +637,9 @@ run a real working author / publisher site.
 **Authoring**
 
 - Markdown (CommonMark + GFM) with YAML frontmatter.
-- Five default collections: `posts`, `photos`, `publications`,
-  `workshops`, `cookbook`. Add your own under `collections:` in
+- Four default content collections — `posts`, `photos`, `publications`,
+  `workshops` — plus `bundles` and `series` for Folio-sourced
+  publication groupings. Add your own under `collections:` in
   `config/site.yml`.
 - Bundle-style collections (`content/<name>/<slug>/index.md` plus
   colocated assets) and flat single-file pages where appropriate.
@@ -445,5 +831,6 @@ run a real working author / publisher site.
   commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
   the `~> 2.4` floor bought.
 
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/grantrayner/abqari/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

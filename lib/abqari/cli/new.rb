@@ -3,6 +3,7 @@
 require 'fileutils'
 require 'optparse'
 require 'erb'
+require 'yaml'
 
 module Abqari
   module CLI
@@ -82,6 +83,13 @@ module Abqari
       # The git line defaults to the canonical repo so it bundles
       # out of the box — operators tracking a fork edit the URL.
       DEFAULT_RUBYGEMS_GEMFILE_LINE = "gem 'abqari', '~> #{Abqari::VERSION.split('.').first(2).join('.')}'"
+
+      # Docs referenced from generated files must be FULL URLs. A
+      # scaffolded site has no `docs/` directory — that lives in the
+      # engine repo and isn't shipped in the gem — so a bare
+      # `docs/theming.md` in a site's own config sent the reader looking
+      # for a file they'll never find.
+      THEMING_DOC_URL = 'https://github.com/grantrayner/abqari/blob/main/docs/theming.md'
       DEFAULT_GIT_GEMFILE_LINE      = "gem 'abqari', git: 'https://github.com/grantrayner/abqari.git'"
       DEFAULT_PATH_GEMFILE_LINE     = "gem 'abqari', path: '../abqari'"
 
@@ -111,7 +119,15 @@ module Abqari
           return false
         end
 
+        if rest.length > 1
+          warn "Ignoring extra argument(s): #{rest[1..].map(&:inspect).join(', ')}"
+          warn 'Quote the name if it contains spaces: abqari new "my blog site"'
+          warn ''
+        end
+
         projectname = rest.first
+        return false unless valid_projectname?(projectname)
+
         target_dir  = File.expand_path(projectname)
 
         return false unless preflight_ok?(target_dir)
@@ -119,9 +135,13 @@ module Abqari
 
         copy_skeleton!(target_dir, build_template_vars(projectname))
         materialize_theme!(target_dir)
-        run_bundle_install!(target_dir) unless @options[:skip_bundle]
+        bundled = @options[:skip_bundle] ? true : run_bundle_install!(target_dir)
+
+        # Next steps print either way — the site exists and the reader
+        # needs to know where it is — but the exit status reflects
+        # whether it's actually ready to build.
         print_next_steps(projectname, target_dir)
-        true
+        bundled
       end
 
       private
@@ -140,14 +160,68 @@ module Abqari
           opts.on('--with LIST', Array,   "Extra collections to enable (#{WITH_COLLECTIONS.join('/')}, comma-separated, repeatable)") { |v| @options[:with] |= v.map(&:strip) }
           opts.on('--blank',              'Minimum-viable scaffold (no example post, no tutorial text, no in-line config docs)') { @options[:blank] = true }
           opts.on('--skip-bundle',        "Don't run `bundle install` after scaffolding")         {     @options[:skip_bundle] = true }
-          opts.on('--force',              'Overwrite the target directory if non-empty')         {     @options[:force] = true }
+          # "Overwrite the target directory" read as "replace it".
+          # It doesn't — it writes the skeleton over the top, replacing
+          # same-named files and leaving everything else in place.
+          opts.on('--force',              'Scaffold into a non-empty directory (overwrites same-named files)') { @options[:force] = true }
           opts.on('-h', '--help', 'Show this message') { puts opts; exit }
         end
       end
 
       # --- Preflight + validation ----------------------------------------
 
+      # `abqari new <projectname>` creates a directory named
+      # `projectname` in the CURRENT directory. It is not a path.
+      #
+      # Nothing validated it, so `File.expand_path` happily accepted
+      # anything: `abqari new ""` scaffolded into the cwd with an empty
+      # title, and `..` or an absolute path wrote ~40 files wherever
+      # they pointed. Nothing is ever deleted (the scaffolder only
+      # writes), but same-named files — `Gemfile`, `README.md`,
+      # `content/index.md` — were overwritten, and `--force` skips the
+      # non-empty check that otherwise caught most of it. `rails new`
+      # and `jekyll new` both refuse these for the same reason.
+      def valid_projectname?(name)
+        if name.to_s.strip.empty?
+          warn 'Project name is empty. Usage: abqari new <projectname>'
+          return false
+        end
+
+        if name != name.strip
+          warn "Project name #{name.inspect} has leading or trailing whitespace."
+          return false
+        end
+
+        if name.include?('/') || name.include?(File::SEPARATOR)
+          warn "Project name #{name.inspect} looks like a path. `abqari new` creates a " \
+               'directory in the current directory — cd to where you want it first.'
+          return false
+        end
+
+        if name == '.' || name == '..' || name.start_with?('-')
+          warn "Project name #{name.inspect} is not a usable directory name."
+          return false
+        end
+
+        true
+      end
+
       def preflight_ok?(target_dir)
+        # `--force` deliberately skips the non-empty check, but it never
+        # meant "write into an unrelated project". A `.git` directory we
+        # didn't create is the clearest signal of exactly that.
+        if @options[:force] && File.directory?(File.join(target_dir, '.git'))
+          warn "Refusing --force: #{target_dir} contains a .git directory, so it's an " \
+               'existing repository rather than a new project. Remove it first, or ' \
+               'scaffold into a new directory.'
+          return false
+        end
+
+        if File.exist?(target_dir) && !File.directory?(target_dir)
+          warn "#{target_dir} already exists and is a file, not a directory."
+          return false
+        end
+
         if File.exist?(target_dir) && !@options[:force]
           contents = Dir.children(target_dir) rescue []
           unless contents.empty?
@@ -188,7 +262,15 @@ module Abqari
           theme:        @options[:theme],
           locale:       @options[:locale],
           with:         @options[:with],
+          # Emits a value as a YAML scalar. Templates MUST route every
+          # interpolation that lands in `config/site.yml` or in a
+          # content file's frontmatter through this — see `yaml_scalar`.
+          yaml:         method(:yaml_scalar),
           fonts_block:  fonts_block,
+          # Blank mode drops the tutorial commentary, but a theme whose
+          # identity DEPENDS on webfonts still needs the real block —
+          # see `fonts_block_blank`.
+          fonts_block_blank: fonts_block_blank,
           gemfile_line: engine_gemfile_line,
           # Pins the scaffolded site to the Ruby doing the scaffolding.
           # Without a committed `.ruby-version`, a deploy host picks its
@@ -208,6 +290,26 @@ module Abqari
         end
       end
 
+      # The `fonts:` block for `--blank`, which ships a minimum-viable
+      # config with no tutorial commentary.
+      #
+      # Blank mode used to emit no fonts section at all, while
+      # `print_next_steps` still told the user to run `bin/fetch-fonts`
+      # — which then reported "No fonts configured". Magazine and sand
+      # fell back to system serifs on every blank scaffold: precisely
+      # the silent-typography-downgrade the fonts machinery exists to
+      # prevent, reintroduced by the flag meant to reduce noise.
+      #
+      # System-font themes still get nothing (there's genuinely nothing
+      # to declare); font-dependent themes get the real block, no
+      # commentary.
+      def fonts_block_blank
+        entries = ThemeFonts.yaml_entries(@options[:theme], indent: '  ')
+        return '' if entries.empty?
+
+        "fonts:\n#{entries}\n"
+      end
+
       # The scaffolded `fonts:` section, matched to the chosen theme.
       # Magazine and sand build their identity on webfonts their stacks
       # only *name* — without the matching `fonts:` block +
@@ -218,9 +320,9 @@ module Abqari
         if entries.empty?
           <<~YAML.rstrip
             # The #{@options[:theme]} theme uses system fonts — nothing to download.
-            # To self-host Google Fonts later (each shipped theme's faces are
-            # listed in the engine's docs/theming.md), declare them here and
-            # run `bin/fetch-fonts` once:
+            # To self-host Google Fonts later, declare them here and run
+            # `bin/fetch-fonts` once. Each shipped theme's faces are listed at
+            # #{THEMING_DOC_URL}
             #
             # fonts:
             #   - family: Inter
@@ -233,7 +335,7 @@ module Abqari
             # `bin/fetch-fonts` once to download them into vendor/fonts/
             # (served from your own origin; no requests to Google at visit
             # time). Switching theme later? Each shipped theme's faces are
-            # listed in the engine's docs/theming.md.
+            # listed at #{THEMING_DOC_URL}
             fonts:
             #{entries}
           YAML
@@ -242,6 +344,27 @@ module Abqari
 
       def titleize(slug)
         slug.to_s.tr('-_', ' ').split(/\s+/).map(&:capitalize).join(' ')
+      end
+
+      # Render `value` as a YAML scalar, quoting only when YAML needs it.
+      #
+      # Everything a template interpolates into `config/site.yml` or into
+      # frontmatter goes through here, because the values are arbitrary
+      # `--name` / `--description` / `--author` / `--locale` strings. A
+      # colon is the case that bites — `--name "My Site: A Story"` used to
+      # emit `title: My Site: A Story`, which is a YAML syntax error, so
+      # the scaffold reported success and every later command died on
+      # Psych. A `#` was worse: it silently truncated the value to
+      # everything before the comment marker.
+      #
+      # Delegating to Psych rather than hand-rolling a quote-if-special
+      # regex is the point. Psych knows the whole plain-scalar grammar —
+      # not just `:` and `#`, but leading `-`/`@`, and the resolver traps
+      # where an unquoted `yes` loads back as `true` and `1.0` as a Float.
+      # Values that need no quoting pass through unchanged, so the common
+      # case still reads as plain YAML.
+      def yaml_scalar(value)
+        value.to_s.to_yaml.sub(/\A---\s*/, '').chomp
       end
 
       # --- Copy the skeleton, with .tt → ERB substitution ----------------
@@ -378,14 +501,23 @@ module Abqari
 
       # --- `bundle install` after scaffolding -----------------------------
 
+      # Returns false when `bundle install` fails, so `abqari new` exits
+      # non-zero. The scaffold itself is complete and usable at this
+      # point — the files are all written — but a script that runs
+      # `abqari new … && cd … && bin/build` needs to know the site can't
+      # actually build yet. Exiting 0 on a failed install made that
+      # undetectable.
       def run_bundle_install!(target_dir)
         puts ''
         puts 'Running bundle install...'
         Dir.chdir(target_dir) do
-          success = system('bundle', 'install')
-          unless success
-            warn '[warn] `bundle install` failed. Run it manually inside the project, or check the Gemfile.'
-          end
+          next true if system('bundle', 'install')
+
+          warn ''
+          warn '[warn] `bundle install` failed — the site is scaffolded but its'
+          warn '       dependencies are not installed. Run `bundle install` inside'
+          warn '       the project, or check the Gemfile.'
+          false
         end
       end
 

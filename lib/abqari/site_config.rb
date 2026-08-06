@@ -54,6 +54,7 @@ module Abqari
     KNOWN_KEYS = %w[
       author
       block_ai_scraping
+      bundle_assets
       collections
       contact
       csp
@@ -131,13 +132,18 @@ module Abqari
 
       return if unknown.empty?
 
-      msg = "Unknown config key(s) in site.yml: #{unknown.sort.join(', ')}. " \
-            'Typos silently no-op; add `x_` prefix for intentional user extensions, ' \
-            "or set ABQARI_STRICT_CONFIG=true to make this a hard error."
+      # The advice differs by mode. The old message ended "…or set
+      # ABQARI_STRICT_CONFIG=true to make this a hard error" in BOTH
+      # branches — including the one raised *because* it was already set,
+      # which told the user to enable the thing that had just fired.
+      base = "Unknown config key(s) in site.yml: #{unknown.sort.join(', ')}. " \
+             'Typos silently no-op; add an `x_` prefix for intentional user extensions'
 
-      raise ArgumentError, msg if strict
+      if strict
+        raise UserError, "#{base} (ABQARI_STRICT_CONFIG is on, so this is fatal)."
+      end
 
-      Log.warn msg
+      Log.warn "#{base}, or set ABQARI_STRICT_CONFIG=true to make this a hard error."
     end
 
     # Keys that must be present for a correct build. `title` feeds
@@ -157,7 +163,7 @@ module Abqari
                   'need an absolute base URL. Set `url:` (per-environment under ' \
                   '`environments:` is fine).'
         if env.to_s == 'production'
-          raise ArgumentError, url_msg if strict
+          raise UserError, url_msg if strict
 
           Log.warn url_msg
         end
@@ -174,14 +180,28 @@ module Abqari
     # is not supported; fail loudly at config time instead of shipping a
     # broken site. A bare host or a lone `/` path is fine.
     def validate_url_has_no_path!(url)
-      path = begin
-        URI.parse(url.to_s).path.to_s
+      parsed = begin
+        URI.parse(url.to_s)
       rescue URI::InvalidURIError
-        '' # a malformed URL is a separate problem; don't crash here
+        nil # a malformed URL is a separate problem; don't crash here
       end
+      return if parsed.nil?
+
+      # Check the scheme FIRST. Without one, `URI.parse('example.com')`
+      # puts the whole string in `path`, so the path check below fired
+      # and reported that `url` "has a path component ("example.com")" —
+      # technically true, humanly baffling, and pointing at the wrong
+      # mistake.
+      if parsed.scheme.to_s.empty?
+        raise UserError,
+              "`url` (#{url.inspect}) is missing a scheme. Use the full origin, " \
+              "e.g. \"https://#{url.to_s.sub(%r{\A/+}, '')}\"."
+      end
+
+      path = parsed.path.to_s
       return if path.empty? || path == '/'
 
-      raise ArgumentError,
+      raise UserError,
             "`url` (#{url.inspect}) has a path component (#{path.inspect}). " \
             'Abqari does not support subdirectory/base-path deployment — every ' \
             'asset and internal link is root-relative and would 404 under a path ' \

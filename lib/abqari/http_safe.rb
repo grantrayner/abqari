@@ -2,7 +2,7 @@
 
 require 'net/http'
 require 'uri'
-require 'resolv'
+require 'socket'  # Addrinfo — the resolver the SSRF guard shares with Net::HTTP
 require 'ipaddr'
 
 module Abqari
@@ -140,29 +140,83 @@ module Abqari
 
     class BlockedHostError < StandardError; end
 
+    # Ranges that `IPAddr#loopback?` / `#private?` / `#link_local?` do
+    # NOT already cover, but that a build must never reach.
+    #
+    # `0.0.0.0/8` is the one that matters most: `0.0.0.0` is not
+    # loopback, private or link-local by any of those predicates, yet
+    # connecting to it reaches localhost on Linux and macOS — so it was
+    # a one-token bypass of the whole guard.
+    BLOCKED_RANGES = [
+      IPAddr.new('0.0.0.0/8'),     # "this network"; 0.0.0.0 reaches localhost
+      IPAddr.new('100.64.0.0/10'), # CGNAT — carrier-internal, not public
+      IPAddr.new('192.0.0.0/24'),  # IETF protocol assignments
+      IPAddr.new('198.18.0.0/15'), # benchmarking
+      IPAddr.new('224.0.0.0/4'),   # multicast
+      IPAddr.new('240.0.0.0/4'),   # reserved, includes 255.255.255.255
+      IPAddr.new('::/128'),        # unspecified
+      IPAddr.new('ff00::/8')       # multicast
+    ].freeze
+
     # Raise unless every address `uri.host` resolves to is public.
+    #
+    # Resolution goes through `Addrinfo.getaddrinfo` — deliberately the
+    # same resolver `Net::HTTP` will use to open the socket. The previous
+    # implementation used `Resolv.getaddresses` and fell back to parsing
+    # the host with `IPAddr`, which created a gap between what the guard
+    # checked and what the connection actually did: `Resolv` returns
+    # nothing for `http://2130706433/`, `IPAddr.new` rejects it, so the
+    # guard skipped the host — and then `getaddrinfo` expanded it to
+    # 127.0.0.1 and connected. The same held for `0x7f000001`,
+    # `017700000001`, `127.1` and `127.0.1`; every legacy `inet_aton`
+    # form was a bypass. Asking the connecting resolver removes that
+    # whole class of mismatch rather than enumerating the forms.
+    #
+    # A host that doesn't resolve here won't connect there either (same
+    # resolver), so an empty result falls through and lets the request
+    # fail with its natural "no such host" error rather than a
+    # misleading "refusing to fetch".
+    #
+    # DNS-rebinding TOCTOU remains — the address could change between
+    # this check and the connect. Acceptable for a local build tool.
     def assert_public_host!(uri)
       host = uri.host.to_s
+      # `URI` keeps the brackets on an IPv6 literal; the resolver
+      # wants them off.
+      probe = host.delete_prefix('[').delete_suffix(']')
+
       addresses =
         begin
-          Resolv.getaddresses(host)
+          Addrinfo.getaddrinfo(probe, nil, nil, :STREAM).map(&:ip_address).uniq
         rescue StandardError
           []
         end
-      # If the host is itself an IP literal, check it directly.
-      addresses = [host] if addresses.empty?
+      return if addresses.empty?
 
       addresses.each do |addr|
         ip = begin
           IPAddr.new(addr)
-        rescue IPAddr::Error
-          next # not an IP (unresolvable name) — let the request fail normally
+        rescue StandardError
+          next
         end
-        next unless ip.loopback? || ip.private? || ip.link_local?
+        next if public_ip?(ip)
 
         raise BlockedHostError,
               "refusing to fetch #{host}: resolves to non-public address #{addr}"
       end
+    end
+
+    def public_ip?(ip)
+      # `::ffff:127.0.0.1` is loopback wearing an IPv6 hat — unwrap it
+      # so the IPv4 rules apply rather than the (much narrower) v6 ones.
+      ip = ip.native if ip.ipv4_mapped?
+
+      return false if ip.loopback? || ip.private? || ip.link_local?
+
+      BLOCKED_RANGES.none? { |range| range.include?(ip) }
+    rescue StandardError
+      # An address we can't reason about is not one we should fetch.
+      false
     end
   end
 end

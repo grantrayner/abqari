@@ -86,11 +86,14 @@ module Abqari
       @config = SiteConfig.with_defaults(raw)
       @pages           = []
       @generated_pages = []
+      # Contribute phase is open until Renderer#generate_all closes it.
+      @collections_final = false
       # Per-build memo registry. All `||=` caches on Site route
       # through `memo(key) { … }` so a rebuild only has to clear one
       # hash; adding a new memo can never go out of sync with the
       # rebuild-reset code. See `reset_state_for_rebuild!`.
-      @memos     = {}
+      @memos      = {}
+      @memo_mutex = Mutex.new
       @renderer  = Renderer.new(self)
       @artifacts = ArtifactWriter.new(self)
 
@@ -194,10 +197,53 @@ module Abqari
     # mid-`generate_all`, so invalidating at every add keeps the memo
     # honest without requiring careful generator-ordering.
     def add_generated_page(page)
+      assert_collection_open!(page)
+
       @generated_pages << page
       @memos.delete(:collection_cache)
       @memos.delete(:collection_url_index_cache)
       @memos.delete(:posts) if page.respond_to?(:post?) && page.post?
+    end
+
+    # Close the contribute phase. Called by `Renderer#generate_all` once
+    # every generator that can add pages to a collection has run; from
+    # here on, collections are what the deriving generators (pagination,
+    # taxonomies, related indexes) will see.
+    def finalise_collections!
+      @collections_final = true
+    end
+
+    def collections_final?
+      @collections_final == true
+    end
+
+    # Raise if a page tries to join a collection after the barrier.
+    #
+    # Pagination reads a collection and freezes the slices into
+    # `Paginator` objects; anything added afterwards is silently missing
+    # from the archive and every shard. That's the worst shape of bug
+    # this codebase can produce — output that is quietly incomplete, with
+    # a green build and nothing to investigate. Better a loud failure at
+    # the moment the ordering is violated, naming the page.
+    #
+    # Only collection-joining pages are refused. Taxonomy pages,
+    # paginated shards, visualizations and related indexes are all
+    # produced BY the derive phase and belong to no collection, so they
+    # add freely.
+    def assert_collection_open!(page)
+      return unless collections_final?
+      return unless page.respond_to?(:collection) && page.collection
+
+      raise <<~MSG
+        #{page.class} joins the '#{page.collection}' collection but was added after
+        collections were finalised (url: #{page.respond_to?(:url) ? page.url : '?'}).
+
+        Pages that join a collection must be generated in the contribute
+        phase of Renderer#generate_all, before Site#finalise_collections!.
+        Adding one later means pagination has already sliced the
+        collection without it, so it would be missing from the archive
+        and its shards with no other symptom.
+      MSG
     end
 
     # ------------------------------------------------------------------
@@ -230,8 +276,26 @@ module Abqari
       File.join(engine_root, rel)
     end
 
+    # Absolute, always. `Page#url` derives every internal URL by
+    # stripping this prefix off the page's output path, and the output
+    # path is absolute — so a relative `ABQARI_OUTPUT_DIR=_site` used to
+    # strip nothing and leave the developer's full filesystem path
+    # embedded in every href, `<loc>` and feed link:
+    #
+    #   <loc>https://example.com/Users/me/dev/mysite//about/</loc>
+    #
+    # Files still landed in the right place, so the build reported
+    # success and shipped a sitemap advertising local paths to the world.
+    # A trailing slash was the mirror-image bug: it consumed the leading
+    # `/` and produced scheme-relative URLs. `expand_path` normalises
+    # both, and matches what `ArtifactWriter#reset_output` already does
+    # before it deletes anything — the two had drifted, which is how a
+    # value safe enough to delete under could still corrupt every URL.
     def output_dir
-      ENV['ABQARI_OUTPUT_DIR'] || File.join(site_root, '_site')
+      raw = ENV['ABQARI_OUTPUT_DIR']
+      return File.join(site_root, '_site') if raw.nil? || raw.strip.empty?
+
+      File.expand_path(raw, site_root)
     end
 
     # ------------------------------------------------------------------
@@ -312,6 +376,40 @@ module Abqari
       DEFAULT_COLLECTIONS.each_key { |name| result[name] = collection_config(name) }
       (config['collections'] || {}).each_key { |name| result[name] ||= collection_config(name) }
       result
+    end
+
+    # Extensions published out of a bundle directory: the built-in
+    # allow-list (`Page::Bundle::PUBLISHABLE_EXTENSIONS`) plus anything
+    # the site adds via
+    #
+    #   bundle_assets:
+    #     extensions: [.gpx, .stl]
+    #
+    # Additive rather than replacing, so a site that wants one extra
+    # download type doesn't have to restate the media defaults (and
+    # silently lose an image format when the defaults grow). Entries are
+    # normalised to lower-case and dot-prefixed, so `GPX`, `.gpx` and
+    # `gpx` all work.
+    def bundle_asset_extensions
+      memo(:bundle_asset_extensions) do
+        extra = Array((config['bundle_assets'] || {})['extensions'])
+                .map { |e| e.to_s.strip.downcase }
+                .reject(&:empty?)
+                .map { |e| e.start_with?('.') ? e : ".#{e}" }
+
+        # Markdown can't be opted back in. It's content, and publishing
+        # it as an asset is precisely the bug this allow-list closes —
+        # a `published: false` sibling shipped verbatim to production.
+        content, allowed = extra.partition { |e| Page::Bundle::CONTENT_EXTENSIONS.include?(e) }
+        unless content.empty?
+          Log.warn "Ignoring #{content.join(', ')} in `bundle_assets.extensions:` — " \
+                   'markdown is content, not an asset, and publishing it would expose ' \
+                   'files marked `published: false`. Move the file out of the bundle if ' \
+                   'you want it published.'
+        end
+
+        (Page::Bundle::PUBLISHABLE_EXTENSIONS + allowed).to_set
+      end
     end
 
     # Resolve a page like `content/photos/index.md` to the collection
@@ -767,6 +865,10 @@ module Abqari
     # silently go out of sync.
     def reset_state_for_rebuild!
       @generated_pages = []
+      # Reopen the contribute phase. Without this the dev server's
+      # second incremental rebuild would raise on the first publisher
+      # page it generated, because the flag survived the first build.
+      @collections_final = false
       @memos.clear
       @renderer.clear_template_cache
     end
@@ -813,9 +915,33 @@ module Abqari
     # this Site instance (or until `reset_state_for_rebuild!` runs).
     # Every cache on Site routes through here so there's a single
     # source of truth for what gets cleared between rebuilds.
+    #
+    # Mutex-guarded because templates call memoised accessors
+    # (`site.collection`, `site.posts`, …) from the parallel render
+    # pool. In practice most memos are warm before `render_pages`
+    # starts, and on MRI the GVL makes a torn Hash unlikely — but
+    # "unlikely on one implementation" isn't a guarantee, and
+    # `Renderer` already takes exactly this precaution for its own
+    # template and mtime caches. The lock is uncontended once a value
+    # exists, so the steady-state cost is a single `Hash#key?`.
+    #
+    # Re-entrant by design: a memoised accessor whose block calls
+    # another memoised accessor would deadlock on a plain Mutex, so the
+    # fast path reads WITHOUT the lock and the block runs OUTSIDE it.
+    # Two threads racing a cold key may both compute; they produce the
+    # same value and the last write wins, which is the standard,
+    # harmless memoisation race.
     def memo(key)
       return @memos[key] if @memos.key?(key)
-      @memos[key] = yield
+
+      value = yield
+      # `||=` rather than assuming the ivar: tests build sites with
+      # `Site.allocate` and set only the ivars they need, and a
+      # NoMethodError on nil there would be a baffling way to learn
+      # about a lock. The real constructor always sets it, so the
+      # lazy-init race is unreachable outside single-threaded test code.
+      (@memo_mutex ||= Mutex.new).synchronize { @memos[key] = value }
+      @memos[key]
     end
 
     def folio_enabled?

@@ -1,5 +1,5 @@
 ---
-title: Welcome to <%= title %>
+title: <%= yaml.call("Welcome to #{title}") %>
 published: true
 date: <%= Time.now.strftime('%Y-%m-%d') %>
 description: A starter post. Edit or delete this once you're up and running.

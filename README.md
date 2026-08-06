@@ -11,18 +11,39 @@ optional overrides), while the engine — layouts, themes, helpers, asset
 pipeline — lives in the dependency. Forking the engine is also
 supported for users who want to own all the code.
 
-> **Status:** v1.1.0 — see [CHANGELOG.md](CHANGELOG.md). Distributed
-> via RubyGems (`gem install abqari`) and as a Bundler path/git
-> source. The API follows [semver](https://semver.org/) from this
-> release onward — breaking changes bump the major version, every
+> **Status:** v1.1.0 — first public release, see
+> [CHANGELOG.md](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md).
+> Distributed via RubyGems (`gem install abqari`) and as a Bundler
+> path/git source. The API follows [semver](https://semver.org/) from
+> this release onward — breaking changes bump the major version, every
 > other change is backwards-compatible within a major.
+
+## Documentation
+
+This README is the complete guide; these cover single topics in depth.
+They live in the repository rather than in the gem, so the links are
+absolute.
+
+| Guide | Covers |
+| --- | --- |
+| [Theming](https://github.com/grantrayner/abqari/blob/main/docs/theming.md) | Design tokens, dark mode, ejecting and customising a theme, per-theme webfonts |
+| [Deploying](https://github.com/grantrayner/abqari/blob/main/docs/deploying.md) | Cloudflare Pages, GitHub Pages, Render, custom domains, troubleshooting |
+| [Publications](https://github.com/grantrayner/abqari/blob/main/docs/publications.md) | The canonical publication schema, bundles, series, Folio integration |
+| [Plugins](https://github.com/grantrayner/abqari/blob/main/docs/plugins.md) | Lifecycle hooks, `post_process` filters, writing a site plugin |
+| [Security](https://github.com/grantrayner/abqari/blob/main/docs/security.md) | Trust boundaries, what's hardened, what's powerful by design |
+| [Architecture](https://github.com/grantrayner/abqari/blob/main/docs/ARCHITECTURE.md) | How the build pipeline fits together — for contributors |
+
+Reporting a vulnerability:
+[SECURITY.md](https://github.com/grantrayner/abqari/blob/main/SECURITY.md).
 
 ## Design principles
 
-1. **Minimal dependencies.** Eight small runtime gems — three
+1. **Minimal dependencies.** Seven small runtime gems — three
    (`commonmarker`, `erubi`, `ruby-vips`) do the work on every build;
-   the rest cover syntax highlighting, the dev server, and content
-   importers.
+   the rest cover syntax highlighting, the dev server, and CSV/Base64
+   handling. Content importing needs one more (`reverse_markdown`),
+   deliberately left out of the runtime set so a normal install doesn't
+   pull in nokogiri for a feature it never uses.
 2. **Ruby-first.** ERB templates, real Ruby in views.
 3. **Rails-style structure.** `app/views/`, `app/helpers/`, `config/`.
 4. **SEO baked in.** Sitemap, RSS, JSON Feed, OG, JSON-LD, robots, redirects — all native.
@@ -76,7 +97,10 @@ Three things need to be on your computer before Abqari can run.
 Most macOS and Linux machines already have at least one of them; the
 commands below are safe to run either way.
 
-**Ruby 3.3 or newer** — the language Abqari is written in.
+**Ruby 3.3 or newer** — the language Abqari is written in. Ruby 3.3,
+3.4 and 4.0 are tested on every change: the full suite runs against
+each, and each also gets a clean-container install of the built gem
+following this quickstart.
 
 Check what you have:
 
@@ -150,7 +174,7 @@ Test that it worked:
 abqari version
 ```
 
-You should see something like `abqari 1.0.0`. If you get
+You should see a version number, e.g. `abqari 1.1.0`. If you get
 `command not found`, see [Troubleshooting](#troubleshooting) below.
 
 ### Step 3 — Create your first site
@@ -329,6 +353,16 @@ newer. Run `ruby --version` to check. If you have multiple Ruby
 versions installed (via rbenv / rvm / asdf), make sure 3.3+ is the
 active one.
 
+**`Address already in use` when starting `bin/serve`**
+Something already holds port 4000 — most often another Abqari site's dev
+server. Either stop it, or run this one somewhere else:
+
+```bash
+ABQARI_PORT=4001 bin/serve
+```
+
+To find out what's holding the port first: `lsof -nP -iTCP:4000 -sTCP:LISTEN`.
+
 **Browser shows the old version after I edit a file**
 `bin/serve`'s live-reload depends on the optional `listen` gem. Run
 `bundle install` from inside the site directory — the scaffolded
@@ -426,7 +460,7 @@ Edit `Gemfile`:
 ```ruby
 source 'https://rubygems.org'
 
-gem 'abqari', '~> 1.0'
+gem 'abqari', '~> 1.1'
 
 group :development do
   gem 'listen', '~> 3.8'    # optional, for the dev-server file watcher
@@ -436,7 +470,7 @@ end
 Or — pin to a git ref while tracking pre-release work:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.0.0'
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.1.0'
 ```
 
 Install the libvips C library once (hard dep for the image pipeline):
@@ -539,7 +573,7 @@ and helper in your repo, no gem dependency), clone the engine as
 your starting point:
 
 ```bash
-git clone https://github.com/your-handle/abqari my-site
+git clone https://github.com/grantrayner/abqari my-site
 cd my-site
 bundle install
 bin/new --name "My Blog" --locale en --theme minimal --clean
@@ -592,14 +626,21 @@ they're for CI, previews, and edge cases.
 | `ABQARI_SITE_ROOT` | current dir | Site root. Set by `bin/*` wrappers; override to build a site elsewhere. |
 | `ABQARI_OUTPUT_DIR` | `<site>/_site` | Output directory. Refuses to wipe the site root or a source dir. |
 | `ABQARI_LOG` | `info` | Log level: `debug` / `info` / `warn` / `error`. |
+| `ABQARI_DEBUG` | unset | `1` prints a backtrace for user-facing errors (bad YAML, invalid config, bad flag), which are otherwise reported as a single line. Unexpected exceptions always keep their backtrace. |
 | `ABQARI_INCLUDE_DRAFTS` | unset | `true` forces `published: false` posts into the build. |
 | `ABQARI_INCLUDE_FUTURE` | unset | `true` forces future-dated posts into the build. |
 | `ABQARI_STRICT_CONFIG` | unset | `true` turns unknown-config-key warnings (and a missing `config/site.yml`) into hard errors. Recommended in CI. |
+| `ABQARI_PORT` | `4000` | Dev-server port. Useful when you run several Abqari sites and 4000 is taken. Rejects anything that isn't a number in 1–65535, rather than silently binding a port you can't guess. |
 | `ABQARI_BIND` | `127.0.0.1` | Dev-server bind address. Set `0.0.0.0` to preview on a phone over LAN. |
 | `ABQARI_VERBOSE_LOG` | unset | `true` restores stock WEBrick dev-server logging, including the client-disconnect backtraces Abqari filters out. For debugging the socket layer. |
 | `ABQARI_SLOW_PAGE_MS` | `500` | Slow-page warning threshold (ms); `0` disables it. |
 | `ABQARI_ALLOW_EXTERNAL_OUTPUT` | unset | `true` permits an output dir outside the site root (CI artifact mounts). |
 | `ABQARI_ALLOW_EXTERNAL_SYMLINKS` | unset | `true` permits symlinks that escape the site root. Avoid. |
+
+Boolean variables above accept the literal string `true` (or `1`/`yes`
+for `ABQARI_DEBUG`) — `on`, `TRUE` and `y` are not recognised and read
+as unset. This is deliberate: a build flag that half-matches is worse
+than one that plainly doesn't.
 
 **Secrets** (POSSE syndication + webmentions) can come from the
 environment instead of committed `config/site.yml` — set these in your
@@ -642,6 +683,14 @@ If you skip `bin/new`, the example content stays. Useful for poking around — b
 ## Importing content
 
 If you're moving from another platform, `bin/import` pulls content from a platform export into your site's `content/<collection>/` tree. Each imported post lands as a regular Abqari bundle — same layout, same frontmatter conventions, same image pipeline — so the imported posts are indistinguishable from posts you'd write fresh.
+
+**One-time prerequisite.** Importing needs the `reverse_markdown` gem, which Abqari doesn't install by default — it pulls in nokogiri, and a site that never imports shouldn't carry it. Uncomment the line in your `Gemfile` and `bundle install`, or:
+
+```bash
+gem install reverse_markdown
+```
+
+`bin/import` tells you this if it's missing, so there's nothing to remember up front.
 
 ```bash
 bin/import substack ~/Downloads/substack-export.zip
@@ -950,7 +999,7 @@ it from `bin/build` before `Abqari::Site.new`.)
 
 ## Collections
 
-Four collections ship as built-in defaults:
+Four content collections ship as built-in defaults:
 
 | Collection | URL prefix | Layout | Use case |
 | --- | --- | --- | --- |
@@ -958,6 +1007,11 @@ Four collections ship as built-in defaults:
 | `photos` | `/photos/:slug/` | `photo.html.erb` | Image-centric posts with location / camera / series metadata |
 | `publications` | `/publications/:slug/` | `publication.html.erb` | Books, atlases, anything with a cover and price; integrates with Folio |
 | `workshops` | `/workshops/:slug/` | `workshop.html.erb` | Training offerings: dates, location, format, instructors, registration link |
+
+Two further built-ins — `bundles` and `series` — exist for Folio-sourced
+publication groupings rather than for files you author. They take no
+`content/` directory of their own; see
+[Folio integration](#folio-integration) below.
 
 Each collection has sensible defaults; configure overrides in
 `config/site.yml`:
@@ -1312,7 +1366,7 @@ footer:
 
 The page automatically appears in the nav and the footer. To remove it, delete the block. To reorder, change the number.
 
-The shipped [`content/about.md`](content/about.md) is a working example: it joins the nav at order 3 and includes a "Subscribe" section with RSS and JSON Feed links — so RSS discovery isn't hidden behind `<link rel="alternate">` alone. Edit the body to make it yours, or delete the file if you don't want an about page.
+The shipped [`content/about.md`](https://github.com/grantrayner/abqari/blob/main/lib/abqari/templates/site_skeleton/content/about.md.tt) is a working example: it joins the nav at order 3 and includes a "Subscribe" section with RSS and JSON Feed links — so RSS discovery isn't hidden behind `<link rel="alternate">` alone. Edit the body to make it yours, or delete the file if you don't want an about page.
 
 ### Explicit override (the power-user path)
 
@@ -1837,9 +1891,9 @@ Three GitHub Actions workflows ship in `.github/workflows/`, one per first-class
 
 | Host | Workflow file | Gate variable | Required secrets |
 | --- | --- | --- | --- |
-| **Cloudflare Pages** | [`deploy-cloudflare.yml`](.github/workflows/deploy-cloudflare.yml) | `ENABLE_CLOUDFLARE = true` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_PROJECT_NAME` variable) |
-| **Render** | [`deploy-render.yml`](.github/workflows/deploy-render.yml) | `ENABLE_RENDER = true` | `RENDER_DEPLOY_HOOK_URL` |
-| **GitHub Pages** | [`deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml) | `ENABLE_GITHUB_PAGES = true` | None (uses OIDC) |
+| **Cloudflare Pages** | [`deploy-cloudflare.yml`](https://github.com/grantrayner/abqari/blob/main/lib/abqari/templates/site_skeleton/.github/workflows/deploy-cloudflare.yml) | `ENABLE_CLOUDFLARE = true` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_PROJECT_NAME` variable) |
+| **Render** | [`deploy-render.yml`](https://github.com/grantrayner/abqari/blob/main/lib/abqari/templates/site_skeleton/.github/workflows/deploy-render.yml) | `ENABLE_RENDER = true` | `RENDER_DEPLOY_HOOK_URL` |
+| **GitHub Pages** | [`deploy-github-pages.yml`](https://github.com/grantrayner/abqari/blob/main/lib/abqari/templates/site_skeleton/.github/workflows/deploy-github-pages.yml) | `ENABLE_GITHUB_PAGES = true` | None (uses OIDC) |
 
 Gate variables live in **Settings → Secrets and variables → Actions → Variables**. Secrets live in the **Secrets** tab on the same page.
 
@@ -2224,7 +2278,7 @@ What's already wired in:
 
 | Feature | What it does |
 | --- | --- |
-| **Skip-to-content link** | First focusable element on every page; visually hidden until tabbed to. Targets `<main id="main-content">` so keyboard users bypass the nav. Defined in [`_skip_link.html.erb`](app/views/partials/_skip_link.html.erb) |
+| **Skip-to-content link** | First focusable element on every page; visually hidden until tabbed to. Targets `<main id="main-content">` so keyboard users bypass the nav. Defined in [`_skip_link.html.erb`](https://github.com/grantrayner/abqari/blob/main/app/views/partials/_skip_link.html.erb) |
 | **`<main>` landmark** | Every layout wraps content in `<main id="main-content" tabindex="-1">` for the skip-link target and screen-reader "jump to main" navigation |
 | **`aria-label="Primary"`** on the site nav | Disambiguates from pagination / footer navs in screen readers |
 | **`aria-label="Pagination"`** on pagination | Same — pagination shows up as "Pagination, navigation" instead of generic "navigation" |
@@ -2313,8 +2367,8 @@ Use both: Dependabot (or similar) for continuous monitoring and PR creation; `bi
 bin/test
 ```
 
-The engine ships with a Minitest suite under `test/` — roughly 60
-test files and 800 tests, running in about half a minute. Coverage
+The engine ships with a Minitest suite under `test/` — around 80 test
+files and 900 tests, running in about a minute. Coverage
 spans helpers, paginator logic, full site builds, deploy artifacts,
 SEO meta (canonicals, OG cards, feeds, sitemap escaping), the audit
 run, the CLI scaffolder, content importers, IndieWeb/syndication,
@@ -2398,7 +2452,7 @@ Build-time and runtime perf are already tuned for typical sites (~50–200 pages
 - **Content-hashed asset caching.** Fingerprinted assets that already exist with a matching name (matching content) are skipped — no rehash, no recopy.
 - **Mtime-aware bundle/public/font copying.** Files only copy when the source is newer than the destination.
 - **Parallel page rendering.** For sites with 16+ pages, rendering runs on a thread pool sized to `Etc.nprocessors`. Below that threshold, sequential (thread-spawn overhead would dominate).
-- **Incremental mode.** `bin/serve`'s watcher rebuilds with `incremental: true` — `_site/` isn't wiped; all the mtime/hash checks above pay off.
+- **Incremental mode.** `bin/serve`'s watcher rebuilds with `incremental: true` — `_site/` isn't wiped; all the mtime/hash checks above pay off. The tradeoff: because nothing is wiped, output for a **deleted or renamed** source file stays on disk, so the dev server keeps serving a page you've removed until you restart or run `bin/build`. Production builds are always full builds, so a deploy never carries a stale page.
 - **HTML minification.** Production builds strip whitespace between tags, remove comments, collapse runs of whitespace. `<pre>`, `<textarea>`, `<script>`, and `<style>` content is preserved. Disable with `minify: false` in `site.yml`.
 - **CSS/JS minification.** Production builds strip comments and collapse whitespace in stylesheets and scripts before fingerprinting. Conservative on purpose: quoted CSS strings, `calc()` spacing, and descendant selectors survive; JS files using template literals ship untouched. Same `minify:` switch as HTML.
 
@@ -2490,16 +2544,16 @@ bin/audit                  # verify nothing regressed
 ```
 
 `abqari new` scaffolds the Gemfile pinned to the current major.minor
-(`gem 'abqari', '~> 1.0'`), so `bundle update abqari` picks up patch
-releases and bumping the pin is the deliberate action of taking a
-feature release. To track a fork or an unreleased branch instead,
-swap the line for a git source:
+(`gem 'abqari', '~> 1.1'` as of this release), so `bundle update abqari`
+picks up patch releases and bumping the pin is the deliberate action of
+taking a feature release. To track a fork or an unreleased branch
+instead, swap the line for a git source:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/your-handle/abqari.git', tag: 'v1.0.0'
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.1.0'
 ```
 
-The cadence: read [CHANGELOG.md](CHANGELOG.md) before each upgrade,
+The cadence: read [CHANGELOG.md](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md) before each upgrade,
 note any breaking changes (`Removed:` and `Changed:` entries), then
 bump the pin and run the build.
 
@@ -2648,7 +2702,7 @@ layout: application       # optional, defaults to 'application'
 ### What's in 1.0
 
 Stable, semver-tracked surface area as of `1.0.0`. The
-[CHANGELOG](CHANGELOG.md) lists every shipping feature; broadly:
+[CHANGELOG](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md) lists every shipping feature; broadly:
 four built-in collections (`posts`, `photos`, `publications`,
 `workshops`) plus the `bundles`/`series` meta-collections, ERB
 templating with the standard helper library,

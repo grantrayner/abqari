@@ -277,12 +277,37 @@ module Abqari
       # special characters, or surrounding whitespace gets quoted.
       def yaml_scalar(str)
         return '""' if str.empty?
+
+        # Control characters — newlines above all — are handled FIRST and
+        # separately, because they can't be fixed by wrapping in quotes:
+        # a literal newline inside a double-quoted scalar still ends the
+        # line. An imported title of "Hello\npermalink: /x" would have
+        # been written straight through, turning one mapping entry into
+        # two. Importer input is a third-party export, so this is
+        # attacker-shaped. Escape them into their YAML forms instead.
+        if str.match?(/[\x00-\x1F\x7F]/)
+          return %("#{escape_yaml_double_quoted(str)}")
+        end
+
         if str.match?(/[:#&*\[\]{}|>!%@`]|\A[\s"'-]|[\s"']\z|\A(true|false|yes|no|null|~)\z/i) ||
            str.include?(': ')
-          %("#{str.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}")
+          %("#{escape_yaml_double_quoted(str)}")
         else
           str
         end
+      end
+
+      # Escape a string for a YAML double-quoted scalar: backslashes and
+      # quotes, then the control characters that have named escapes,
+      # then anything else remaining as \uXXXX.
+      def escape_yaml_double_quoted(str)
+        str
+          .gsub('\\', '\\\\\\\\')
+          .gsub('"', '\\"')
+          .gsub("\n", '\\n')
+          .gsub("\r", '\\r')
+          .gsub("\t", '\\t')
+          .gsub(/[\x00-\x1F\x7F]/) { |c| format('\\u%04X', c.ord) }
       end
 
       def block_array(key, items)
@@ -304,12 +329,22 @@ module Abqari
         rooted.empty? ? path : rooted
       end
 
+      # Write the run's report to the site root.
+      #
+      # `_import_report.md` is overwritten each run, deliberately: it
+      # describes the LAST import, and the skeleton's `.gitignore`
+      # already excludes it. Say so when replacing an existing one so a
+      # second import doesn't quietly discard the first report someone
+      # was still reading.
       def finalise
         return if @opts.dry_run
 
         report_path = File.join(@opts.site_root, '_import_report.md')
+        existed = File.exist?(report_path)
         File.write(report_path, @report.to_markdown)
-        @logger.call("\nReport: ./#{File.basename(report_path)}")
+
+        note = existed ? ' (replaced the previous one)' : ''
+        @logger.call("\nReport: ./#{File.basename(report_path)}#{note}")
       end
     end
   end

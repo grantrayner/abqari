@@ -29,4 +29,9 @@ $LOAD_PATH.unshift(dev_lib) if File.exist?(File.join(dev_lib, 'abqari.rb'))
 require 'abqari'         # for Abqari::VERSION (used by `abqari version`)
 require 'abqari/cli'
 
-exit(Abqari::CLI.run(ARGV) ? 0 : 1)
+# `run_cli` presents expected failures (Abqari::UserError) as a plain
+# message and Ctrl-C as "Interrupted", instead of a backtrace. Genuine
+# defects keep their trace. ABQARI_DEBUG=1 restores it for UserError.
+Abqari.run_cli do
+  exit(Abqari::CLI.run(ARGV) ? 0 : 1)
+end

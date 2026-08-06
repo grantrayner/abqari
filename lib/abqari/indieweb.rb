@@ -204,12 +204,56 @@ module Abqari
           next unless target_host_matches?(target, own_host)
 
           key = canonicalise(target)
-          index[key] << mention
+          index[key] << sanitise_mention(mention)
         end
         # Newest first within each target — matches the "Replies"
         # section visual convention.
         index.each_value { |list| list.sort_by! { |m| m['published'].to_s }.reverse! }
         index
+      end
+
+      # Every URL a mention carries, scrubbed to an absolute http(s) URL
+      # or dropped.
+      #
+      # Webmentions are the least-trusted data the engine renders:
+      # anyone on the internet can send one, and `author.url`,
+      # `author.photo` and the source URL are all copied from the
+      # SENDER's markup. They land in `href` and `src` attributes in
+      # `partials/_webmentions`.
+      #
+      # Erubi's auto-escaping is not sufficient protection here. It stops
+      # a value from breaking out of the attribute, but it leaves the URL
+      # scheme untouched — `javascript:fetch('//evil', {...})` escapes to
+      # itself and stays a working link. Escaping defends the HTML
+      # grammar; only scheme validation defends the URL.
+      #
+      # Sanitising here rather than in the template means anything
+      # reading `site.data['webmentions']` — the shipped partial, a
+      # user's own layout, a plugin — gets clean data by construction,
+      # instead of every reader having to remember. The on-disk cache
+      # keeps the raw upstream payload; this applies at point of use, so
+      # a cache written by an older version is scrubbed on load too.
+      #
+      # Unsafe values become `nil`. The partial already guards on empty
+      # (`if !author_url.empty?`), so a dropped URL degrades to plain
+      # text rather than a broken link.
+      def sanitise_mention(mention)
+        return mention unless mention.is_a?(Hash)
+
+        clean = mention.merge(
+          'url'       => Helpers.external_http_url(mention['url']),
+          'wm-source' => Helpers.external_http_url(mention['wm-source'])
+        )
+
+        author = mention['author']
+        if author.is_a?(Hash)
+          clean['author'] = author.merge(
+            'url'   => Helpers.external_http_url(author['url']),
+            'photo' => Helpers.external_http_url(author['photo'])
+          )
+        end
+
+        clean
       end
 
       # True when `target`'s host matches the site's own host. When the

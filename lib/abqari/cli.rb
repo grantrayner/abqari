@@ -75,8 +75,45 @@ module Abqari
 
       private
 
+      # Every subcommand's flag parsing funnels through here, so a bad
+      # flag is reported once, the same way, for all of them.
+      #
+      # `OptionParser#parse` raises on an unknown flag, and nothing
+      # caught it — so `abqari new --bloank mysite`, a one-character
+      # typo of a real flag, met a new user with a six-frame backtrace.
+      # Catching centrally (rather than in each subcommand) means a
+      # future subcommand gets the behaviour for free.
       def dispatch(class_name, argv)
-        Object.const_get(class_name).run(argv)
+        Object.const_get(class_name).run(normalize_argv(argv))
+      rescue OptionParser::ParseError => e
+        warn e.message
+        warn ''
+        warn "Run `abqari #{command_word(class_name)} --help` for the available options."
+        false
+      end
+
+      def command_word(class_name)
+        COMMANDS.key(class_name) || ''
+      end
+
+      # Force ARGV to UTF-8 so non-ASCII arguments survive.
+      #
+      # Ruby tags ARGV with the locale encoding. Under a C/POSIX locale
+      # — Docker images, cron, some CI runners, `env -i` — that's
+      # US-ASCII or ASCII-8BIT, and the first `File.expand_path` or ERB
+      # render against a UTF-8 template raised
+      # `Encoding::CompatibilityError`. `abqari new café` then died
+      # PART WAY THROUGH scaffolding, leaving a half-written directory
+      # that the non-empty preflight refused to overwrite on retry.
+      #
+      # The bytes are already correct; only the tag is wrong. Anything
+      # that isn't valid UTF-8 is left alone for the subcommand to
+      # reject with a real message.
+      def normalize_argv(argv)
+        argv.map do |arg|
+          candidate = arg.dup.force_encoding(Encoding::UTF_8)
+          candidate.valid_encoding? ? candidate : arg
+        end
       end
 
       def print_version

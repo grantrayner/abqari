@@ -36,8 +36,9 @@ ISC License:
 
 CSS/JS framework by The Bootstrap Authors — https://getbootstrap.com
 
-MIT License (https://github.com/twbs/bootstrap/blob/main/LICENSE). The
-vendored minified files retain their upstream license banners.
+Bootstrap v5.3.8, MIT License. Full license text ships at
+`themes/bootstrap/public/LICENSE`; the vendored minified files also
+retain their upstream license banners.
 
 ## Everything else
 

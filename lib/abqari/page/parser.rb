@@ -103,7 +103,8 @@ module Abqari
         # or Array — `frontmatter['title']` then does String#[] substring
         # matching (garbage) or raises a TypeError far from the parse.
         unless result.is_a?(Hash)
-          raise "frontmatter in #{source_path} must be a mapping (key: value pairs), " \
+          raise UserError,
+                "frontmatter in #{source_path} must be a mapping (key: value pairs), " \
                 "got #{result.class}"
         end
         result
@@ -113,10 +114,15 @@ module Abqari
         YAML.safe_load(yaml,
                        permitted_classes: Abqari::YAML_PERMITTED_CLASSES,
                        filename: source_path) || {}
-      rescue Psych::SyntaxError
-        raise # already carries source_path via filename:
+      rescue Psych::SyntaxError => e
+        # `filename:` above puts the path in Psych's message; the line
+        # number is relative to the frontmatter block, so say so rather
+        # than let the author hunt for line 2 of a 200-line file.
+        raise UserError,
+              "#{source_path} — invalid YAML in frontmatter at line #{e.line}, " \
+              "column #{e.column}: #{e.problem} #{e.context}".strip
       rescue StandardError => e
-        raise "invalid frontmatter in #{source_path}: #{e.class}: #{e.message}"
+        raise UserError, "invalid frontmatter in #{source_path}: #{e.class}: #{e.message}"
       end
     end
   end

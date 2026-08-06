@@ -8,19 +8,25 @@
 # Usage: bin/fetch-folio
 
 ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+# Resolve the bundle from this site, not from cwd — `bundler/setup`
+# finds its Gemfile relative to the current directory, so running this
+# from elsewhere would load an unrelated bundle (or none) and fail.
+ENV['BUNDLE_GEMFILE']   ||= File.expand_path('../Gemfile', __dir__)
 
 require 'bundler/setup'
 require 'abqari'
 
-site  = Abqari::Site.new
-folio = Abqari::Folio.new(site)
+Abqari.run_cli do
+  site  = Abqari::Site.new
+  folio = Abqari::Folio.new(site)
 
-unless folio.enabled?
-  warn 'Folio: not configured. Set folio.base_url and folio.author_slug in config/site.yml.'
-  exit 1
+  unless folio.enabled?
+    warn 'Folio: not configured. Set folio.base_url and folio.author_slug in config/site.yml.'
+    exit 1
+  end
+
+  # Drop ETags so we get a fresh 200 even if Folio thinks nothing changed.
+  Dir.glob(File.join(folio.cache_dir, 'etag-*')).each { |f| File.delete(f) }
+
+  folio.fetch
 end
-
-# Drop ETags so we get a fresh 200 even if Folio thinks nothing changed.
-Dir.glob(File.join(folio.cache_dir, 'etag-*')).each { |f| File.delete(f) }
-
-folio.fetch

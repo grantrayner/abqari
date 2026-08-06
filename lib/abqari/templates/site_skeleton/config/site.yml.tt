@@ -9,14 +9,14 @@
 # wait until you have a feel for what you want.
 
 # Site identity ──────────────────────────────────────────────────────────
-title: <%= title %>
-description: <%= description %>
-author: <%= author %>
+title: <%= yaml.call(title) %>
+description: <%= yaml.call(description) %>
+author: <%= yaml.call(author) %>
 
 # Locale ─────────────────────────────────────────────────────────────────
 # ISO 639-1 code. Sets <html lang>, RSS <language>, and Preferred-
 # Languages in security.txt. Single-locale only.
-locale: <%= locale %>
+locale: <%= yaml.call(locale) %>
 
 # SEO + social sharing ───────────────────────────────────────────────────
 # Solid SEO ships as standard: page titles, meta descriptions,
@@ -58,19 +58,34 @@ locale: <%= locale %>
 # the engine gem. Switch freely — none of the theme files are in this
 # repo (they live in the gem). Built-ins: minimal / magazine / notebook /
 # bootstrap / sand / custom / none. To customize one, copy it into this
-# repo with `abqari theme eject <name>` (see the engine's docs/theming.md
-# for the full token reference); your copy shadows the gem's.
-theme: <%= theme %>
+# repo with `abqari theme eject <name>`; your copy shadows the gem's.
+# Full token reference:
+# https://github.com/grantrayner/abqari/blob/main/docs/theming.md
+theme: <%= yaml.call(theme) %>
 
 # Fonts ──────────────────────────────────────────────────────────────────
 <%= fonts_block %>
+
+# Bundle assets ──────────────────────────────────────────────────────────
+# Files colocated with a post's index.md are published alongside it when
+# their extension is a known media type — images, video, audio, subtitles,
+# PDF/EPUB/ZIP. Anything else stays behind and is reported at build time,
+# so working files (.psd, .sketch, draft notes) don't ship by accident.
+#
+# Markdown is content, not an asset: only index.md renders, and a second
+# .md in the folder is skipped entirely. To keep a file local with no
+# build warning, prefix it with a dot (.notes.md).
+#
+# Add extensions here if your site publishes something else:
+# bundle_assets:
+#   extensions: [.gpx, .stl]
 
 # Collections ────────────────────────────────────────────────────────────
 # Four collections ship as built-in defaults. Flip enabled to false on
 # any your site doesn't use. Per-collection toggles for index / show /
 # archive / feeds / next / related / toc are scaffolded with sensible
-# defaults; consult the engine's reference config (or
-# docs/publications.md) for the full surface.
+# defaults. Full surface:
+# https://github.com/grantrayner/abqari/blob/main/docs/publications.md
 collections:
   posts:
     enabled: true

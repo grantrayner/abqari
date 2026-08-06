@@ -8,30 +8,39 @@
 # Flags:
 #   --strict        — exit non-zero on any error-severity finding (CI).
 #   --strict=warn   — exit non-zero on errors AND warnings.
+#   --verbose / -v  — set ABQARI_LOG=debug for extra build output.
 
 require 'optparse'
 
-options = { strict: nil }
+options = { strict: nil, log: nil }
 OptionParser.new do |opts|
-  opts.banner = 'Usage: bin/audit [--strict[=warn]]'
+  opts.banner = 'Usage: bin/audit [--strict[=warn]] [--verbose]'
   opts.on('--strict[=LEVEL]', %w[error warn],
           'Exit non-zero when findings exist at LEVEL or above (default: error)') do |level|
     options[:strict] = level || 'error'
   end
+  opts.on('-v', '--verbose', 'Verbose output (ABQARI_LOG=debug)') { options[:log] = 'debug' }
 end.parse!(ARGV)
 
+ENV['ABQARI_LOG']         = options[:log] if options[:log]
 ENV['ABQARI_ENV']       ||= 'production'
 ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+# Resolve the bundle from this site, not from cwd — `bundler/setup`
+# finds its Gemfile relative to the current directory, so running this
+# from elsewhere would load an unrelated bundle (or none) and fail.
+ENV['BUNDLE_GEMFILE']   ||= File.expand_path('../Gemfile', __dir__)
 
 require 'bundler/setup'
 require 'abqari'
 
-audit = Abqari::Audit.new(Abqari::Site.new).run
+Abqari.run_cli do
+  audit = Abqari::Audit.new(Abqari::Site.new).run
 
-if options[:strict]
-  count = audit.count(at_least: options[:strict])
-  if count.positive?
-    Abqari::Log.error "Audit failed: #{count} finding(s) at severity >= #{options[:strict]}"
-    exit 1
+  if options[:strict]
+    count = audit.count(at_least: options[:strict])
+    if count.positive?
+      Abqari::Log.error "Audit failed: #{count} finding(s) at severity >= #{options[:strict]}"
+      exit 1
+    end
   end
 end

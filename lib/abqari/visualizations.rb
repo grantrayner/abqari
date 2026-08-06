@@ -182,11 +182,18 @@ module Abqari
 
     # Used by Site's incremental render: re-render when shared deps change
     # or any post changes (since post data feeds the JSON).
+    def layout_name
+      'visualization'
+    end
+
     def needs_render?
       return true unless File.exist?(output_path)
 
       output_mtime = File.mtime(output_path)
       return true if @site.shared_deps_mtime > output_mtime
+      # Layouts live outside GLOBAL_DEP_GLOBS and are tracked per-page;
+      # only Page consulted them, so editing this layout rebuilt nothing.
+      return true if @site.layout_deps_mtime(layout_name) > output_mtime
 
       @site.posts.any? { |post| (post.lastmod || Time.now) > output_mtime }
     end
@@ -202,7 +209,7 @@ module Abqari
     private
 
     def render
-      RenderContext.new(self, @site).render_layout('visualization')
+      RenderContext.new(self, @site).render_layout(layout_name)
     end
   end
 end

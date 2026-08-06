@@ -60,9 +60,17 @@ class FrontmatterRobustnessTest < Minitest::Test
   end
 
   def test_non_hash_frontmatter_raises_with_source_path
-    err = assert_raises(RuntimeError) { page_from("---\njust a bare string\n---\nbody") }
+    # Abqari::UserError — a content mistake, printed without a backtrace.
+    err = assert_raises(Abqari::UserError) { page_from("---\njust a bare string\n---\nbody") }
     assert_includes err.message, 'must be a mapping'
     assert_includes err.message, @tmpdir
+  end
+
+  def test_malformed_frontmatter_yaml_reports_file_and_position
+    err = assert_raises(Abqari::UserError) { page_from("---\ntitle: [unclosed\n---\nbody") }
+    assert_includes err.message, @tmpdir, 'names the file'
+    assert_match(/line \d+/, err.message, 'and where in the frontmatter')
+    refute_match(/psych/i, err.message, 'without Psych internals leaking through')
   end
 
   def test_invalid_date_raises_with_source_path
@@ -226,13 +234,24 @@ class RequiredKeyValidationTest < Minitest::Test
   end
 
   def test_blank_url_in_production_raises_under_strict
-    assert_raises(ArgumentError) do
+    assert_raises(Abqari::UserError) do
       capture_io { Abqari::SiteConfig.validate!({ 'title' => 'X' }, strict: true, env: :production) }
     end
   end
 
+  def test_scheme_less_url_names_the_actual_mistake
+    # `URI.parse('example.com')` puts the whole string in `path`, so
+    # this used to be reported as "has a path component" — true, but
+    # pointing at the wrong problem.
+    err = assert_raises(Abqari::UserError) do
+      Abqari::SiteConfig.validate!({ 'title' => 'X', 'url' => 'example.com' }, env: :production)
+    end
+    assert_match(/missing a scheme/, err.message)
+    assert_match(%r{https://example\.com}, err.message)
+  end
+
   def test_path_bearing_url_is_rejected
-    err = assert_raises(ArgumentError) do
+    err = assert_raises(Abqari::UserError) do
       Abqari::SiteConfig.validate!(
         { 'title' => 'X', 'url' => 'https://user.github.io/repo' }, env: :production
       )

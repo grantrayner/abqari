@@ -171,10 +171,19 @@ module Abqari
       File.write(output_path, @site.post_process(render, page: self))
     end
 
+    def layout_name
+      @layout
+    end
+
     def needs_render?
       return true unless File.exist?(output_path)
 
-      File.mtime(output_path) < @site.shared_deps_mtime
+      output_mtime = File.mtime(output_path)
+      return true if output_mtime < @site.shared_deps_mtime
+      # Layouts are tracked per-page rather than in GLOBAL_DEP_GLOBS —
+      # without this, editing `publications_index.html.erb` left the
+      # index stale on the dev server.
+      @site.layout_deps_mtime(layout_name) > output_mtime
     end
 
     def lastmod
@@ -188,7 +197,7 @@ module Abqari
     private
 
     def render
-      RenderContext.new(self, @site).render_layout(@layout)
+      RenderContext.new(self, @site).render_layout(layout_name)
     end
   end
 
@@ -275,21 +284,48 @@ module Abqari
       File.write(output_path, @site.post_process(render, page: self))
     end
 
+    def layout_name
+      @layout
+    end
+
     def needs_render?
       return true unless File.exist?(output_path)
 
       output_mtime = File.mtime(output_path)
       return true if @site.shared_deps_mtime > output_mtime
+      # Layouts are tracked per-page rather than in GLOBAL_DEP_GLOBS —
+      # without this, editing `publication.html.erb` left every show
+      # page stale on the dev server.
+      return true if @site.layout_deps_mtime(layout_name) > output_mtime
 
       # If the publisher cache is newer than this page's output, re-render —
       # the underlying data may have changed since last build.
-      cache_path = File.join(@site.site_root, 'vendor', 'folio', "#{kind}s.yml")
-      File.exist?(cache_path) && File.mtime(cache_path) > output_mtime
+      cache_path = folio_cache_path
+      cache_path && File.exist?(cache_path) && File.mtime(cache_path) > output_mtime
     end
 
     def lastmod
-      cache_path = File.join(@site.site_root, 'vendor', 'folio', "#{kind}s.yml")
-      File.exist?(cache_path) ? File.mtime(cache_path) : Time.now
+      cache_path = folio_cache_path
+      cache_path && File.exist?(cache_path) ? File.mtime(cache_path) : Time.now
+    end
+
+    # On-disk Folio cache backing this page's kind.
+    #
+    # Derived from KIND_TO_COLLECTION rather than pluralising `kind`.
+    # `"#{kind}s.yml"` gets publications and bundles right and produces
+    # `seriess.yml` for series — a file that never exists, so series
+    # pages never noticed a stale cache (no re-render when Folio data
+    # changed) and fell through to the `Time.now` lastmod, restamping
+    # every series page's sitemap entry on every build. The determinism
+    # test couldn't catch it: both builds run on the same day.
+    #
+    # The collection names ARE the cache basenames, so reusing the map
+    # keeps the two from drifting again.
+    def folio_cache_path
+      basename = KIND_TO_COLLECTION[@kind.to_s]
+      return nil unless basename
+
+      File.join(@site.site_root, 'vendor', 'folio', "#{basename}.yml")
     end
 
     def bundle_images
@@ -299,7 +335,7 @@ module Abqari
     private
 
     def render
-      RenderContext.new(self, @site).render_layout(@layout)
+      RenderContext.new(self, @site).render_layout(layout_name)
     end
   end
 

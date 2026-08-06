@@ -23,7 +23,15 @@
 #   like a real user, instead of satisfying it from the local artifact.
 set -euo pipefail
 
-RUBIES=("3.4" "4.0")
+# Keep in step with the `ruby:` and `image:` matrices in
+# .github/workflows/ci.yml, and the gemspec's `required_ruby_version`.
+# The FLOOR matters most here: it's where a native dependency is likeliest
+# to have no precompiled binary for the platform and quietly fall back to
+# building from source — which fails in these deliberately toolchain-free
+# images, exactly as it would on a user's minimal deploy host. Testing
+# only the newer lines would leave the version the gemspec advertises
+# unproven.
+RUBIES=("3.3" "3.4" "4.0")
 PUBLISHED="${STRANGER_PUBLISHED:-0}"
 [ "${1:-}" = "--published" ] && PUBLISHED=1
 
@@ -48,7 +56,7 @@ if [ "${STRANGER_INNER:-0}" = "1" ]; then
   if [ "$PUBLISHED" = "1" ]; then
     echo '-- bundle install (abqari from rubygems.org — published mode)'
   else
-    # Not on rubygems.org yet, so the scaffolded `gem 'abqari', '~> 1.0'`
+    # Not on rubygems.org yet, so the scaffolded `gem 'abqari', '~> X.Y'`
     # can't resolve remotely. Substitute a path source built from the
     # ARTIFACT (unpacked .gem + its regenerated gemspec) — byte-faithful
     # to what a published install would contain. The ONLY deviation from

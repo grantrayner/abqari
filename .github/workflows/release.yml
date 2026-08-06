@@ -1,25 +1,41 @@
 # Push a new Abqari version to RubyGems on tag.
 #
-# Trigger: pushing a tag matching `v*.*.*` (e.g. `git tag v0.2.0 && git push origin v0.2.0`).
+# Trigger: pushing a tag matching `v*.*.*` (e.g. `git tag v1.1.0 && git push origin v1.1.0`).
 # The workflow re-runs the full suite, verifies the tag matches the
 # VERSION constant, builds the gem, and pushes it to RubyGems.
 #
-# Setup once per repo:
-#   1. Get an API key from https://rubygems.org/profile/api_keys
-#   2. Add it as the `RUBYGEMS_API_KEY` secret in GitHub repo Settings.
-#   3. Enable MFA on your RubyGems account (`rubygems_mfa_required` is
-#      set in the gemspec, so unsigned pushes from any account without
-#      MFA will be rejected by RubyGems).
+# Authentication is TRUSTED PUBLISHING — there is no API key in this
+# repository, and no `RUBYGEMS_API_KEY` secret to leak, rotate, or
+# accidentally print. The `publish` job mints a short-lived credential
+# by exchanging GitHub's OIDC token with RubyGems.org, which only
+# accepts it for this repo + this workflow file.
+#
+# Setup once per gem, on rubygems.org (nothing to configure here):
+#   1. Sign in, then go to
+#      https://rubygems.org/settings/pending_trusted_publishers  (before
+#      the gem's first release) or the gem's own "Trusted publishers"
+#      page (after it exists).
+#   2. Create a publisher with:
+#        RubyGem name:  abqari          (pending publishers only)
+#        Owner:         grantrayner
+#        Repository:    abqari
+#        Workflow:      release.yml
+#        Environment:   (leave blank — see the note in `publish` below)
+#   3. Keep MFA on for the account. `rubygems_mfa_required` is set in the
+#      gemspec, and trusted publishing does not replace that.
+#
+# A pending publisher converts to a normal one on the first successful
+# push, and makes you the gem's owner — so this works for a gem that has
+# never been published.
 
 name: Release
 
 # Third-party actions are SHA-pinned (not `@v5`-style floating tags).
-# Floating tags on a workflow that holds `contents: write` and the
-# RubyGems API key is a supply-chain hazard: an attacker who
-# compromises any major-tag action can publish abqari on our behalf.
-# Dependabot's `github-actions` ecosystem (.github/dependabot.yml)
-# keeps these pins up to date — bumping them is a reviewable PR
-# rather than a silent upstream release.
+# Floating tags on a workflow that can publish the gem are a
+# supply-chain hazard: an attacker who compromises any major-tag action
+# could publish abqari on our behalf. Dependabot's `github-actions`
+# ecosystem (.github/dependabot.yml) keeps these pins up to date —
+# bumping them is a reviewable PR rather than a silent upstream release.
 
 on:
   push:
@@ -28,17 +44,26 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.2.0)'
+        description: 'Tag to release (e.g. v1.1.0)'
         required: true
 
+# Least privilege: nothing here writes to the repo. The gem goes to
+# RubyGems over the network, and the artifact upload needs no `contents`
+# scope. (This was `contents: write`, which nothing used.)
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  # ------------------------------------------------------------------
+  # Gate. Holds NO secrets — see the `publish` job's comment for why
+  # that split matters.
+  # ------------------------------------------------------------------
+  verify:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install libvips with AVIF support
         # libheif1 + plugin packages are required for AVIF encoding —
@@ -51,6 +76,16 @@ jobs:
                                    libheif-plugin-dav1d
 
       - name: Install Pagefind (for site audit step)
+        # `curl | bash` executes whatever the host serves, so this step
+        # is confined to a job that holds no credential and cannot mint
+        # one — `id-token: write` is granted only to `publish`.
+        #
+        # It used to run in the same job as the RubyGems API key, where a
+        # compromised or DNS-hijacked pagefind.app could have read the
+        # key from the environment and published a malicious release.
+        # Both halves of that are now closed: the job split, and trusted
+        # publishing leaving no long-lived key to steal. The worst this
+        # step can do is fail the gate.
         run: |
           curl -LSf https://pagefind.app/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -62,12 +97,29 @@ jobs:
 
       - name: Resolve tag
         id: tag
+        env:
+          # Bound to env rather than interpolated into the script body.
+          # `${{ inputs.tag }}` inline is a shell-injection sink — the
+          # expansion happens before bash sees the line, so the value
+          # becomes code. Triggering workflow_dispatch needs repo write
+          # access, so this isn't an escalation, but this is the job
+          # that decides what gets published and the fix is free.
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
           else
-            echo "tag=${GITHUB_REF##*/}" >> "$GITHUB_OUTPUT"
+            tag="${GITHUB_REF##*/}"
           fi
+
+          # Validate the shape before any later step consumes it.
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Refusing to release: '$tag' is not a vMAJOR.MINOR.PATCH tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Verify tag matches VERSION constant
         env:
@@ -76,7 +128,21 @@ jobs:
           expected="${TAG#v}"
           actual=$(ruby -Ilib -r abqari -e 'puts Abqari::VERSION')
           if [ "$actual" != "$expected" ]; then
-            echo "Tag $TAG (=> version $expected) doesn't match lib/abqari.rb VERSION ($actual)" >&2
+            echo "Tag $TAG (=> version $expected) doesn't match lib/abqari/version.rb VERSION ($actual)" >&2
+            exit 1
+          fi
+
+      - name: Verify CHANGELOG has a section for this version
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        # A release whose changelog still files its features under
+        # [Unreleased] documents the wrong thing for the only version
+        # anyone can install — and `changelog_uri` in the gemspec points
+        # users straight at it.
+        run: |
+          version="${TAG#v}"
+          if ! grep -q "^## \[${version}\]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## [${version}]' section" >&2
             exit 1
           fi
 
@@ -98,18 +164,61 @@ jobs:
       - name: Run bundle-audit (CVE check)
         run: bundle-audit check --update
 
+  # ------------------------------------------------------------------
+  # Publish. The ONLY job that can push, so it runs the smallest
+  # possible set of steps: checkout, Ruby, credentials, build, push. No
+  # third-party installers, no apt, no bundle — `gem build` needs only
+  # the gemspec and lib/abqari/version.rb, which is exactly why that
+  # file is kept dependency-free. Keeping this job minimal matters more
+  # under trusted publishing, not less: anything running here runs
+  # alongside a live (if short-lived) push credential.
+  # ------------------------------------------------------------------
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Mint the OIDC token that RubyGems exchanges for a short-lived
+      # push credential. Granted at JOB level, not workflow level, so
+      # the `verify` job — which runs the tests, the audit, and a
+      # `curl | bash` installer — cannot request one.
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # No git credential needs to survive into later steps; this
+          # job only reads the tree and pushes over HTTPS to RubyGems.
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
+
+      # Exchanges the job's OIDC token for a RubyGems credential scoped
+      # to this repo + workflow, valid for minutes. Nothing to store in
+      # repo secrets, nothing to rotate, and a leaked log line is
+      # expired by the time anyone reads it.
+      #
+      # SHA-pinned like everything else. The upstream README shows
+      # `@main`, which for an action that handles publish credentials is
+      # precisely the pin you don't want.
+      #
+      # NOTE: no `environment:` on this job, deliberately. A GitHub
+      # environment adds optional approval gates, but the name must match
+      # the trusted publisher's Environment field on rubygems.org exactly
+      # — and a mismatch surfaces as an opaque auth failure mid-release.
+      # Leave both blank, or set both together.
+      - name: Configure RubyGems credentials (trusted publishing)
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+
       - name: Build gem
         run: gem build abqari.gemspec
 
       - name: Push to RubyGems
-        env:
-          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
-        run: |
-          gem push abqari-*.gem
+        run: gem push abqari-*.gem
 
       - name: Upload .gem to release artifacts
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: gem-${{ steps.tag.outputs.tag }}
+          name: gem-${{ needs.verify.outputs.tag }}
           path: abqari-*.gem
           retention-days: 90

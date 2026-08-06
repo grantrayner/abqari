@@ -28,9 +28,22 @@ module Abqari
 
       def run(argv)
         platform, *rest = argv
-        if platform.nil? || %w[-h --help help].include?(platform)
+
+        # An explicit `--help` is a success; being invoked with nothing
+        # is a usage error. Both printed help and returned true, so
+        # `bin/import` alone exited 0 — out of step with every other
+        # command here (`abqari new` and `abqari theme` with no args
+        # both exit 1) and a trap for any script checking the status.
+        if %w[-h --help help].include?(platform)
           print_help
           return true
+        end
+
+        if platform.nil?
+          warn 'Missing required argument: platform'
+          warn ''
+          print_help
+          return false
         end
 
         importer_class = Importers.lookup(platform)

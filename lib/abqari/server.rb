@@ -6,6 +6,9 @@ require 'timeout'
 
 module Abqari
   class Server
+    # Override with `ABQARI_PORT=4001 bin/serve`. Worth having because a
+    # machine running several Abqari sites has several dev servers wanting
+    # 4000, and `bin/serve` takes no arguments by design.
     DEFAULT_PORT = 4000
     # Localhost-only by default. WEBrick's stdlib default is to bind to
     # 0.0.0.0 (all interfaces) — which would expose unrendered drafts
@@ -13,6 +16,10 @@ module Abqari
     # that want to preview on a phone over LAN can override with
     # `ABQARI_BIND=0.0.0.0 bin/serve`.
     DEFAULT_BIND = '127.0.0.1'
+    # 0 is excluded deliberately: WEBrick reads it as "any free port", which
+    # would start a server the operator then has to hunt for. Ports below
+    # 1024 need root and would fail later and less clearly.
+    PORT_RANGE = (1..65_535).freeze
     POLL_INTERVAL = 0.5
     DEBOUNCE = 0.1
     WATCH_GLOBS = ['content/**/*', 'app/**/*', 'themes/**/*', 'config/**/*', 'lib/**/*', 'data/**/*'].freeze
@@ -79,9 +86,58 @@ module Abqari
       end
     end
 
-    def initialize(site, port: DEFAULT_PORT, bind: nil, logger: nil)
+    # `port:` and `bind:` resolve the same way: an explicit argument wins,
+    # then the environment, then the default. Embedders and the test suite
+    # pass explicit values and are unaffected by whatever is exported in the
+    # shell — which matters, because a stray ABQARI_PORT would otherwise
+    # make every test that binds a socket fight for the same one.
+    class << self
+      # ABQARI_PORT, parsed strictly.
+      #
+      # `String#to_i` is the wrong tool here and quietly wrong in three ways:
+      # "abc".to_i is 0, which WEBrick reads as "bind any free port" and
+      # starts a server on a port nobody knows; "4000x".to_i is 4000, so a
+      # typo silently works; and "99999".to_i is 99999, which fails deep in
+      # the socket layer with a message that doesn't mention the env var.
+      #
+      # An operator who sets this has a specific port in mind. If we can't
+      # honour it, say so here rather than serving something surprising.
+      def port_from_env
+        raw = ENV['ABQARI_PORT'].to_s.strip
+        return nil if raw.empty?
+
+        unless raw.match?(/\A\d+\z/)
+          raise UserError, "ABQARI_PORT=#{raw.inspect} is not a number. " \
+                           'Set it to a port between 1 and 65535, or unset it ' \
+                           "to use the default (#{DEFAULT_PORT})."
+        end
+
+        port = raw.to_i
+        unless PORT_RANGE.cover?(port)
+          raise UserError, "ABQARI_PORT=#{port} is out of range. " \
+                           "Use #{PORT_RANGE.min}–#{PORT_RANGE.max} " \
+                           '(ports below 1024 also need root).'
+        end
+
+        port
+      end
+
+      # Check the environment knobs WITHOUT constructing a server or
+      # touching the filesystem.
+      #
+      # `bin/serve` builds the entire site before it reaches
+      # `Server.new`, so a typo'd ABQARI_PORT cost a full build before
+      # the (genuinely good) error appeared. Call this first and it
+      # fails in microseconds instead.
+      def validate_env!
+        port_from_env
+        nil
+      end
+    end
+
+    def initialize(site, port: nil, bind: nil, logger: nil)
       @site = site
-      @port = port
+      @port = port || self.class.port_from_env || DEFAULT_PORT
       @bind = bind || ENV['ABQARI_BIND'] || DEFAULT_BIND
       # WEBrick's internal logger. Defaults to `QuietLog` — WEBrick's
       # own stderr logger with client-disconnect errors filtered out

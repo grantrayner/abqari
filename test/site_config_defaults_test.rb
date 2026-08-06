@@ -63,10 +63,20 @@ class SiteConfigDefaultsTest < Minitest::Test
   end
 
   def test_validate_raises_in_strict_mode
-    err = assert_raises(ArgumentError) do
+    # Abqari::UserError, not ArgumentError: config mistakes are user
+    # errors, and entry points print them without a backtrace.
+    err = assert_raises(Abqari::UserError) do
       Abqari::SiteConfig.validate!({ 'unknown' => 'x' }, strict: true)
     end
     assert_match(/unknown/i, err.message)
+  end
+
+  def test_strict_mode_message_does_not_advise_enabling_strict_mode
+    err = assert_raises(Abqari::UserError) do
+      Abqari::SiteConfig.validate!({ 'unknown' => 'x' }, strict: true)
+    end
+    refute_match(/set ABQARI_STRICT_CONFIG=true/, err.message,
+                 'the strict-mode error told the user to enable the flag that just fired')
   end
 
   def test_deploy_key_is_known

@@ -19,8 +19,14 @@ end.parse!(ARGV)
 ENV['ABQARI_LOG']         = options[:log] if options[:log]
 ENV['ABQARI_ENV']       ||= 'production'
 ENV['ABQARI_SITE_ROOT'] ||= File.expand_path('..', __dir__)
+# Resolve the bundle from this site, not from cwd — `bundler/setup`
+# finds its Gemfile relative to the current directory, so running this
+# from elsewhere would load an unrelated bundle (or none) and fail.
+ENV['BUNDLE_GEMFILE']   ||= File.expand_path('../Gemfile', __dir__)
 
 require 'bundler/setup'
 require 'abqari'
 
-Abqari::Site.new.build
+Abqari.run_cli do
+  Abqari::Site.new.build
+end
