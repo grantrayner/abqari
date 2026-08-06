@@ -80,8 +80,82 @@ end
 
 require 'fileutils'
 require 'tmpdir'
+
+# Drop Ruby warnings raised from inside INSTALLED GEMS, before anything
+# is required.
+#
+# Ruby 3.4+ warns on every mutation of a "chilled" string literal — a
+# file with no `frozen_string_literal` comment. `reverse_markdown` has
+# several, and it's called in a loop by the importer tests, so a clean
+# run buried its own result under ~400 identical lines of
+# "literal string will be frozen in the future".
+#
+# The filter is deliberately narrow: only warnings whose text points
+# into a gem path are dropped. A warning from `lib/` or `test/` — ours
+# to fix — still prints. `VERBOSE_WARNINGS=1` restores everything, for
+# when you're auditing a dependency rather than reading a test run.
+unless ENV['VERBOSE_WARNINGS']
+  module GemWarningFilter
+    GEM_PATH_RE = %r{/gems/[^/]+/(lib|ext)/}
+
+    def warn(message, category: nil, **kwargs)
+      return if message.to_s.match?(GEM_PATH_RE)
+
+      super
+    end
+  end
+  Warning.extend(GemWarningFilter)
+end
+
 require 'abqari'
 require 'minitest/autorun'
+
+# Quiet the engine's own logger by default.
+#
+# The suite deliberately exercises paths that log: builds, missing
+# config, syndication, webmention fetches, plugin loading. At `info`
+# that's several hundred lines of "Built 1 page(s)" and "Missing `url`"
+# interleaved with the progress dots, which makes a failure genuinely
+# hard to find. `error` keeps the loud things loud — including the
+# deliberate crash fixtures, which SHOULD be visible — and drops the
+# routine chatter.
+#
+# Set ABQARI_LOG to see everything for a debugging run:
+#   ABQARI_LOG=info bin/test
+unless ENV['ABQARI_LOG']
+  REAL_STDOUT = $stdout
+  REAL_STDERR = $stderr
+
+  # Suppress info/warn when nobody is listening — but never when a test
+  # is capturing.
+  #
+  # Gating on the log LEVEL would have been simpler and wrong: a test
+  # that captures output is a test that asserts on it, so a quiet level
+  # empties the very string under assertion. And the suite captures
+  # three different ways (`capture_io`, a local `capture_stderr` helper,
+  # and hand-rolled `$stderr = StringIO.new`), so wrapping any one of
+  # them misses the others — and the next idiom someone invents.
+  #
+  # Checking whether the stream has been swapped covers all three and
+  # anything future, because every capture technique works by replacing
+  # `$stdout`/`$stderr`. Captured output is therefore byte-identical to
+  # what it was before this filter existed.
+  #
+  # `error` is never suppressed: the suite exercises real failure paths
+  # (plugin crashes, render errors) and those staying loud is the point.
+  module QuietUnlessCaptured
+    def info(msg)  = capturing? ? super : nil
+    def warn(msg)  = capturing? ? super : nil
+    def debug(msg) = capturing? ? super : nil
+
+    private
+
+    def capturing?
+      !$stdout.equal?(REAL_STDOUT) || !$stderr.equal?(REAL_STDERR)
+    end
+  end
+  Abqari::Log.singleton_class.prepend(QuietUnlessCaptured)
+end
 
 # Production config so we exercise the real env (canonical URL, indexable, etc.).
 ENV['ABQARI_ENV'] ||= 'production'

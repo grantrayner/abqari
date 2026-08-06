@@ -145,13 +145,15 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Install bundler-audit
-        run: gem install bundler-audit
-
       - name: Run bundle-audit
+        # bundler-audit is in the Gemfile's development group, so
+        # `bundler-cache: true` above has already installed it at the
+        # pinned version — no separate `gem install` step, and the
+        # version CI scans with is the version a contributor gets.
+        #
         # `check --update` refreshes the advisory database before scanning
         # so the runner picks up CVEs published since the last cache build.
-        run: bundle-audit check --update
+        run: bundle exec bundle-audit check --update
 
   # The "stranger test": install the built gem and follow the quickstart
   # in a CLEAN ruby:X-slim job container — no Rust, no libvips, no

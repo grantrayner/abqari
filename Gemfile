@@ -9,6 +9,14 @@ ruby '>= 3.3'   # matches abqari.gemspec's required_ruby_version
 gemspec
 
 group :development do
+  # bundler-audit: the CVE check in `bin/check` and both CI workflows.
+  # In the bundle rather than a global `gem install` so it's pinned,
+  # reviewable via Dependabot, and — the reason it moved here — present
+  # regardless of which Ruby is active. A global install belongs to one
+  # Ruby, so switching from 3.3 to 4.0 silently broke `bin/check`'s CVE
+  # step with "command not found". `require: false`: it's a CLI, never
+  # loaded in-process.
+  gem 'bundler-audit', '~> 0.9', require: false
   gem 'listen', '~> 3.8'    # FS events for the dev-server watcher (optional)
   gem 'minitest', '~> 5.0'
   # reverse_markdown is an OPTIONAL runtime dependency (see the gemspec

@@ -117,8 +117,16 @@ class RenderPoolTest < Minitest::Test
     end.new('exploder')
 
     pages = Array.new(20) { |i| FakePage.new("p#{i}") } + [boom]
-    err = assert_raises(RuntimeError) { make_renderer(pages).render_pages }
+
+    err = nil
+    _out, log = capture_io do
+      err = assert_raises(RuntimeError) { make_renderer(pages).render_pages }
+    end
+
     assert_match(/page\(s\) failed to render/, err.message)
+    # The failure is also reported per-page, with the page named, so a
+    # multi-page failure can be diagnosed from the log alone.
+    assert_match(/render failed: exploder/, log)
     # Every other page should still have been written even though one threw.
     other_pages = pages.reject { |p| p == boom }
     assert other_pages.all?(&:rendered_at),

@@ -158,11 +158,11 @@ jobs:
           ABQARI_ENV: production
         run: bundle exec bin/audit --strict
 
-      - name: Install bundler-audit
-        run: gem install bundler-audit
-
       - name: Run bundle-audit (CVE check)
-        run: bundle-audit check --update
+        # From the bundle (development group) rather than a separate
+        # `gem install` — one less unpinned fetch in the release path,
+        # and the gate scans with the same version `bin/check` does.
+        run: bundle exec bundle-audit check --update
 
   # ------------------------------------------------------------------
   # Publish. The ONLY job that can push, so it runs the smallest

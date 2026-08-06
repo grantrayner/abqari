@@ -59,14 +59,28 @@ class HooksRegistryTest < Minitest::Test
 
   def test_hook_exceptions_are_re_raised_with_logged_backtrace
     Abqari::Hooks.register(:explode) { raise 'boom' }
-    err = assert_raises(RuntimeError) { Abqari::Hooks.run(:explode) }
+
+    err = nil
+    _out, log = capture_io do
+      err = assert_raises(RuntimeError) { Abqari::Hooks.run(:explode) }
+    end
+
     assert_equal 'boom', err.message
+    # The backtrace half of the name was never actually checked.
+    assert_match(/plugin hook explode crashed/, log)
+    assert_match(/hooks_test\.rb:\d+/, log, 'the log should locate the failing hook')
   end
 
   def test_filter_exceptions_are_re_raised
     Abqari::Hooks.register(:explode) { |_v| raise 'filter-boom' }
-    err = assert_raises(RuntimeError) { Abqari::Hooks.run_filter(:explode, 'x') }
+
+    err = nil
+    _out, log = capture_io do
+      err = assert_raises(RuntimeError) { Abqari::Hooks.run_filter(:explode, 'x') }
+    end
+
     assert_equal 'filter-boom', err.message
+    assert_match(/plugin filter explode crashed/, log)
   end
 
   def test_registered_events_returns_unique_keys
@@ -122,8 +136,14 @@ class PluginLoaderTest < Minitest::Test
     bad_path = File.join(@tmpdir, 'plugins', 'broken.rb')
     File.write(bad_path, 'def syntax error not valid')
 
-    err = assert_raises(SyntaxError) { Abqari::PluginLoader.load_from(@tmpdir) }
+    err = nil
+    _out, log = capture_io do
+      err = assert_raises(SyntaxError) { Abqari::PluginLoader.load_from(@tmpdir) }
+    end
+
     assert_includes err.message.to_s.downcase, 'syntax'
+    assert_match(/plugin load failed/, log)
+    assert_includes log, bad_path, 'the log should name the offending plugin file'
   end
 end
 

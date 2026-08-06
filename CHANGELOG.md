@@ -428,6 +428,44 @@ alter what your site publishes.
   gained it; the scaffolded copy never did — the only real behavioural
   drift across the eight script pairs.
 
+- **`bin/check`'s CVE step broke whenever the active Ruby changed.**
+  `bundler-audit` was expected as a global `gem install`, and a global
+  install belongs to exactly one Ruby — so switching the development
+  Ruby from 3.3 to 4.0 left `bundle exec bundle-audit` reporting
+  "command not found", and the check silently sat at ✗. A gate nobody
+  can get to pass is a gate nobody reads.
+
+  It's now in the Gemfile's development group (`require: false` — it's a
+  CLI), so it's pinned, Dependabot-visible, and present under whichever
+  Ruby is active. Both CI workflows dropped their separate
+  `gem install bundler-audit` step and call it through the bundle, so
+  the version that gates a release is the version a contributor runs.
+
+  (Unchanged for scaffolded sites: `bin/audit`'s optional CVE section
+  still shells out to a globally installed `bundle-audit`, as the README
+  describes.)
+
+- **`bin/test` buried its own result.** A passing run emitted well over
+  a thousand lines: ~400 chilled-string warnings from inside
+  `reverse_markdown` (Ruby 3.4+ warns on every literal mutation in a
+  file without the magic comment, and the importer tests call it in a
+  loop), plus every `Built 1 page(s)`, `Missing \`url\``, webmention
+  and syndication line the suite legitimately triggers. Finding a
+  failure meant scrolling past all of it.
+
+  Warnings originating inside installed gems are now filtered
+  (`VERBOSE_WARNINGS=1` restores them), and the engine's own info/warn
+  output is suppressed only when nothing is capturing it — detected by
+  checking whether `$stdout`/`$stderr` has been swapped, so all three
+  capture idioms in the suite keep seeing byte-identical output.
+  `ABQARI_LOG=info bin/test` restores everything. Errors are never
+  suppressed. A clean run is now 12 lines.
+
+  Four tests that deliberately trigger logged errors now capture and
+  assert on them rather than printing to the terminal — including
+  `test_hook_exceptions_are_re_raised_with_logged_backtrace`, which
+  never actually checked that a backtrace was logged.
+
 - **The clean-container test skipped the Ruby version the gemspec
   advertises.** Both `bin/stranger-test` and CI's `stranger` job ran
   3.4 and 4.0 while `required_ruby_version` is `>= 3.3`, leaving the

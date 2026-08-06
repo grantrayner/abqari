@@ -85,7 +85,10 @@ class CliThemeTest < Minitest::Test
 
   def test_requires_site_root
     Dir.chdir(Dir.mktmpdir('abqari-not-a-site')) do
-      refute Abqari::CLI::Theme.run(['eject', 'minimal'])
+      _out, err = capture_io do
+        refute Abqari::CLI::Theme.run(['eject', 'minimal'])
+      end
+      assert_match(/site root/, err, 'and it should say why it refused')
     end
   end
 
