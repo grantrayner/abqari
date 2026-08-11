@@ -9,6 +9,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.1.1] — 2026-08-11
+
+Bug-fix release, all of it found while building a site against the
+published 1.1.0 gem.
+
+Upgrade if you minify (the default in production): a tag name written
+inside an HTML comment could silently delete everything between that
+comment and the next one, and layouts carry explanatory comments as a
+matter of course. Upgrade too if you use the contact button — it never
+worked at all.
+
+### Fixed
+
+- **A tag name written inside an HTML comment silently deleted page
+  content — production builds only.** `Minifier.minify` stashed
+  `<pre>` / `<textarea>` / `<script>` / `<style>` blocks *before* it
+  stripped comments, so ordinary explanatory prose in a layout or
+  partial — `<!-- see the <script> tag below -->` — opened a
+  "preserved" region at the comment's own text. That region ran to the
+  next genuine `</script>` further down the document, swallowing the
+  comment's `-->` on the way; the orphaned `<!--` then paired with some
+  later `-->`, and the comment pass deleted the placeholder along with
+  everything between the two. Pages shipped with an empty `<main>`
+  against a green build, and only in production, because dev doesn't
+  minify.
+
+  Comments and preserved blocks are now matched in one ordered
+  left-to-right pass, so whichever construct starts first consumes the
+  other and tag-like text inside a comment can't open a region. This is
+  the same single-pass discipline (and the same failure class) as the
+  CSS minifier's comment/string handling. Conditional comments
+  (`<!--[if …]>`) are stashed rather than stripped, so they now survive
+  verbatim instead of having their contents whitespace-collapsed.
+
+- **A document beginning or ending with a `<pre>` / `<script>` /
+  `<style>` block leaked the minifier's internal placeholder.** The
+  final trim used `String#strip`, which removes NUL bytes as well as
+  whitespace, truncating the stash sentinel so the placeholder never
+  matched on restore and shipped as literal `ABQARI_PRESERVED_0` text.
+  Real pages end in `</html>`, which is why this stayed hidden. Both
+  the HTML and CSS minifiers now trim whitespace only.
+
+- **The contact button did nothing when clicked.** `contact-button.js`
+  delegates on `.contact-button[data-user][data-domain]`, but the
+  partial only ever emitted the styling classes (`btn
+  btn-outline-secondary`, or whatever `css_class:` was set to) — the
+  wrapper's `.contact-button-wrapper` is a different class token, so
+  the selector matched nothing on every site that enabled the button.
+  No console error; the button just sat there. `.contact-button` is now
+  emitted as a styling-free JS hook alongside `css_class:`, so
+  overriding the variant can't break the handler.
+
+- **`contact.subject:` rendered a malformed `data-subject` attribute.**
+  `_contact_button.html.erb` built the whole attribute as a Ruby string
+  and emitted it through `<%= %>`, which auto-escapes under Erubi — so
+  the attribute's own quote characters came out as entities
+  (`data-subject=&quot;Project enquiry&quot;`) and the subject would
+  not have reached `contact-button.js` even once the click handler
+  fired. The attribute name and quotes are now literal template text;
+  only the value passes through the escape.
+
+### Changed
+
+- `Minifier::PRESERVE_REGEX` and `Minifier::COMMENT_REGEX` are gone,
+  replaced by the single `Minifier::HTML_TOKEN_REGEX`. Both were
+  internal to `minify` and nothing outside the engine has reason to
+  reference them; they're called out because 1.1.0 is on RubyGems and
+  removing a public constant is technically breaking. `PRESERVE_TAGS`
+  is unchanged.
+
+- `test/low_priority_hardening_test.rb` no longer relies on
+  `Object#stub`. Minitest 6 dropped `minitest/mock` from the default
+  install, so that test errored on every run of the suite.
+
 ## [1.1.0] — 2026-08-06
 
 First public release on RubyGems. 1.0.0 below was tagged in git but
@@ -884,6 +958,7 @@ run a real working author / publisher site.
   commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
   the `~> 2.4` floor bought.
 
-[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/grantrayner/abqari/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/grantrayner/abqari/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0

@@ -6,20 +6,46 @@ module Abqari
   # <pre>, <textarea>, <script>, and <style> blocks where whitespace matters.
   module Minifier
     PRESERVE_TAGS = %w[pre textarea script style].freeze
-    PRESERVE_REGEX = /<(#{PRESERVE_TAGS.join('|')})\b[^>]*>.*?<\/\1>/im.freeze
     PLACEHOLDER = "\x00ABQARI_PRESERVED_%d\x00"
-    COMMENT_REGEX = /<!--(?!\[if).*?-->/m.freeze
+
+    # Comments and preserved blocks are recognised in ONE left-to-right
+    # pass, via ordered alternation, so whichever construct STARTS first
+    # consumes the other — the same single-pass discipline (and for the
+    # same reason) as CSS_TOKEN_REGEX below.
+    #
+    # Stashing preserved blocks first and stripping comments afterwards
+    # is what this replaced, and it was wrong: a tag-like string written
+    # inside a comment — `<!-- see the <script> tag -->` in a layout —
+    # opened a preserved region at the `<script>` text, which then ran
+    # to the next GENUINE `</script>` further down the document,
+    # swallowing the comment's own `-->` on the way. The orphaned `<!--`
+    # then paired with some later `-->`, and the comment pass deleted
+    # the placeholder and everything between. Pages came out with an
+    # empty `<main>`, in production builds only (dev doesn't minify).
+    #
+    # Comments matched here are dropped, except conditional comments
+    # (`<!--[if …]>`), which are stashed so they survive verbatim.
+    HTML_TOKEN_REGEX = %r{
+      (?<comment><!--.*?-->)
+      |
+      (?<preserved><(?<tag>#{PRESERVE_TAGS.join('|')})\b[^>]*>.*?</\k<tag>>)
+    }imx.freeze
+    CONDITIONAL_COMMENT_REGEX = /\A<!--\[if/i.freeze
 
     def self.minify(html)
       preserved = []
 
-      protected_html = html.gsub(PRESERVE_REGEX) do |match|
-        preserved << match
-        format(PLACEHOLDER, preserved.length - 1)
+      protected_html = html.gsub(HTML_TOKEN_REGEX) do
+        match = ::Regexp.last_match
+        if match[:comment] && !match[:comment].match?(CONDITIONAL_COMMENT_REGEX)
+          ''
+        else
+          preserved << match[0]
+          format(PLACEHOLDER, preserved.length - 1)
+        end
       end
 
       minified = protected_html
-                 .gsub(COMMENT_REGEX, '')
                  # Collapse inter-tag whitespace to a SINGLE space, not
                  # nothing. `<em>a</em> <strong>b</strong>` must stay
                  # "a b" — deleting the space renders "ab". The size win
@@ -29,12 +55,28 @@ module Abqari
                  # significant whitespace inside them is untouched.)
                  .gsub(/>\s+</, '> <')
                  .gsub(/\s{2,}/, ' ')
-                 .strip
+      minified = trim(minified)
 
-      minified.gsub(/\x00ABQARI_PRESERVED_(\d+)\x00/) do
-        preserved[::Regexp.last_match(1).to_i]
-      end
+      restore(minified, preserved)
     end
+
+    # `String#strip` also removes NUL bytes, which would bite the
+    # PLACEHOLDER's trailing \x00 whenever a document starts or ends
+    # with a preserved block — the placeholder then fails to match on
+    # restore and ships to the browser as literal
+    # "\x00ABQARI_PRESERVED_0" text. `\s` in a Ruby regex is whitespace
+    # only, so trimming this way leaves the sentinels intact.
+    TRIM_REGEX = /\A\s+|\s+\z/.freeze
+    PLACEHOLDER_REGEX = /\x00ABQARI_PRESERVED_(\d+)\x00/.freeze
+
+    def self.trim(text)
+      text.gsub(TRIM_REGEX, '')
+    end
+
+    def self.restore(text, preserved)
+      text.gsub(PLACEHOLDER_REGEX) { preserved[::Regexp.last_match(1).to_i] }
+    end
+    private_class_method :trim, :restore
 
     # Comments and quoted strings are recognised in ONE left-to-right
     # pass, via ordered alternation, so whichever construct STARTS first
@@ -81,11 +123,9 @@ module Abqari
                  .gsub(/\s+/, ' ')
                  .gsub(/\s*([{};,>])\s*/, '\1')
                  .gsub(';}', '}')
-                 .strip
+      minified = trim(minified)
 
-      minified.gsub(/\x00ABQARI_PRESERVED_(\d+)\x00/) do
-        preserved[::Regexp.last_match(1).to_i]
-      end
+      restore(minified, preserved)
     end
 
     JS_LINE_COMMENT_REGEX  = %r{^[ \t]*//.*$}.freeze

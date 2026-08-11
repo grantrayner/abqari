@@ -41,9 +41,13 @@ Running the suite needs the libvips C library (`brew install vips` /
    bin/audit         # reports no new errors
    ```
 5. **Update the README** if your change affects behaviour, config, or
-   the project structure.
-6. **Update CHANGELOG.md** — add an entry under the current release
-   heading (create a new dated version section when cutting a release).
+   the project structure — and `docs/` if it lands in a documented
+   subsystem (theming, plugins, publications, deploying, security).
+6. **Update CHANGELOG.md** — add an entry under `## [Unreleased]` as
+   part of the same change, while you still remember why. Lead with the
+   user-visible symptom, and say why it hid if it was hiding.
+   [docs/releasing.md](docs/releasing.md) has the entry style and the
+   full release procedure.
 
 ## Style
 
@@ -110,13 +114,20 @@ released yet.
 
 ### Cutting a release
 
+**[docs/releasing.md](docs/releasing.md) is the full procedure** — how
+to choose the version number, what the changelog owes the reader, and
+which files carry the version alongside `version.rb`. Follow it rather
+than the summary here; this section covers only what the automation
+does once you tag.
+
 ```bash
 bin/check                     # tests + strict audit + CVE scan
 bin/stranger-test             # clean-container install on every supported Ruby
 ```
 
 Then update `lib/abqari/version.rb`, move the `[Unreleased]` changelog
-entries under a dated `## [X.Y.Z]` heading, commit, and tag:
+entries under a dated `## [X.Y.Z]` heading, update the README's
+version-bearing lines, relock, commit, and tag:
 
 ```bash
 git tag vX.Y.Z && git push origin vX.Y.Z

@@ -15,6 +15,10 @@
   Place anywhere by calling `<%%= render 'partials/contact_button' %%>`
   from any layout. Already wired into the default about layout.
 
+  `.contact-button` is the JS hook contact-button.js delegates on. It's
+  always emitted and carries no styling, so `css_class:` can be anything
+  without breaking the click handler — keep the two roles separate.
+
   Default styling: `.btn .btn-outline-secondary` from _common.css.
   Override with `css_class:` to swap the variant — e.g.
       <%%= render 'partials/contact_button', css_class: 'btn btn-success' %%>
@@ -31,10 +35,10 @@
   <% subject = cfg['subject'] %>
   <% button_class = defined?(css_class) ? css_class.to_s : 'btn btn-outline-secondary' %>
   <p class="contact-button-wrapper">
-    <button type="button" class="<%= button_class %>"
+    <button type="button" class="contact-button <%= button_class %>"
             data-user="<%= user %>"
             data-domain="<%= domain %>"
-            <%= subject ? %(data-subject="#{h(subject)}") : '' %>>
+            <% if subject %>data-subject="<%= subject %>"<% end %>>
       <%= label %>
     </button>
   </p>
