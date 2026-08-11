@@ -29,5 +29,5 @@ group :development do
   # Bundler's frozen mode regardless of which Ruby minor we're on.
   gem 'ostruct', '~> 0.6'
   gem 'rexml', '~> 3.3'
-  gem 'simplecov', '~> 0.22', require: false  # line coverage; opt-in via COVERAGE=1
+  gem 'simplecov', '~> 1.0', require: false   # line coverage; opt-in via COVERAGE=1
 end
