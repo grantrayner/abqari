@@ -63,7 +63,7 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install libvips with AVIF support
         # libheif1 + plugin packages are required for AVIF encoding —
@@ -91,7 +91,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           bundler-cache: true
 
@@ -195,14 +195,14 @@ jobs:
       # `curl | bash` installer — cannot request one.
       id-token: write
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No git credential needs to survive into later steps; this
           # job only reads the tree and pushes over HTTPS to RubyGems.
           persist-credentials: false
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
 
       # Exchanges the job's OIDC token for a RubyGems credential scoped
       # to this repo + workflow, valid for minutes. Nothing to store in
@@ -228,7 +228,7 @@ jobs:
         run: gem push abqari-*.gem
 
       - name: Upload .gem to release artifacts
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gem-${{ needs.verify.outputs.tag }}
           path: abqari-*.gem
