@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.1.2] — 2026-10-09
+
 ### Fixed
 
 - **Changing `fonts:` and re-running `bin/fetch-fonts` didn't reach
@@ -983,7 +987,8 @@ run a real working author / publisher site.
   commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
   the `~> 2.4` floor bought.
 
-[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/grantrayner/abqari/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/grantrayner/abqari/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/grantrayner/abqari/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/grantrayner/abqari/releases/tag/v1.0.0
