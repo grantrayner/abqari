@@ -1629,7 +1629,9 @@ Then run once:
 bin/fetch-fonts
 ```
 
-Abqari downloads the woff2 files to `vendor/fonts/`, generates a `fonts.css` with rewritten URLs, and serves everything from `/assets/fonts/` at build time. The head partial conditionally includes the link tag whenever `fonts:` is configured.
+Abqari downloads the woff2 files to `vendor/fonts/`, generates a `fonts.css` with rewritten URLs, and serves everything from `/assets/fonts/` at build time. The stylesheet is fingerprinted like any other asset (`/assets/fonts/fonts.<hash>.css`), so changing `fonts:` and re-running `bin/fetch-fonts` busts the immutable cache. The head partial links it whenever `fonts:` is configured and the fetch has run.
+
+If you override the head partial, link the stylesheet with `<%= asset_path('fonts/fonts.css') %>`. An unhashed copy still ships at `/assets/fonts/fonts.css`, but `_headers` caches it for a year, so returning visitors won't see font changes.
 
 ## Icons
 

@@ -367,8 +367,12 @@
   <% Array(site.config['fonts_preload']).each do |path| %>
   <link rel="preload" href="<%= sanitized_url(path) %>" as="font" type="font/woff2" crossorigin>
   <% end %>
-  <% if Array(site.config['fonts']).any? %>
-  <link rel="stylesheet" href="/assets/fonts/fonts.css">
+  <%# Fingerprinted, never the fixed `/assets/fonts/fonts.css` — that
+      URL is cached `immutable`, so a re-fetch never reached returning
+      visitors. No link until `bin/fetch-fonts` has run. %>
+  <% fonts_css = Array(site.config['fonts']).any? && optional_asset_path('fonts/fonts.css') %>
+  <% if fonts_css %>
+  <link rel="stylesheet" href="<%= fonts_css %>">
   <% end %>
   <%# Render-blocking CSS ships as ONE fingerprinted bundle (syntax +
       _common + theme app.css + site.css, same cascade order as the

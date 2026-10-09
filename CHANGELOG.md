@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **Changing `fonts:` and re-running `bin/fetch-fonts` didn't reach
+  returning visitors; they kept the old fonts for up to a year.** The
+  head linked the font stylesheet at a fixed `/assets/fonts/fonts.css`,
+  and the generated `_headers` serves all of `/assets/*` with
+  `Cache-Control: public, max-age=31536000, immutable`, so a browser
+  that had cached the old file never asked for it again. The new
+  families fell back to system fonts. It hid because a first visit, a
+  hard reload, and the dev server (which doesn't apply `_headers`) all
+  show the new fonts; only returning visitors on a host that honours
+  `_headers` were stuck. `syntax.css` had the same bug before the CSS
+  bundle.
+
+  `vendor/fonts/fonts.css` now goes through the asset pipeline and is
+  linked as `/assets/fonts/fonts.<hash>.css`, minified in production,
+  so a re-fetch changes the URL. Dev-server rebuilds now re-render
+  every page after a re-fetch, because every head carries the hash.
+  The head no longer emits the link when `fonts:` is set but
+  `bin/fetch-fonts` hasn't run; it used to link a stylesheet that
+  404'd.
+
+  If your site overrides `_head.html.erb`, change its font link to
+  `<%= asset_path('fonts/fonts.css') %>`. The unhashed copy still ships
+  at `/assets/fonts/fonts.css`, so an overridden head keeps working,
+  but it keeps the stale-cache problem.
 
 ## [1.1.1] — 2026-08-11
 

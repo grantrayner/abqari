@@ -48,13 +48,17 @@ module Abqari
     # `compute_shared_deps_mtime` time so we only walk the active
     # theme's directory, not every theme that happens to ship with
     # the gem.
+    #
+    # `vendor/fonts/fonts.css` is here because every page's head links
+    # it by content hash; a re-fetch must re-render them all.
     GLOBAL_DEP_GLOBS = [
       'app/views/partials/**/*',
       'app/icons/**/*',
       'app/assets/**/*',
       'lib/**/*',
       'config/**/*',
-      'data/**/*'
+      'data/**/*',
+      'vendor/fonts/fonts.css'
     ].freeze
 
     # The renderer only needs the frontmatter block (no body), but

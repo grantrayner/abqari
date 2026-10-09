@@ -8,6 +8,7 @@ module Abqari
     OUTPUT_SUBDIR = 'assets'
     HASH_LENGTH = 10
     BUNDLE_LOGICAL = 'css/bundle.css'
+    FONTS_LOGICAL = 'fonts/fonts.css'
     # A theme name is a directory name under themes/ and nothing more.
     # The strict pattern is load-bearing: the name is joined into
     # filesystem paths in several places (here, ArtifactWriter,
@@ -55,6 +56,7 @@ module Abqari
       [engine_app_assets, site_app_assets].uniq.each do |dir|
         process_dir(dir) if dir && Dir.exist?(dir)
       end
+      process_font_stylesheet
       build_css_bundle
     end
 
@@ -170,6 +172,22 @@ module Abqari
       end
 
       @paths[logical] = "/#{OUTPUT_SUBDIR}/#{fingerprinted}"
+    end
+
+    # The `bin/fetch-fonts` stylesheet gets a content hash like any
+    # other asset. At its old fixed URL it sat under the `/assets/*
+    # immutable` cache rule, so a site that changed `fonts:` and
+    # re-fetched kept serving returning visitors the old `@font-face`
+    # rules for a year. Its woff2 `url()`s are root-absolute, so the
+    # renamed file still resolves them. ArtifactWriter#copy_fonts keeps
+    # shipping the unhashed copy for sites that override the head.
+    def process_font_stylesheet
+      source = File.join(@site.site_root, 'vendor', 'fonts', 'fonts.css')
+      return unless File.file?(source)
+      return if @site.external_symlink?(source)
+
+      write_asset(FONTS_LOGICAL, processed_content(source, FONTS_LOGICAL))
+      @sources[FONTS_LOGICAL] = source
     end
 
     def processed_content(entry, logical)
