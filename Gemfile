@@ -17,7 +17,7 @@ group :development do
   # step with "command not found". `require: false`: it's a CLI, never
   # loaded in-process.
   gem 'bundler-audit', '~> 0.9', require: false
-  gem 'listen', '~> 3.8'    # FS events for the dev-server watcher (optional)
+  gem 'listen', '~> 3.10'   # FS events for the dev-server watcher (optional)
   gem 'minitest', '~> 5.0'
   # reverse_markdown is an OPTIONAL runtime dependency (see the gemspec
   # for why it isn't declared there) — but the engine's own test suite
