@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.2.0] — 2026-10-11
+
+Upgrade if you serve the generated CSP: Chrome has been blocking
+Abqari's own speculation rules, so nothing was prerendered and every
+page logged a CSP violation, plus a Permissions-Policy error about
+`interest-cohort`. Upgrade too if you deploy to Render, which ignores
+`_headers` (`abqari headers` prints the rules it needs), or through the
+shipped GitHub Actions workflows with `fonts:` set, which deployed
+sites without their fonts.
+
+On a host that ignores `_headers`, rebuild after upgrading and re-copy
+the CSP and Permissions-Policy: both changed. Workflow files are copied
+into each site at `abqari new`, so the font fix needs adding to existing
+sites by hand.
+
 ### Added
 
 - **`speculation_rules.href_matches`** sets the URL patterns to
@@ -1093,7 +1110,8 @@ run a real working author / publisher site.
   commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
   the `~> 2.4` floor bought.
 
-[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/grantrayner/abqari/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/grantrayner/abqari/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/grantrayner/abqari/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/grantrayner/abqari/compare/v1.0.0...v1.1.0
