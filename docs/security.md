@@ -152,6 +152,14 @@ against the cases where the cost of getting it wrong is high.
   headers file ships them in `Content-Security-Policy: script-src`.
   `test/csp_inline_scripts_test.rb` checks every inline script on a
   built page against the built policy.
+- The policy has `style-src 'self'`, so a site template that adds
+  `style="…"`, a `<style>` block or an `on…=` handler is blocked
+  wherever the CSP is enforced. `bin/audit` reports each one as a
+  **Security** error (`Audit::Csp`), checked against the `_headers` the
+  same build wrote, so a `headers:` override or `csp:` extension is
+  what gets checked. Move styles into `app/assets/css/site.css`
+  (classes, or data attributes matched by attribute selectors for
+  per-element values) rather than weakening the policy.
 - Defence-in-depth directives: `object-src 'none'` (no
   `<object>`/`<embed>`), `frame-ancestors 'none'` (no clickjacking),
   `form-action 'self'` (no cross-origin form POSTs unless explicitly

@@ -2331,6 +2331,7 @@ Rebuilds the site, walks the output, and writes a markdown report to `audit/<YYY
 | **Privacy** | External resource loads (URLs not on the site host) |
 | **Dependencies** | Outdated gems via `bundle outdated`, CVEs via `bundle-audit` (if installed) |
 | **Content** | Posts without descriptions, single-use tags, `series_position` problems that break prev/next silently (non-Integer, duplicate, or missing) |
+| **Security** | Inline code the built `_headers` CSP would block: `style="…"` attributes, `<style>` blocks, `on…=` handlers, and inline scripts whose hash isn't in `script-src`. Errors, because the page breaks on any host that enforces the policy |
 
 The report opens with a summary table, a **Suggested fixes** code block listing every `bundle update <gem>` command needed to clear the dependency findings, and then groups findings by category with severity (`error`, `warn`, `info`) and a suggestion where applicable. Reports accumulate in `audit/` — useful to commit so you have a diffable history of site quality over time.
 
@@ -2365,7 +2366,7 @@ GitHub Dependabot does three things abqari's audit does **not**:
 
 What `bin/audit` does that Dependabot doesn't:
 
-- **Same report covers links, SEO, accessibility, privacy, and content.** Dependabot only watches dependencies.
+- **Same report covers links, SEO, accessibility, privacy, content, and the CSP.** Dependabot only watches dependencies.
 - **Uses the same `ruby-advisory-db`** Dependabot's Ruby ecosystem coverage uses, just at a single point in time.
 - **Outputs to git-trackable markdown.** A diffable `audit/` history of every check you've run.
 

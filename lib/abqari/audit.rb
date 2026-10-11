@@ -12,6 +12,7 @@ require_relative 'audit/privacy'
 require_relative 'audit/performance'
 require_relative 'audit/dependencies'
 require_relative 'audit/content'
+require_relative 'audit/csp'
 
 module Abqari
   # Site audit orchestrator. Each check lives in its own rule class
@@ -36,14 +37,15 @@ module Abqari
       'privacy' => 'Privacy',
       'perf'    => 'Performance',
       'deps'    => 'Dependencies',
-      'content' => 'Content'
+      'content' => 'Content',
+      'security' => 'Security'
     }.freeze
 
     # Rule classes, in execution order. Order matters only for the
     # output report — findings are grouped by category, not insertion
     # order — but Links first keeps the report scan-friendly: errors
     # appear before warnings.
-    RULES = [Links, SEO, A11y, Privacy, Performance, Dependencies, Content].freeze
+    RULES = [Links, SEO, A11y, Privacy, Performance, Dependencies, Content, Csp].freeze
 
     attr_reader :findings
 

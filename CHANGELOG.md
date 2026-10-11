@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **`bin/audit` now fails on inline code the site's own CSP would
+  block.** The generated policy has `style-src 'self'` and pins inline
+  scripts by hash, so a template that adds `style="…"`, a `<style>`
+  block, an `onclick=`, or an unhashed `<script>` breaks on any host
+  that enforces the CSP. It hid because nothing local enforces it: the
+  dev server doesn't apply `_headers`, the page renders, and the
+  browser only logs a console error. One site had 52 inline
+  `style="--ratio: …"` attributes that would have collapsed every photo
+  pane the moment its CSP went live.
+
+  The new **Security** category (`Audit::Csp`) checks every page
+  against the CSP in the built `_headers`, so a `headers:` override or
+  `csp:` extension is what's checked. It reports one error per page per
+  kind of inline code, with an example and how to fix it. It follows
+  the spec: hashes, `'unsafe-inline'` (ignored once a hash or nonce is
+  present), `'unsafe-hashes'` for attributes, the `-elem`/`-attr`
+  directives and the `default-src` fallback. `bin/audit --strict` fails
+  on these, so a site that passed yesterday can fail today; every
+  finding is code that is already broken wherever the policy is
+  applied.
 
 ## [1.2.0] — 2026-10-11
 

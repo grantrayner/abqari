@@ -31,6 +31,24 @@ module Abqari
       'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
     }.freeze
 
+    # A `_headers` file as `{ 'path', 'name', 'value' }` rules: an
+    # unindented path line, then indented `Name: value` lines. The shape
+    # `build` writes, for both the generated policy and a `headers:`
+    # override. Read back by `abqari headers` and the CSP audit.
+    def self.parse(text)
+      path = nil
+      text.each_line.with_object([]) do |line, rules|
+        next if line.strip.empty? || line.lstrip.start_with?('#')
+
+        if line.match?(/\A\S/)
+          path = line.strip
+        elsif path
+          name, value = line.strip.split(/:\s*/, 2)
+          rules << { 'path' => path, 'name' => name, 'value' => value.to_s } unless name.to_s.empty?
+        end
+      end
+    end
+
     def initialize(site)
       @site = site
     end

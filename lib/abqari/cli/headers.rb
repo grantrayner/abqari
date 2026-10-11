@@ -47,21 +47,8 @@ module Abqari
         true
       end
 
-      # `_headers` blocks: an unindented path line, then indented
-      # `Name: value` lines. Same shape HeadersFile writes, for both the
-      # generated policy and a `headers:` override in site.yml.
       def parse(text)
-        path = nil
-        text.each_line.with_object([]) do |line, rules|
-          next if line.strip.empty? || line.lstrip.start_with?('#')
-
-          if line.match?(/\A\S/)
-            path = line.strip
-          elsif path
-            name, value = line.strip.split(/:\s*/, 2)
-            rules << { 'path' => path, 'name' => name, 'value' => value.to_s } unless name.to_s.empty?
-          end
-        end
+        HeadersFile.parse(text)
       end
 
       private
