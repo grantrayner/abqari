@@ -75,6 +75,52 @@ class HeadersCspTest < Minitest::Test
     refute_includes csp, "'inline-speculation-rules'"
   end
 
+  # Chrome ignores 'inline-speculation-rules' once script-src lists a
+  # hash, which ours always does — so the block needs its own.
+  def test_speculation_rules_body_is_pinned_by_hash
+    cfg = { 'speculation_rules' => { 'eagerness' => 'eager', 'href_matches' => '/news/*' } }
+    assert_includes policy_for(cfg), "'#{Abqari::SpeculationRules.sha256(make_site(cfg))}'"
+  end
+
+  def test_speculation_rules_disabled_omits_hash
+    cfg = { 'speculation_rules' => { 'enabled' => false } }
+    refute_includes policy_for(cfg), "'#{Abqari::SpeculationRules.sha256(make_site(cfg))}'"
+  end
+
+  # Sites on hosts that ignore `_headers` (Render) paste the CSP by
+  # hand. With unchanged config, the body — and so that pasted hash —
+  # must survive an upgrade. This is the hash 1.1.x emitted.
+  def test_default_speculation_rules_body_matches_earlier_releases
+    assert_equal 'sha256-iQERkQhAjmWMRJlmxSUdTKGSKkETMRxTvX1e+3S6/nE=', Abqari::SpeculationRules.sha256(make_site)
+  end
+
+  def test_speculation_rules_default_to_the_posts_collection_slug
+    rules = spec_rules('collections' => { 'posts' => { 'slug' => 'articles' } })
+    assert_equal({ 'href_matches' => '/articles/*' }, rules['prerender'][0]['where'])
+  end
+
+  def test_speculation_rules_href_matches_accepts_a_list
+    rules = spec_rules('speculation_rules' => { 'href_matches' => ['/news/*', '/posts/*'] })
+    assert_equal({ 'or' => [{ 'href_matches' => '/news/*' }, { 'href_matches' => '/posts/*' }] },
+                 rules['prerender'][0]['where'])
+  end
+
+  def test_speculation_rules_pattern_cannot_close_the_script_tag
+    body = Abqari::SpeculationRules.script(make_site('speculation_rules' => { 'href_matches' => '/x/</script><b>' }))
+    refute_includes body, '<'
+    assert_equal '/x/</script><b>', JSON.parse(body)['prerender'][0]['where']['href_matches']
+  end
+
+  # Google dropped FLoC; Chrome now logs an unrecognised-feature error
+  # for `interest-cohort` on every page.
+  def test_permissions_policy_omits_interest_cohort
+    refute_includes Abqari::HeadersFile::BASE_HEADERS['Permissions-Policy'], 'interest-cohort'
+  end
+
+  def spec_rules(config)
+    JSON.parse(Abqari::SpeculationRules.script(make_site(config)))
+  end
+
   def test_newsletter_extends_script_src_when_script_is_set
     csp = policy_for('newsletter' => {
                        'action' => 'https://buttondown.email/api/emails/embed-subscribe/me',

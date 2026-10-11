@@ -44,8 +44,13 @@ directly, rebuilds on every push to `main`.
    | Name | Anything memorable — appears in the Render URL (`<name>.onrender.com`) |
    | Branch | `main` |
    | Root Directory | _Leave blank_ |
-   | Build Command | `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d && bundle install && bundle exec bin/build` |
+   | Build Command | `bundle install && bundle exec bin/fetch-fonts && bundle exec bin/build` |
    | Publish Directory | `_site` |
+
+   Render's native runtime already ships libvips, so there's no
+   install step. `bin/fetch-fonts` is there because the scaffold
+   git-ignores `vendor/fonts/` (see [Fonts](#fonts) below); it's a
+   no-op for a site with no `fonts:`.
 
 5. Click **Advanced** → **Add Environment Variable**:
 
@@ -60,6 +65,76 @@ directly, rebuilds on every push to `main`.
 8. When the build finishes you'll see a green **Live** status and a
    URL like `https://abqari-xyz.onrender.com`. Open it — your site
    is up.
+9. Add the headers. **Render doesn't read `_site/_headers`**, so
+   until you do, the site has no CSP or security headers and assets
+   aren't cached. See [Headers](#headers-render-ignores-_headers).
+
+### Images: WebP only
+
+Render's libvips has no AVIF encoder, and the build can't add the
+libheif plugin that provides one. The image pipeline notices, skips
+AVIF and logs `AVIF unsupported by this libvips build` on every
+build. Say so in config and the warning goes away:
+
+```yaml
+# config/site.yml
+images:
+  formats: [webp]
+```
+
+Visitors get WebP variants, which every current browser decodes, with
+an original-format fallback.
+
+### Fonts
+
+The scaffold's `.gitignore` excludes `vendor/fonts/`, where
+`bin/fetch-fonts` writes the self-hosted font files. A fresh checkout
+on the build server therefore has no fonts: the build succeeds, and
+the site ships without its fonts. Pick one:
+
+- **Fetch at build time** — keep `bundle exec bin/fetch-fonts` in the
+  build command, as above. Every deploy downloads the fonts from
+  Google Fonts again.
+- **Commit them** — run `bin/fetch-fonts` locally, delete the
+  `vendor/fonts/*` and `!vendor/fonts/.gitkeep` lines from
+  `.gitignore`, and commit `vendor/fonts/`. Deploys need no network
+  for fonts, and you drop `bin/fetch-fonts` from the build command.
+  Re-run and re-commit after changing `fonts:`.
+
+The GitHub Actions workflows the scaffold ships run `bin/fetch-fonts`
+before `bin/build`. Sites scaffolded from an older abqari don't have
+that step and need to add it to their own copies of
+`.github/workflows/deploy-*.yml`. If you commit `vendor/fonts/`, you can
+drop it.
+
+### Headers (Render ignores `_headers`)
+
+`bin/build` writes the CSP, the security headers and the asset cache
+rule to `_site/_headers`. Cloudflare Pages and Netlify read that file;
+[Render doesn't](https://render.com/docs/static-site-headers). The
+rules have to be entered in Render instead, and the engine prints them
+for you:
+
+```bash
+bin/build && bundle exec abqari headers
+```
+
+The output is a `headers:` block. Paste it under your static site in
+`render.yaml`, or add each rule's **Path**, **Name** and **Value** in
+the dashboard under **Settings → Headers**.
+
+Two rules matter most:
+
+- **`Cache-Control: public, max-age=31536000, immutable` on
+  `/assets/*`.** Without it Render serves assets with `max-age=0`, so
+  the browser revalidates the fonts on every page and text flashes in
+  the fallback font. It's the same rule `_headers` carries.
+- **The `Content-Security-Policy`.** It pins the SHA-256 of each of
+  Abqari's inline scripts, and the speculation-rules hash depends on
+  your config. **Re-copy it after upgrading abqari or changing
+  `config/site.yml`** (rebuild, re-run `abqari headers`, compare). With
+  a stale hash the page still loads, but the browser blocks that script
+  and logs a CSP violation on every page.
 
 ### Custom domain
 
@@ -336,8 +411,9 @@ After deploying, walk through this checklist:
 
 You're missing libvips on the build environment.
 
-- **Render**: ensure your build command starts with
-  `sudo apt-get update && sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d &&`
+- **Render**: the native runtime includes libvips, so this
+  shouldn't happen there. If it does, check the service uses a native
+  Ruby environment rather than a Docker image without libvips.
 - **Cloudflare Pages / GitHub Pages**: the shipped workflows
   include the apt step automatically. If you've edited the
   workflow, make sure you didn't remove it.
@@ -365,9 +441,10 @@ sudo apt-get install -y libvips42 libheif1 \
 ```
 
 The shipped workflow files (`deploy-cloudflare.yml`,
-`deploy-render.yml`, `deploy-github-pages.yml`) already do this. If
-you're using Render's dashboard auto-deploy, update your build
-command to include the plugin packages.
+`deploy-render.yml`, `deploy-github-pages.yml`) already do this. On
+Render's own build, which can't install the plugins, set
+`images.formats: [webp]` instead (see
+[Images: WebP only](#images-webp-only)).
 
 If you can't install the plugins for some reason, the image pipeline
 will now degrade gracefully — it probes each format at startup, logs

@@ -4,6 +4,7 @@ require 'uri'
 
 require_relative 'theme_bootstrap'
 require_relative 'plausible_script'
+require_relative 'speculation_rules'
 
 module Abqari
   class HeadersFile
@@ -26,7 +27,7 @@ module Abqari
     BASE_HEADERS = {
       'X-Content-Type-Options'    => 'nosniff',
       'Referrer-Policy'           => 'strict-origin-when-cross-origin',
-      'Permissions-Policy'        => 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+      'Permissions-Policy'        => 'camera=(), microphone=(), geolocation=()',
       'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
     }.freeze
 
@@ -208,21 +209,19 @@ module Abqari
     end
 
     # The `<script type="speculationrules">` block the head emits is an
-    # inline script as far as CSP is concerned, so `script-src` must
-    # carry `'inline-speculation-rules'` (Chrome's keyword for exactly
-    # this) or the block is rejected — no prerender, plus a console
-    # error on every page. Its content is config-dependent (posts slug,
-    # eagerness), so a static hash can't cover it. On by default; the
-    # head gates on `speculation_rules.enabled` not being false.
+    # inline script as far as CSP is concerned. `'inline-speculation-rules'`
+    # is Chrome's keyword for exactly this, but Chrome stops honouring
+    # it once script-src lists a hash — and the base policy always does
+    # — so the block is pinned by its own SHA-256 as well. The body is
+    # config-dependent, so the hash is computed per build from the same
+    # SpeculationRules.script the head emits.
     def apply_speculation_rules(policy)
+      policy['script-src'] << "'#{SpeculationRules.sha256(@site)}'"
       policy['script-src'] << "'inline-speculation-rules'"
     end
 
     def speculation_rules_enabled?
-      cfg = @site.config['speculation_rules']
-      return true unless cfg.is_a?(Hash)
-
-      cfg['enabled'] != false
+      SpeculationRules.enabled?(@site)
     end
 
     # Plausible: external tracker + inline init script. Both need explicit

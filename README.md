@@ -1631,6 +1631,8 @@ bin/fetch-fonts
 
 Abqari downloads the woff2 files to `vendor/fonts/`, generates a `fonts.css` with rewritten URLs, and serves everything from `/assets/fonts/` at build time. The stylesheet is fingerprinted like any other asset (`/assets/fonts/fonts.<hash>.css`), so changing `fonts:` and re-running `bin/fetch-fonts` busts the immutable cache. The head partial links it whenever `fonts:` is configured and the fetch has run.
 
+`vendor/fonts/` is git-ignored, so every deploy has to fetch the fonts too, or the site ships in fallback fonts with a green build. The shipped GitHub Actions workflows run `bin/fetch-fonts` before `bin/build`; on a host that builds from its own command (Render), add it there. Or commit `vendor/fonts/` instead. See [deploying.md → Fonts](https://github.com/grantrayner/abqari/blob/main/docs/deploying.md#fonts).
+
 If you override the head partial, link the stylesheet with `<%= asset_path('fonts/fonts.css') %>`. An unhashed copy still ships at `/assets/fonts/fonts.css`, but `_headers` caches it for a year, so returning visitors won't see font changes.
 
 ## Icons
@@ -1763,7 +1765,7 @@ Every build emits the files a static host needs to serve a real site:
 | `feed.xml` | RSS 2.0 feed of latest posts |
 | `feed.json` | JSON Feed 1.1 |
 | `robots.txt` | Per-environment — `Disallow: /` in dev/staging, real one in production |
-| `_headers` | Security headers (CSP, HSTS, Permissions-Policy, etc.) + asset cache-control. Read by Cloudflare Pages and Netlify |
+| `_headers` | Security headers (CSP, HSTS, Permissions-Policy, etc.) + asset cache-control. Read by Cloudflare Pages and Netlify. Render ignores it — `bundle exec abqari headers` prints the same rules to paste in (see [deploying.md](https://github.com/grantrayner/abqari/blob/main/docs/deploying.md#headers-render-ignores-_headers)) |
 | `_redirects` | 301 mappings for any post with `redirect_from:` |
 | `manifest.json` | Web app manifest, populated from your site title + locale. Override colours/names under `manifest:` in `site.yml` |
 | `/.well-known/security.txt` | Generated when `security_contact:` is set |
@@ -1784,7 +1786,7 @@ Abqari generates a stub HTML page at `/old-tutorial/` with a `<meta refresh>` an
 
 **SEO meta** — every page's `<head>` includes canonical URL, Open Graph tags, Twitter card tags, RSS/JSON Feed alternates, and (for posts) JSON-LD `Article` structured data. All driven from `site.config` and frontmatter — no manual tagging required.
 
-**Security headers** — the default `_headers` ships with a strict CSP (`'self'` only — works because Abqari has no inline scripts/styles), HSTS (1 year), `Referrer-Policy`, `Permissions-Policy` (camera/mic/geolocation/FLoC all off), `X-Content-Type-Options`, and `frame-ancestors 'none'`.
+**Security headers** — the default `_headers` ships with a strict CSP (`'self'` only, with each of Abqari's few inline scripts pinned by SHA-256 rather than allowed by `'unsafe-inline'`), HSTS (1 year), `Referrer-Policy`, `Permissions-Policy` (camera/mic/geolocation off), `X-Content-Type-Options`, and `frame-ancestors 'none'`.
 
 The policy is *built* from the features you've configured — enabling Plausible adds `plausible.io`, setting `newsletter.action` adds that provider's origin, and so on. You never hand-write it. Two keys extend it when the engine can't infer what you need:
 
@@ -1879,7 +1881,13 @@ for readers on slow or data-saving connections. Tune or disable:
 speculation_rules:
   enabled: true          # false to omit entirely
   eagerness: moderate    # conservative / moderate / eager
+  href_matches: /news/*  # default: the posts collection (/posts/*); one pattern or a list
 ```
+
+Set `href_matches` when your main content isn't in `posts` — a site
+whose articles live in a `news` collection prerenders nothing until it
+does. The generated CSP pins the rules block by hash, so changing any
+of these changes the CSP; on a host that ignores `_headers`, re-copy it.
 
 Run `bin/audit` after building — it checks every page for missing
 descriptions, broken links, missing alt text, and other SEO and
@@ -2416,13 +2424,15 @@ Run a single test file: `bundle exec ruby -Ilib -Itest test/helpers_test.rb`. Ru
 
 ## Livereload
 
-`bin/serve` watches `content/`, `app/`, `themes/`, `config/`, `lib/`, and `data/` for changes. On change:
+`bin/serve` watches `content/`, `app/`, `themes/`, `config/`, `lib/`, `data/`, and `plugins/` for changes. On change:
 
 1. The build runs incrementally (no `_site/` wipe; mtime-aware copies skip unchanged work).
 2. The build version bumps and the watcher classifies the change scope.
 3. Each rendered page in dev opens a Server-Sent Events stream to `/__reload__`; when the server pushes a rebuild event the client either:
    - **Swaps the `<link rel="stylesheet">` href** in place if only CSS files changed (preserves scroll position and form state), or
    - **Reloads the page** if anything else changed.
+
+**Ruby isn't reloaded.** Plugins, and anything they `require` from `lib/`, load once when `bin/serve` starts. When one of those files changes, the server logs a one-line warning naming it; restart `bin/serve` to load the new code. If a build fails while that code is stale, the failure output ends with the same reminder, because the usual symptom is `NoMethodError: undefined method '…' for an instance of Abqari::RenderContext` from a layout calling a helper the server hasn't loaded.
 
 **Watcher backend.** When the `listen` gem is installed (it's a development-group dep), the watcher uses native FS events (FSEvents on macOS, inotify on Linux) — zero overhead between changes. Without `listen`, it falls back to 500ms mtime polling. Both modes debounce events by 100ms so editor tools that fire two events per save don't double-rebuild.
 
@@ -2443,6 +2453,8 @@ end
 ```
 
 Lifecycle events: `:before_build`, `:after_load_pages`, `:after_generate`, `:after_build`. Filters: `:post_process(html, site, page)`. Full reference in [`docs/plugins.md`](https://github.com/grantrayner/abqari/blob/main/docs/plugins.md).
+
+`bin/serve` doesn't reload plugins, so restart it after editing one. It warns you when it sees the change (see [Livereload](#livereload)).
 
 ## Performance
 

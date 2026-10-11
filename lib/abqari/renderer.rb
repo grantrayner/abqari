@@ -18,20 +18,83 @@ module Abqari
     # Below this many pages, parallelism hurts more than it helps.
     PARALLEL_THRESHOLD = 16
 
+    # Render threads can only overlap file I/O: ERB, markdown and the
+    # post-processors are Ruby and hold the GVL. Past a handful they
+    # add contention, not throughput — a 270-page site built in ~1.07s
+    # on 1, 2, 4 or 8 threads, and 1.18s on 14.
+    MAX_RENDER_THREADS = 4
+
+    # Where a container's CPU quota is exposed. `Etc.nprocessors` reports
+    # the host's CPUs (or the cpuset), not the quota, so a build
+    # container on a large host would otherwise start dozens of threads
+    # to share a fraction of one CPU.
+    CGROUP_ROOT = '/sys/fs/cgroup'
+
     # Default page-size for `paginate: true`. Overridable per-site via
     # `pagination.per_page` config.
     PAGINATION_DEFAULT = 10
 
     # Slow-page detection. When a single page's `write` (render +
-    # post-process + file write) takes longer than this, the renderer
-    # logs a warning with the URL, elapsed time, and a short list of
+    # post-process + file write) uses more CPU than this, the renderer
+    # logs a warning with the URL, the time, and a short list of
     # heuristic causes (output size, image count, code-block count,
-    # TOC presence). End-of-build summary surfaces the slowest few.
+    # TOC presence, a measured plugin filter). End-of-build summary
+    # surfaces the slowest few.
     #
     # Default 500ms — high enough to ignore the normal per-page
     # baseline (~5–50ms), low enough to catch real outliers. Override
     # with `ABQARI_SLOW_PAGE_MS=N` (set to 0 to disable detection).
     SLOW_PAGE_THRESHOLD_MS = (ENV['ABQARI_SLOW_PAGE_MS'] || '500').to_i
+
+    # Pages are timed by the CPU their own thread used, not wall-clock.
+    # Wall-clock includes every other render thread's turn on the GVL
+    # and any CPU throttling, so on a container with a small quota a
+    # 5ms page read as 500ms+ and dozens of pages were reported slow.
+    # The trade: time spent blocked on I/O no longer counts, which
+    # suits a warning whose every listed cause is CPU work.
+    PAGE_CLOCK = defined?(Process::CLOCK_THREAD_CPUTIME_ID) ? Process::CLOCK_THREAD_CPUTIME_ID : Process::CLOCK_MONOTONIC
+
+    # A plugin filter is named as a cause only when it accounts for at
+    # least this share of the slow page's time. It used to be named on
+    # every slow page whenever any `:post_process` hook was registered.
+    PLUGIN_FILTER_SHARE = 0.25
+    PLUGIN_FILTER_MS = :abqari_plugin_filter_ms
+
+    class << self
+      def render_threads
+        [available_cpus, MAX_RENDER_THREADS].min
+      end
+
+      def available_cpus(cgroup_root: CGROUP_ROOT)
+        [Etc.nprocessors, cgroup_cpu_limit(cgroup_root)].compact.min
+      end
+
+      # CPUs granted by the cgroup quota, rounded up, or nil when there
+      # is no quota (or no cgroup to read). v2 first, then v1.
+      def cgroup_cpu_limit(root)
+        v2 = read_cgroup(File.join(root, 'cpu.max'))
+        quota, period = v2 ? v2.split : v1_quota(root)
+        return nil if quota.nil? || quota == 'max' || quota.to_i <= 0 || period.to_i <= 0
+
+        [(quota.to_f / period.to_i).ceil, 1].max
+      end
+
+      private
+
+      def v1_quota(root)
+        %w[cpu cpu,cpuacct].each do |dir|
+          quota = read_cgroup(File.join(root, dir, 'cpu.cfs_quota_us'))
+          return [quota, read_cgroup(File.join(root, dir, 'cpu.cfs_period_us'))] if quota
+        end
+        nil
+      end
+
+      def read_cgroup(path)
+        File.read(path).strip
+      rescue SystemCallError
+        nil
+      end
+    end
 
     # Files whose mtime invalidates every cached page render.
     # `app/views/layouts/` is NOT here — layout files are handled
@@ -296,7 +359,7 @@ module Abqari
       queue = Thread::Queue.new
       pages.each { |page| queue << page }
 
-      thread_count = [Etc.nprocessors, pages.size].min
+      thread_count = [self.class.render_threads, pages.size].min
       threads = Array.new(thread_count) do
         Thread.new do
           loop do
@@ -335,7 +398,7 @@ module Abqari
       # so plugin output sees the same shape browsers will. Runs BEFORE
       # livereload injection + minification so plugin transformations
       # are minified along with the rest of the page.
-      html = Hooks.run_filter(:post_process, html, @site, page)
+      html = run_plugin_filters(html, page)
       html = inject_livereload(html) if @site.env == :development
       html = Minifier.minify(html) if minify_html?
       html
@@ -351,6 +414,17 @@ module Abqari
     end
 
     private
+
+    # Plugin filters, timed on the page clock so the slow-page report
+    # can say whether they mattered. Read back by `render_one`, which
+    # zeroes the counter before each page.
+    def run_plugin_filters(html, page)
+      t0 = Process.clock_gettime(PAGE_CLOCK, :millisecond)
+      Hooks.run_filter(:post_process, html, @site, page)
+    ensure
+      spent = Process.clock_gettime(PAGE_CLOCK, :millisecond) - t0
+      Thread.current[PLUGIN_FILTER_MS] = (Thread.current[PLUGIN_FILTER_MS] || 0) + spent
+    end
 
     # Fail the build when two pages resolve to the same output file.
     # Without this, whichever page the (parallel) render loop writes
@@ -400,13 +474,14 @@ module Abqari
     # `SLOW_PAGE_THRESHOLD_MS`. Slow pages are collected for the
     # end-of-build summary.
     def render_one(page, errors, mutex, slow_pages = nil, slow_mutex = nil)
-      t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      Thread.current[PLUGIN_FILTER_MS] = 0
+      t0 = Process.clock_gettime(PAGE_CLOCK, :millisecond)
       page.write
-      elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0) * 1000).round
+      elapsed_ms = Process.clock_gettime(PAGE_CLOCK, :millisecond) - t0
 
       return unless slow_page?(elapsed_ms) && slow_pages && slow_mutex
 
-      causes = infer_slow_causes(page)
+      causes = infer_slow_causes(page, elapsed_ms: elapsed_ms, plugin_ms: Thread.current[PLUGIN_FILTER_MS])
       Log.warn(slow_page_note(page, elapsed_ms, causes))
       slow_mutex.synchronize { slow_pages << { page: page, ms: elapsed_ms, causes: causes } }
     rescue StandardError, PathSafe::Error => e
@@ -466,7 +541,7 @@ module Abqari
         advice: 'Set `toc: false` in the page\'s frontmatter to skip the TOC for one page, or raise `posts.show.toc.min_headings` to skip shorter pages globally.'
       },
       plugin_filter: {
-        label:  ->(_)    { 'plugin filter' },
+        label:  ->(meta) { "plugin filter #{meta[:ms]}ms" },
         impact: 'A plugin registered against the `:post_process` hook transforms the rendered HTML — the engine can\'t see inside the plugin code.',
         advice: 'Profile the offending plugin in `plugins/*.rb`, or temporarily disable it (rename to `*.rb.off`) to confirm it\'s the bottleneck.'
       }
@@ -478,7 +553,7 @@ module Abqari
     def slow_page_note(page, elapsed_ms, causes)
       url       = page.respond_to?(:url) && page.url ? page.url : page.source_path.to_s
       cause_str = causes.empty? ? '' : " — #{causes.map { |c| c[:label] }.join(' · ')}"
-      "Slow page: #{url} took #{format_ms(elapsed_ms)}#{cause_str}"
+      "Slow page: #{url} took #{format_ms(elapsed_ms)} of CPU#{cause_str}"
     end
 
     # Sample cheap heuristics that often correlate with slow renders.
@@ -490,7 +565,15 @@ module Abqari
     # cause-catalogue key, `label` is the populated short string for
     # the inline warning. The summary uses `type` to look up the
     # full impact + advice from `SLOW_PAGE_CAUSES`.
-    def infer_slow_causes(page)
+    def infer_slow_causes(page, elapsed_ms: 0, plugin_ms: 0)
+      causes = content_causes(page)
+      if plugin_ms.to_i.positive? && plugin_ms >= elapsed_ms * PLUGIN_FILTER_SHARE
+        causes << build_cause(:plugin_filter, ms: plugin_ms)
+      end
+      causes
+    end
+
+    def content_causes(page)
       causes = []
       return causes unless page.respond_to?(:output_path)
       path = page.output_path
@@ -505,7 +588,6 @@ module Abqari
       code_count = html.scan(/<pre\b/i).size
       causes << build_cause(:many_code_blocks, count: code_count) if code_count >= 10
       causes << build_cause(:toc) if html.include?('class="toc"') || html.include?("class='toc'")
-      causes << build_cause(:plugin_filter) if Hooks.registered_events.include?(:post_process)
       causes
     rescue StandardError
       # Cause inference is best-effort — never let a probe failure
@@ -532,7 +614,7 @@ module Abqari
       return if slow_pages.empty?
 
       slow_pages.sort_by! { |sp| -sp[:ms] }
-      Log.info("Slow pages (>#{SLOW_PAGE_THRESHOLD_MS}ms): #{slow_pages.size}")
+      Log.info("Slow pages (>#{SLOW_PAGE_THRESHOLD_MS}ms CPU): #{slow_pages.size}")
       slow_pages.first(5).each do |sp|
         url       = sp[:page].respond_to?(:url) && sp[:page].url ? sp[:page].url : sp[:page].source_path
         cause_str = sp[:causes].empty? ? '' : "  (#{sp[:causes].map { |c| c[:label] }.join(' · ')})"

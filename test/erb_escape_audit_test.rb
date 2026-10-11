@@ -111,7 +111,12 @@ class ErbEscapeAuditTest < Minitest::Test
     # the engine-defined `icon_links` hash (fixed filenames + fixed
     # markup, no interpolation of any page/site/user value). Emitted raw
     # so the tag renders as markup, not escaped text.
-    "favicon_link"
+    "favicon_link",
+
+    # _head.html.erb: the speculation-rules JSON body. Emitted raw because
+    # the CSP pins its exact bytes; config-supplied URL patterns pass
+    # through `script_safe_json`, so no literal `<` can close the tag.
+    "SpeculationRules.script"
   ].freeze
 
   def test_no_unaudited_raw_interpolations

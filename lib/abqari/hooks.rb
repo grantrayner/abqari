@@ -102,10 +102,15 @@ module Abqari
   # `Abqari::Hooks.register` to wire themselves into the lifecycle.
   #
   # Why `load` instead of `require`: `require` caches by path, so a
-  # plugin edit isn't reloaded on subsequent Site.new calls. `load`
-  # re-executes every time — important for the dev-server case where
-  # editing a plugin file should re-register its hooks on the next
-  # incremental rebuild.
+  # second Site.new in the same process (the test suite, an embedder)
+  # would silently skip a plugin it had already seen. `load` re-executes
+  # every time.
+  #
+  # The dev server constructs its Site once, so a plugin edited while
+  # `bin/serve` runs is never re-loaded — and neither is anything the
+  # plugin `require`d. `snapshot` and `changed_since` exist so the
+  # server can say so instead of failing with an unexplained
+  # NoMethodError on the next render.
   #
   # The hook table is NOT cleared between reloads. A plugin that
   # registers in its top-level body will accumulate duplicate
@@ -131,6 +136,56 @@ module Abqari
         e.backtrace&.first(5)&.each { |line| Log.error "  #{line}" }
         raise
       end
+    end
+
+    # The site's Ruby as this process has it loaded: every plugin file,
+    # plus every file under the site's `lib/` in `$LOADED_FEATURES` —
+    # in practice, what the plugins required. Maps path → mtime.
+    #
+    # Paths are realpaths because `require_relative` records realpaths
+    # in `$LOADED_FEATURES`; on macOS the temp dir alone (/var →
+    # /private/var) is enough to make a naive prefix match miss.
+    def snapshot(site_root)
+      root = realpath(site_root)
+      return {} unless root
+
+      (plugin_paths(root) | loaded_lib_paths(site_root, root)).each_with_object({}) do |path, mtimes|
+        mtime = mtime_of(path)
+        mtimes[path] = mtime if mtime
+      end
+    end
+
+    # Site-relative paths of Ruby that differs on disk from `snapshot`:
+    # edited, deleted, or a plugin file added after it was taken.
+    def changed_since(snapshot, site_root)
+      root = realpath(site_root)
+      return [] unless root
+
+      edited = snapshot.reject { |path, mtime| mtime_of(path) == mtime }.keys
+      added  = plugin_paths(root) - snapshot.keys
+      (edited + added).map { |path| path.delete_prefix("#{root}/") }.sort
+    end
+
+    def plugin_paths(root)
+      Dir.glob(File.join(root, PLUGIN_GLOB))
+    end
+
+    def loaded_lib_paths(site_root, root)
+      prefixes = [File.expand_path(site_root), root].uniq.map { |r| File.join(r, 'lib', '') }
+      $LOADED_FEATURES.select { |f| prefixes.any? { |p| f.start_with?(p) } }
+                      .filter_map { |f| realpath(f) }
+    end
+
+    def realpath(path)
+      File.realpath(path)
+    rescue SystemCallError
+      nil
+    end
+
+    def mtime_of(path)
+      File.mtime(path)
+    rescue SystemCallError
+      nil
     end
   end
 end

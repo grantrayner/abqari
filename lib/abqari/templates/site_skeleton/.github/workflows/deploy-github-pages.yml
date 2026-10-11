@@ -69,6 +69,14 @@ jobs:
           curl -LSf https://pagefind.app/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Fetch fonts
+        # vendor/fonts/ is git-ignored, so a fresh checkout has no font
+        # files and the build would ship the site in fallback fonts.
+        # No-op when config/site.yml has no `fonts:`.
+        env:
+          ABQARI_ENV: production
+        run: bundle exec bin/fetch-fonts
+
       - name: Build site
         env:
           ABQARI_ENV: production

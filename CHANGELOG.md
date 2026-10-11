@@ -7,7 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **`speculation_rules.href_matches`** sets the URL patterns to
+  prerender: one pattern or a list. The default is unchanged: the posts
+  collection (`/posts/*`, or `/<slug>/*` with a custom `slug:`). A site
+  whose articles live in another collection prerendered nothing, which
+  is how Sanad's `/news/*` surfaced it. Changing it changes the CSP
+  hash (see Fixed).
+
+- **`abqari headers`** prints the built `_site/_headers` as Render
+  header rules, ready to paste into `render.yaml` or the dashboard's
+  Settings → Headers. Render static sites don't read `_headers`, so
+  without this the CSP, the security headers and the year-long
+  `immutable` cache on `/assets/*` were missing, and Render served
+  assets with `max-age=0` (fonts revalidated on every page, so text
+  flashed). It reads the built file rather than computing headers, so
+  the CSP hashes are the ones the site's bundled engine and config
+  produced. Run it with `bundle exec` from the site root.
+  `docs/deploying.md` now covers Render's headers, the git-ignored
+  `vendor/fonts/` and Render's missing AVIF encoder, and no longer
+  tells Render users to `apt-get` packages.
+
+### Fixed
+
+- **Chrome logged a CSP violation on every page, and nothing was
+  prerendered.** "Applying inline speculation rules violates the
+  following Content Security Policy directive". The generated CSP
+  allowed the head's `<script type="speculationrules">` block only
+  through `'inline-speculation-rules'`, and Chrome ignores that keyword
+  once `script-src` also lists hashes, which it always does (the theme
+  bootstrap and the data-saver guard). It hid because nothing visibly
+  breaks: the page works, the dev server doesn't apply `_headers`, and
+  the unit tests checked the keyword and the hashes separately.
+
+  The block's body now comes from `Abqari::SpeculationRules`, which the
+  head partial emits and `HeadersFile` hashes, so the two can't drift.
+  The keyword stays for browsers that honour it. With unchanged config
+  the body is byte-identical to 1.1.x, so a hash already pasted into a
+  host's settings keeps working. A site that overrides `_head.html.erb`
+  keeps matching too, until it sets `href_matches`; then its block
+  needs to emit `<%== Abqari::SpeculationRules.script(site) %>`.
+  `test/csp_inline_scripts_test.rb` now checks every inline script on a
+  built page against the built policy.
+
+- **Chrome logged a Permissions-Policy error about `interest-cohort`
+  on every page.** The generated `Permissions-Policy` still opted out
+  of FLoC, which Google has dropped. It's gone; `camera`, `microphone`
+  and `geolocation` stay off.
+
+- **Builds on Render logged dozens of false "Slow page" warnings, each
+  blaming a "plugin filter".** One build flagged about 45 pages at
+  500ms+, while the same 270 pages render in about 5ms each locally.
+  There were three causes. The render pool was sized by
+  `Etc.nprocessors`, which in a container reports the host's CPUs
+  rather than the quota, so dozens of threads queued for one GVL.
+  Pages were timed by wall-clock, which counted that queueing and any
+  CPU throttling as the page's own time. And the plugin-filter cause
+  was attached to every slow page whenever any `:post_process` hook was
+  registered, without being timed. It hid because a developer machine
+  has the CPUs it reports.
+
+  Pages are now timed by their thread's CPU time, and the warning says
+  "of CPU". The pool follows the cgroup CPU quota when there is one,
+  capped at 4 (`Renderer::MAX_RENDER_THREADS`): rendering holds the
+  GVL, and a 270-page site built no faster on 8 threads than on 1. A
+  plugin filter is named only when it used at least a quarter of the
+  page's time, and with that time ("plugin filter 340ms"). Time a page
+  spends blocked on I/O no longer counts toward the threshold.
+
+- **Sites deployed through the shipped GitHub Actions workflows had no
+  custom fonts.** The scaffold git-ignores `vendor/fonts/`, so a CI
+  checkout has no font files until `bin/fetch-fonts` runs, and
+  `deploy-cloudflare.yml`, `deploy-github-pages.yml` and
+  `deploy-render.yml` went straight to `bin/build`. The build passed,
+  the head (correctly) omitted the missing font stylesheet, and the
+  site shipped in fallback fonts. It hid because the developer's own
+  checkout has the fonts, so local builds look right.
+
+  The workflows now run `bundle exec bin/fetch-fonts` before building;
+  it's a no-op for a site with no `fonts:`. **Existing sites keep their
+  own copies of the workflows and must add the step themselves**, or
+  commit `vendor/fonts/`. Render's own build doesn't use these
+  workflows: its build command needs `bin/fetch-fonts` too (see
+  `docs/deploying.md`).
+
+- **Editing a plugin while `bin/serve` was running broke every page with
+  an unexplained `NoMethodError`.** Add a helper in `plugins/`, save a
+  layout that calls it, and the next rebuild failed every page with
+  `undefined method '…' for an instance of Abqari::RenderContext` until
+  the server was restarted. Plugins load once, at `Site.new`, and the
+  dev server builds its Site once, so neither a plugin nor anything it
+  `require`s from the site's `lib/` is ever reloaded. `plugins/` wasn't
+  even watched, so the server had no idea anything had changed. It hid
+  because the plugin itself was fine: `bin/build` and a freshly started
+  `bin/serve` both load it and work.
+
+  `bin/serve` now watches `plugins/`. When a plugin, or a `lib/` file a
+  plugin required, changes, it logs a one-line warning naming the file
+  and saying to restart. A build that fails while that Ruby is stale
+  ends its error output with the same reminder, because by then the
+  first warning has usually scrolled away. The server deliberately
+  doesn't reload or re-exec itself: a half-saved plugin would then take
+  it down instead of logging an error. Tracking lives in
+  `Site#stale_ruby_sources`.
+
+  `docs/plugins.md` also said a stale plugin's old *and* new callbacks
+  both fire on each rebuild. Only the old ones do.
 
 ## [1.1.2] — 2026-10-09
 

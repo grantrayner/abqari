@@ -325,12 +325,14 @@
   <% end %>
 
   <%# Speculation Rules — prerender posts the user is likely to click
-      (any `/posts/<slug>/` link in the current document). Modern
-      browsers (Chrome, Edge) act on this for measurably-faster
-      navigations; other browsers safely ignore it. The generated
-      `_headers` CSP adds `'inline-speculation-rules'` to script-src so
-      this typed JSON block is allowed under strict CSP (see
-      HeadersFile#apply_speculation_rules). Toggle off with
+      (any `/posts/<slug>/` link in the current document, or whatever
+      `speculation_rules.href_matches` names). Modern browsers (Chrome,
+      Edge) act on this for measurably-faster navigations; other
+      browsers safely ignore it. The body comes from
+      Abqari::SpeculationRules so the generated `_headers` CSP can pin
+      its exact SHA-256 — Chrome ignores `'inline-speculation-rules'`
+      once script-src carries hashes. Emit it byte-for-byte: any change
+      here (even whitespace) breaks the hash. Toggle off with
       `speculation_rules.enabled: false` in config.
 
       The CSP-pinned inline guard JS below honours `prefers-reduced-data`
@@ -339,18 +341,8 @@
       can act on it. This avoids burning bandwidth on metered users.
       The script gets its own SHA256 entry in HeadersFile so strict CSP
       stays clean. %>
-  <% spec_cfg = site.config['speculation_rules'] || {} %>
-  <% if spec_cfg.fetch('enabled', true) %>
-  <%
-    eagerness  = %w[conservative moderate eager].include?(spec_cfg['eagerness'].to_s) ? spec_cfg['eagerness'].to_s : 'moderate'
-    posts_slug = site.collection_config('posts')['slug'].to_s
-    posts_path = posts_slug.empty? ? 'posts' : posts_slug
-  %>
-  <script type="speculationrules" id="abqari-spec-rules">
-  { "prerender": [{ "source": "document",
-    "where": { "href_matches": "/<%= posts_path %>/*" },
-    "eagerness": "<%= eagerness %>" }] }
-  </script>
+  <% if Abqari::SpeculationRules.enabled?(site) %>
+  <script type="speculationrules" id="abqari-spec-rules"><%== Abqari::SpeculationRules.script(site) %></script>
   <script><%== Abqari::SpeculationRulesGuard::SCRIPT %></script>
   <% end %>
 

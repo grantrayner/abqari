@@ -22,7 +22,13 @@ module Abqari
     PORT_RANGE = (1..65_535).freeze
     POLL_INTERVAL = 0.5
     DEBOUNCE = 0.1
-    WATCH_GLOBS = ['content/**/*', 'app/**/*', 'themes/**/*', 'config/**/*', 'lib/**/*', 'data/**/*'].freeze
+    # `plugins/` is here so a plugin edit is noticed at all. Plugins
+    # load once at Site.new, so the change can only be reported (see
+    # #warn_stale_ruby), not picked up.
+    WATCH_GLOBS = ['content/**/*', 'app/**/*', 'themes/**/*', 'config/**/*', 'lib/**/*', 'data/**/*',
+                   'plugins/**/*'].freeze
+    # More than this and the stale-Ruby warning stops being one line.
+    STALE_RUBY_LISTED = 3
     CSS_PATTERN = /\.css\z/.freeze
 
     # How long to hold an SSE connection open before sending a no-op
@@ -377,6 +383,7 @@ module Abqari
       @mutex.synchronize do
         count = changed_paths.size
         Log.info "Change detected (#{count} file#{'s' unless count == 1}). Rebuilding…"
+        warn_stale_ruby if changed_paths.any? { |p| p.end_with?('.rb') }
         @site.build(incremental: true)
         @scope = changed_paths.all? { |p| p =~ CSS_PATTERN } ? 'css' : 'all'
         @version = Time.now.to_f
@@ -392,6 +399,26 @@ module Abqari
     rescue StandardError => e
       Log.error "Build failed: #{e.class}: #{e.message}"
       e.backtrace&.first(5)&.each { |line| Log.debug "  #{line}" }
+      warn_stale_ruby(after_failure: true)
+    end
+
+    # The change warning alone isn't enough: the usual sequence is
+    # edit the plugin, then edit the layout that calls the new helper,
+    # and by the time every page fails with `undefined method ... for
+    # an instance of Abqari::RenderContext` the warning has scrolled
+    # away. So a failed build repeats it, as an error, last.
+    def warn_stale_ruby(after_failure: false)
+      stale = @site.stale_ruby_sources
+      return if stale.empty?
+
+      files = stale.first(STALE_RUBY_LISTED).join(', ')
+      files += " and #{stale.size - STALE_RUBY_LISTED} more" if stale.size > STALE_RUBY_LISTED
+      if after_failure
+        Log.error "Restart bin/serve: #{files} changed after it started, and it is still running " \
+                  'the old Ruby, so helpers added since are undefined.'
+      else
+        Log.warn "#{files} changed, but bin/serve loads Ruby once at startup — restart it to pick that up."
+      end
     end
 
     # ----------------------------------------------------------------

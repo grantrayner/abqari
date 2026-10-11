@@ -102,6 +102,15 @@ module Abqari
       # the registrations land in the global hook table and fire on
       # subsequent `Hooks.run` / `run_filter` calls during build.
       PluginLoader.load_from(site_root)
+      # Taken after loading so it covers what the plugins required.
+      @ruby_snapshot = PluginLoader.snapshot(site_root)
+    end
+
+    # Site Ruby (plugins/, and lib/ files they required) that changed on
+    # disk after this Site loaded it. Ruby loads once per process, so a
+    # long-lived Site — the dev server's — keeps running the old code.
+    def stale_ruby_sources
+      PluginLoader.changed_since(@ruby_snapshot, site_root)
     end
 
     # ------------------------------------------------------------------

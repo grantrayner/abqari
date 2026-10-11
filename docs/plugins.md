@@ -200,10 +200,15 @@ ERB templates can then call `<%= detailed_reading_time(page.body) %>`.
   `Site.new` time. Use numeric prefixes (`01_foo.rb`, `02_bar.rb`)
   if registration order matters.
 - `Kernel#load` is used (not `require`) — top-level code re-runs
-  on every `Site.new`. In the dev server, that means editing a
-  plugin file requires restarting `bin/serve` to re-register hooks
-  cleanly; without the restart, both the old AND the new callbacks
-  fire on each rebuild.
+  on every `Site.new`.
+- The dev server calls `Site.new` once, so it never reloads a
+  plugin, or a file a plugin `require`s from `lib/`. Restart
+  `bin/serve` after editing either; until you do, the old callbacks
+  and helpers keep running. `bin/serve` watches `plugins/` and logs a
+  warning naming the changed file, and if a build fails while it's
+  stale (typically `NoMethodError ... for an instance of
+  Abqari::RenderContext`, from a layout calling a helper the server
+  hasn't loaded), the failure output ends with the same reminder.
 - Plugins ARE loaded for the test suite (the engine itself doesn't
   ship any, but the test fixture pattern works).
 - Plugin load errors (syntax, NameError at the top level) re-raise

@@ -145,9 +145,13 @@ against the cases where the cost of getting it wrong is high.
 
 ### CSP
 
-- Inline scripts use SHA256 hashes pre-computed in `ThemeBootstrap`
-  and `SpeculationRulesGuard`. The headers file ships those hashes in
-  `Content-Security-Policy: script-src`.
+- Inline scripts are allowed by SHA256 hash, never `'unsafe-inline'`.
+  `ThemeBootstrap`, `SpeculationRulesGuard` and `PlausibleScript` are
+  constants; the speculation-rules block depends on config, so
+  `SpeculationRules.sha256` hashes the same body the head emits. The
+  headers file ships them in `Content-Security-Policy: script-src`.
+  `test/csp_inline_scripts_test.rb` checks every inline script on a
+  built page against the built policy.
 - Defence-in-depth directives: `object-src 'none'` (no
   `<object>`/`<embed>`), `frame-ancestors 'none'` (no clickjacking),
   `form-action 'self'` (no cross-origin form POSTs unless explicitly
