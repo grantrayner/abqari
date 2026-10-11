@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.3.0] — 2026-10-11
+
+If CI runs `bin/audit --strict`, run `bin/audit` locally before
+upgrading: a new Security check can fail an audit that passed on
+1.2.0. Every finding is inline code that is already blocked on any host
+that enforces the site's CSP, so the fix is in the site, not the
+policy.
+
 ### Added
 
 - **`bin/audit` now fails on inline code the site's own CSP would
@@ -1131,7 +1141,8 @@ run a real working author / publisher site.
   commonmarker ≥ 2.4 ships precompiled 4.0 binaries, which is what
   the `~> 2.4` floor bought.
 
-[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/grantrayner/abqari/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/grantrayner/abqari/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/grantrayner/abqari/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/grantrayner/abqari/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/grantrayner/abqari/compare/v1.1.0...v1.1.1
