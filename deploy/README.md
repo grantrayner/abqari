@@ -1,20 +1,23 @@
-# Render deployment
+# Site header and checkout checks
 
-Every push to `main` builds and verifies the site, tests its intended response
-headers and configured checkout flows, deploys that exact commit, synchronizes
-Render, and verifies production. A failed production check triggers recovery
-to the previous live revision and headers. No test submits a payment.
+Every push to `main` and pull request builds the site and checks its intended
+headers, browser CSP behavior, and representative checkout paths. Main pushes
+and manual runs also check the public production site. A failed GitHub Actions
+run flags a problem and saves the expected/actual differences and screenshots.
 
-`render.json` identifies this service and its representative purchase flows.
-The built `_site/_headers` is authoritative for Abqari rules; `config/site.yml`
-controls features and the bundled engine generates script hashes. Any extra
-Blueprint rules are retained.
+The checks have no Render API key and do not deploy, change headers, or recover
+releases. Keep the key local. Render's existing automatic deployments remain
+in place. Update Render manually after relevant engine, script, or provider
+changes, then rerun the check workflow. If a deployment is still in progress,
+rerun after Render reports live.
 
-After successful activation, disable Render automatic Git deploys; GitHub
-Actions owns the release order. Set repository Actions variable `RENDER_SYNC_ENABLED=true` only after
-configuring `RENDER_API_KEY` in repository Actions secrets. To rerun deployment, use the workflow's **Run workflow** button on
-`main`. Review the deployment evidence artifact for headers, checkout results,
-and screenshots. Intentional purchase component changes may need a fixture
-update in `render.json`.
+`render.json` supplies the production origin and representative checkout
+fixtures. Abqari uses the built `_site/_headers` as its expected policy; Blueprint extras
+are retained.
 
-The shared action is pinned to an immutable commit. Its [documentation](https://github.com/grantrayner/abqari/tree/95b1fa7bdc3809bd3705544f13663a3c81d1f4a5/actions/render-static) describes validation and recovery.
+Shopify and Folio tests use fresh anonymous sessions and stop at the secure
+card-entry form. They never fill customer or payment details or submit orders.
+Update fixtures intentionally when changing a product or purchase component.
+
+No Actions secrets or activation variables are needed. Use **Run workflow**
+on `main` to repeat production checks. The shared [check documentation](https://github.com/grantrayner/abqari/tree/609d654002830ed0fd1ef0de570c892d71cb3113/actions/render-static) explains coverage and evidence.

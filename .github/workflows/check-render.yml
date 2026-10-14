@@ -1,16 +1,16 @@
-name: Deploy Render with header and checkout checks
+name: Check site headers and checkout
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: render-production
-  cancel-in-progress: false
+  group: site-header-checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  deploy:
-    if: github.ref == 'refs/heads/main' && vars.RENDER_SYNC_ENABLED == 'true'
+  check:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -31,9 +31,9 @@ jobs:
           JEKYLL_ENV: production
         run: |
           bundle exec bin/build
-          bundle exec ruby actions/render-static/test/render_static_test.rb
+          bundle exec ruby actions/render-static/test/header_policy_test.rb
           node --test actions/render-static/test/policy.test.mjs
-      - name: Check checkout, deploy, sync headers, and verify production
+      - name: Check headers, CSP, fonts, and checkout paths
         uses: ./actions/render-static
         with:
-          render-api-key: ${{ secrets.RENDER_API_KEY }}
+          check-production: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
