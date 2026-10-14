@@ -15,7 +15,8 @@ The action serves the build with its intended headers and checks browser CSP
 violations. On production it compares public HTTP response headers with the
 expected rules, probes representative cache paths, and tests the homepage and
 configured purchase pages. Grant Rayner also requires a fingerprinted font
-stylesheet. Rules whose paths have no built files are recorded as unprobed.
+stylesheet. Stronger platform HSTS is accepted; missing or weaker protection
+fails. Rules whose paths have no built files are recorded as unprobed.
 A failed workflow includes expected/actual differences, browser diagnostics,
 and screenshots in its evidence artifact.
 

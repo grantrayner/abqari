@@ -40,3 +40,12 @@ test('cache policy checks apply to matching assets and exclude other paths', () 
   assert.deepEqual(headerMismatches(rules, '/assets/maplibre/maplibre-gl.css', { 'cache-control': rules[0].value }), []);
   assert.deepEqual(headerMismatches(rules, '/', {}), []);
 });
+
+test('platform HSTS may be stronger while missing or weaker protection fails', () => {
+  const rules = [{ path: '/*', name: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }];
+  assert.deepEqual(headerMismatches(rules, '/', { 'strict-transport-security': 'max-age=315360000; includeSubdomains; preload' }), []);
+  for (const value of ['max-age=3600; includeSubDomains', 'max-age=31536000', 'max-age=invalid; includeSubDomains']) {
+    assert.equal(headerMismatches(rules, '/', { 'strict-transport-security': value }).length, 1);
+  }
+  assert.equal(headerMismatches(rules, '/', {}).length, 1);
+});

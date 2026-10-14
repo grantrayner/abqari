@@ -13,6 +13,22 @@ export function safeUrl(raw) {
 
 export function headerMismatches(rules, path, headers) {
   return rules.filter(rule => matchesPath(rule.path, path))
-    .filter(rule => headers[rule.name.toLowerCase()]?.trim() !== rule.value.trim())
+    .filter(rule => {
+      const actual = headers[rule.name.toLowerCase()];
+      if (rule.name.toLowerCase() === 'strict-transport-security') return !hstsSatisfies(actual, rule.value);
+      return actual?.trim() !== rule.value.trim();
+    })
     .map(rule => ({ name: rule.name, expected: rule.value, actual: headers[rule.name.toLowerCase()] ?? '<missing>' }));
+}
+
+function hstsSatisfies(actual, expected) {
+  const parse = value => {
+    const directives = value?.toLowerCase().split(';').map(part => part.trim()) || [];
+    const ages = directives.filter(part => /^max-age=\d+$/.test(part));
+    return ages.length === 1 ? { age: Number(ages[0].slice(8)), subdomains: directives.includes('includesubdomains'), preload: directives.includes('preload') } : null;
+  };
+  const received = parse(actual), required = parse(expected);
+  // Render's onrender.com host can enforce a longer, preloaded HSTS policy.
+  // Accept stronger protection while rejecting missing or weaker directives.
+  return Boolean(received && required && received.age >= required.age && (!required.subdomains || received.subdomains) && (!required.preload || received.preload));
 }
