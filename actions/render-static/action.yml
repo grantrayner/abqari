@@ -1,0 +1,70 @@
+name: Deploy static site and synchronize Render headers
+description: Test the built CSP and checkout flows, deploy the exact commit, sync headers, verify production, and recover on failure.
+inputs:
+  render-api-key:
+    description: Render API key, supplied only through a GitHub Actions secret
+    required: true
+  config:
+    description: Repository deployment configuration
+    default: deploy/render.json
+runs:
+  using: composite
+  steps:
+    - name: Prepare and validate header plan
+      shell: bash
+      env:
+        RENDER_API_KEY: ${{ inputs.render-api-key }}
+        RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
+        ACTION_ROOT: ${{ github.action_path }}
+      run: ruby "$ACTION_ROOT/render_static.rb" prepare
+
+    - name: Install pinned browser check dependencies
+      shell: bash
+      env:
+        ACTION_ROOT: ${{ github.action_path }}
+      run: |
+        npm ci --ignore-scripts --prefix "$ACTION_ROOT"
+        "$ACTION_ROOT/node_modules/.bin/playwright" install --with-deps chromium
+
+    - name: Test built site under intended headers and exercise checkout paths
+      id: preflight
+      shell: bash
+      env:
+        RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
+        ACTION_ROOT: ${{ github.action_path }}
+      run: node "$ACTION_ROOT/checkout_checks.mjs" local
+
+    - name: Deploy exact revision and synchronize Render headers
+      id: release
+      shell: bash
+      env:
+        RENDER_API_KEY: ${{ inputs.render-api-key }}
+        RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
+        ACTION_ROOT: ${{ github.action_path }}
+      run: ruby "$ACTION_ROOT/render_static.rb" deploy
+
+    - name: Verify live headers and Shopify or Folio card-entry forms
+      id: live_checks
+      shell: bash
+      env:
+        RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
+        ACTION_ROOT: ${{ github.action_path }}
+      run: node "$ACTION_ROOT/checkout_checks.mjs" live
+
+    - name: Recover prior live revision and headers when production verification fails
+      if: ${{ failure() && steps.live_checks.outcome == 'failure' }}
+      shell: bash
+      env:
+        RENDER_API_KEY: ${{ inputs.render-api-key }}
+        RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
+        ACTION_ROOT: ${{ github.action_path }}
+      run: ruby "$ACTION_ROOT/render_static.rb" rollback
+
+    - name: Save deployment evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      with:
+        name: render-deployment-${{ github.sha }}
+        path: deployment-evidence/
+        if-no-files-found: warn
+        retention-days: 14
