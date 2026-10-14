@@ -1,4 +1,4 @@
-name: Verify Render deployment action
+name: Verify site header check action
 on:
   push:
     branches: [main]
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22'
-      - run: bundle exec ruby actions/render-static/test/render_static_test.rb
+      - run: bundle exec ruby actions/render-static/test/header_policy_test.rb
       - run: node --test actions/render-static/test/policy.test.mjs
       - run: npm ci --ignore-scripts --prefix actions/render-static
       - run: actions/render-static/node_modules/.bin/playwright install --with-deps chromium

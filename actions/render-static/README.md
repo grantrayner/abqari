@@ -1,53 +1,45 @@
-# Render static-site deployment
+# Static-site header and checkout checks
 
-This action is shared by the production Abqari and Jekyll repositories.
-Pin consumers to its full commit SHA. Set `RENDER_API_KEY` as a repository
-Actions secret; it is supplied only to the Render API steps, never to the
-browser checks. The action runs on the production branch after the site's
-existing build and validation steps.
+This action checks the built site and its public production site. It has no
+Render API client, API key input, deploy step, header update, or recovery step.
+Keep the Render credential local. A failed check reports a problem; an operator
+reviews and updates Render manually when needed.
 
-`deploy/render.json` identifies the service, repository, production origin,
-publish directory, header sources, and representative checkout fixtures.
-Jekyll uses the `headers` block in `render.yaml`. Abqari overlays the built
-`_site/_headers` onto that block, so the bundled engine and `config/site.yml`
-determine current script hashes and feature permissions. A Blueprint may
-still declare extra rules such as `X-Frame-Options`.
+`deploy/render.json` supplies the production origin, published build directory,
+header sources, and representative checkout fixtures. Jekyll uses the headers
+in `render.yaml`. Abqari's generated `_site/_headers` overlays that file, so
+script hashes and feature permissions follow the bundled engine and site
+configuration. Blueprint extras such as `X-Frame-Options` are retained.
 
-The action first checks service identity and snapshots the current headers
-and live commit. It serves the built site locally with the desired headers,
-checks for CSP violations and header mismatches, and exercises each configured
-Shopify or Folio flow as far as its card-entry form. It never fills customer
-details, payment details, or submits an order.
+The action serves the build with its intended headers and checks browser CSP
+violations. On production it compares public HTTP response headers with the
+expected rules, probes representative cache paths, and tests the homepage and
+configured purchase pages. Grant Rayner also requires a fingerprinted font
+stylesheet. Rules whose paths have no built files are recorded as unprobed.
+A failed workflow includes expected/actual differences, browser diagnostics,
+and screenshots in its evidence artifact.
 
-During deployment the previous CSP accepts both old and new script hashes
-and origins. Once the exact commit is live, the final configured rules replace
-the transitional rules and API readback must match. A conversion between
-`unsafe-inline` and hashed scripts is rejected before deployment because
-combining them does not preserve the old inline-script behavior.
+Shopify and Folio checks use fresh anonymous browser contexts and stop when
+the correct checkout's secure card-entry frame is visible. They do not enter
+customer or payment details or submit orders. Successful Shopify checks remove
+their test items; unpaid Folio sessions expire under normal retention rules.
+Checkout session identifiers are redacted from the evidence.
 
-Production checks repeat the header and checkout tests in fresh anonymous
-browser contexts. A failure fails the workflow and restores the previous
-live commit and header snapshot. Recovery refuses to overwrite a newer release
-or header edits made outside the current deployment.
+Site workflows run the build and local checks on pushes and pull requests.
+Production checks run on `main` pushes and manual runs. A production check can
+flag a deploy that is still in progress; rerun it after Render reports live.
+Render's existing deployment settings are retained. If relevant source changes
+require new CSP hashes or provider permissions, update the headers manually
+and rerun the checks. Failed checks never change Render settings.
 
-Artifacts include the header plan and readback, deployment identifiers,
-test results, and screenshots. Checkout tokens are redacted from results.
-Shopify test items are removed from their anonymous carts. Folio test checkouts
-are left unpaid and expire under the application's normal retention rules.
+Consumers pin the action to a full commit SHA. GitHub tokens have only
+`contents: read`; no Actions secrets are required. Source and fixtures are
+public configuration, not credentials.
 
-Disable Render's independent autodeploy only after the new workflow has
-successfully completed for the repository. GitHub Actions then owns deployment
-ordering. Job concurrency must use `cancel-in-progress: false` so a newer push
-does not interrupt a release while transitional headers are active.
+Run the Ruby policy tests, Node policy tests, and browser gate self-test with:
 
-## Checkout fixtures
-
-Each Shopify fixture specifies its product page, product ID, expected cart
-title, store checkout host, and whether the product button renders inline.
-Each Folio fixture specifies its product page, exact Buy now link, expected
-book title, and checkout origin. Update the fixture when intentionally changing
-the representative product or purchase component.
-
-Run `ruby actions/render-static/test/render_static_test.rb` for the deployment
-regression tests. The dedicated action verification workflow also checks that
-a browser-visible CSP failure prevents preflight from passing.
+```
+bundle exec ruby actions/render-static/test/header_policy_test.rb
+node --test actions/render-static/test/policy.test.mjs
+node actions/render-static/test/browser_gate.mjs
+```

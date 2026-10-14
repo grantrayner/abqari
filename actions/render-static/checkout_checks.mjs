@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, stat, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { chromium } from 'playwright';
-import { matchesPath, safeUrl } from './policy.mjs';
+import { matchesPath, safeUrl, headerMismatches } from './policy.mjs';
 
 const config = JSON.parse(await readFile(process.env.RENDER_DEPLOY_CONFIG || 'deploy/render.json', 'utf8'));
 const plan = JSON.parse(await readFile('deployment-evidence/plan.json', 'utf8'));
@@ -73,12 +73,11 @@ async function inspectHeaders(context, path) {
   const deadline = Date.now() + (mode === 'live' ? 60000 : 0);
   while (true) {
     try {
-      const response = await context.request.get(url, { timeout: 30000, headers: { 'Cache-Control': 'no-cache' } });
+      const response = await context.request.head(url, { timeout: 30000, headers: { 'Cache-Control': 'no-cache' } });
       assert.equal(response.status(), 200, `HTTP ${response.status()} for ${path}`);
       const actual = response.headers();
-      for (const rule of plan.desired.filter(r => matchesPath(r.path, new URL(url).pathname))) {
-        assert.equal(actual[rule.name.toLowerCase()], rule.value, `Header ${rule.name} differs on ${path}`);
-      }
+      const mismatches = headerMismatches(plan.desired, new URL(url).pathname, actual);
+      assert.deepEqual(mismatches, [], `Header settings differ on ${path}; review the Render headers manually`);
       return;
     } catch (error) {
       if (Date.now() >= deadline) throw error;
@@ -153,12 +152,22 @@ try {
   await smoke.waitForLoadState('load');
   const assets = await smoke.locator('link[rel="stylesheet"],script[src]').evaluateAll(elements => elements.map(e => e.getAttribute('href') || e.getAttribute('src')).filter(u => u?.startsWith('/assets/')));
   for (const asset of assets.slice(0,3)) await inspectHeaders(smokeContext, asset);
+  const resources = await smoke.locator('link[href],script[src],img[src]').evaluateAll(elements => elements.map(e => e.getAttribute('href') || e.getAttribute('src')).filter(u => u?.startsWith('/assets/')));
+  const probed = ['/'];
+  for (const probe of plan.probes || []) {
+    if (probe.url === '/') continue;
+    // Prefer the live page's current asset URL when filenames change during
+    // a deployment. Header rules apply to the request path, not its build ID.
+    const sample = mode === 'live' ? resources.find(path => matchesPath(probe.pattern, new URL(path, origin).pathname)) || probe.url : probe.url;
+    await inspectHeaders(smokeContext, sample);
+    probed.push(sample);
+  }
   if (config.require_fingerprinted_fonts) {
     assert(assets.some(u => /^\/assets\/fonts\/fonts\.[a-f0-9]{10}\.css$/.test(u)), 'Missing fingerprinted font stylesheet');
     assert(!assets.includes('/assets/fonts/fonts.css'), 'Fixed font stylesheet URL would retain stale cached styling');
   }
   assert.deepEqual(smokeViolations, [], 'CSP violations on the homepage');
-  results.push({ id: 'homepage', stage: 'HTTP headers and CSP', passed: true });
+  results.push({ id: 'homepage', stage: 'HTTP headers and CSP', passed: true, probed_paths: probed, unprobed_paths: plan.unprobed_paths || [] });
   await smokeContext.close();
   for (const test of config.commerce_tests || []) {
     const context = await newContext();
@@ -182,7 +191,7 @@ try {
   failures.push({ id: 'deployment-check', message: redact(error.message) });
   process.exitCode = 1;
 } finally {
-  await writeFile(`deployment-evidence/${mode}-checks.json`, JSON.stringify({ mode, results, failures, payments_submitted: false }, null, 2));
+  await writeFile(`deployment-evidence/${mode}-checks.json`, JSON.stringify({ mode, results, failures, payments_submitted: false, render_settings_changed: false }, null, 2));
   await browser.close();
   if (server) await new Promise(resolveClose => server.close(resolveClose));
 }
