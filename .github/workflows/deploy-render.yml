@@ -1,87 +1,39 @@
-# Deploy to Render on every push to main.
-#
-# OPT IN — this workflow is GATED. Until you enable it, it runs as a
-# no-op even on push. Two ways to deploy to Render — pick one:
-#
-# (A) Render's own GitHub integration (simplest — no workflow needed):
-#     In the Render dashboard, create a Static Site, connect this repo,
-#     set build command `bundle exec bin/build`, publish directory
-#     `_site`, environment variable `ABQARI_ENV=production`. Render
-#     polls GitHub and rebuilds on push.
-#
-# (B) GitHub Actions → Render deploy hook (this workflow). Use when:
-#     - You want CI gates (audit, tests) to block deploys.
-#     - You want builds in your own runners, not Render's.
-#     - You're already standardised on Actions for everything else.
-#
-# To enable Option B:
-#
-#   1. In the Render dashboard, open your Static Site → Settings →
-#      Deploy Hook. Copy the URL.
-#   2. GitHub repo → Settings → Secrets and variables → Actions:
-#      - Secrets (tab): add `RENDER_DEPLOY_HOOK_URL`
-#      - Variables (tab): add `ENABLE_RENDER = true`
-#
-# When triggered, Render fetches the latest commit and builds in its
-# own environment. This workflow only pings the deploy hook — it
-# doesn't push artifacts. If you need Actions-built artifacts shipped
-# to Render, use Render's REST API directly (more setup; not covered).
-#
-# Three deploy options ship in this repo. Each is independently gated
-# on its own `ENABLE_*` repo variable; enable any subset.
-
-name: Deploy → Render
-
+name: Deploy Render with header and checkout checks
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
+concurrency:
+  group: render-production
+  cancel-in-progress: false
 jobs:
-  build-and-trigger:
-    if: vars.ENABLE_RENDER == 'true'
+  deploy:
+    if: github.ref == 'refs/heads/main' && vars.RENDER_SYNC_ENABLED == 'true'
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      - name: Install libvips with AVIF support
-        # libheif1 + plugin packages are required for AVIF encoding —
-        # libvips42 alone doesn't include them on Ubuntu 24.04.
+      - name: Install image build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvips42 libheif1 \
-                                   libheif-plugin-aomenc \
-                                   libheif-plugin-libde265 \
-                                   libheif-plugin-dav1d
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
+          sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d
+      - uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           bundler-cache: true
-
-      - name: Build site (CI verification)
-        # Build locally as a smoke test so Render's build won't run
-        # against code that fails at our own gates. Doesn't ship the
-        # artifact — Render builds its own copy after the hook fires.
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+      - name: Build and validate site
         env:
           ABQARI_ENV: production
-        run: bundle exec bin/build
-
-      - name: Trigger Render deploy
-        env:
-          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          JEKYLL_ENV: production
         run: |
-          if [ -z "$DEPLOY_HOOK" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK_URL secret is empty. Add it under Settings → Secrets."
-            exit 1
-          fi
-          response=$(curl -sS -X POST "$DEPLOY_HOOK" -w "\n%{http_code}")
-          code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-          echo "Render response ($code): $body"
-          # 200/201 = accepted (Render queues the build). Any other code is a failure.
-          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
+          bundle exec bin/build
+          bundle exec ruby actions/render-static/test/render_static_test.rb
+          node --test actions/render-static/test/policy.test.mjs
+      - name: Check checkout, deploy, sync headers, and verify production
+        uses: ./actions/render-static
+        with:
+          render-api-key: ${{ secrets.RENDER_API_KEY }}

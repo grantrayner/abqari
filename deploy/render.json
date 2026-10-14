@@ -1,0 +1,9 @@
+{
+  "service_id": "srv-d8qghq1194ac73dp188g",
+  "service_name": "abqari",
+  "branch": "main",
+  "origin": "https://abqari.onrender.com",
+  "publish_path": "_site",
+  "generated_headers": "_site/_headers",
+  "commerce_tests": []
+}
