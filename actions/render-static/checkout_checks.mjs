@@ -50,6 +50,9 @@ if (mode === 'local') {
 const browser = await chromium.launch({ headless: true });
 const results = [];
 const failures = [];
+const redact = text => text.replace(/https?:\/\/[^\s'";]+/g, url => {
+  try { return safeUrl(url); } catch { return '<url>'; }
+});
 
 async function newContext() {
   const context = await browser.newContext();
@@ -91,9 +94,7 @@ async function openPage(context, path, violations) {
     // Checkout providers manage their own policies. Gate violations caused
     // by the site's policy, including its embedded Shopify frames.
     if (page.url().startsWith(config.origin + '/') && /violat.*(?:content.security.policy|csp)|content.security.policy.*violat/i.test(message.text())) {
-      violations.push(message.text().replace(/https?:\/\/[^\s'";]+/g, url => {
-        try { return safeUrl(url); } catch { return '<url>'; }
-      }));
+      violations.push(redact(message.text()));
     }
   });
   const response = await page.goto(new URL(path, origin).href, { waitUntil: 'domcontentloaded' });
@@ -170,14 +171,15 @@ try {
       assert.deepEqual(violations, [], `CSP violations in ${test.id}`);
       console.log(`${mode}: ${test.id} checkout reached card entry`);
     } catch (error) {
-      failures.push({ id: test.id, message: error.message, csp_violations: violations });
       const page = context.pages()[0];
-      if (page) await page.screenshot({ path: `deployment-evidence/screenshots/${mode}-${test.id}-failed.png` }).catch(() => {});
+      const frames = page ? page.frames().map(frame => ({ name: frame.name(), url: redact(frame.url()) })) : [];
+      failures.push({ id: test.id, message: redact(error.message), csp_violations: violations, frames });
+      if (page) await page.screenshot({ path: `deployment-evidence/screenshots/${mode}-${test.id}-failed.png`, timeout: 5000 }).catch(() => {});
     } finally { await context.close(); }
   }
   assert.equal(failures.length, 0, `${failures.length} checkout check(s) failed`);
 } catch (error) {
-  failures.push({ id: 'deployment-check', message: error.message });
+  failures.push({ id: 'deployment-check', message: redact(error.message) });
   process.exitCode = 1;
 } finally {
   await writeFile(`deployment-evidence/${mode}-checks.json`, JSON.stringify({ mode, results, failures, payments_submitted: false }, null, 2));
