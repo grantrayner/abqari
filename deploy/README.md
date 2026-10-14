@@ -20,4 +20,4 @@ card-entry form. They never fill customer or payment details or submit orders.
 Update fixtures intentionally when changing a product or purchase component.
 
 No Actions secrets or activation variables are needed. Use **Run workflow**
-on `main` to repeat production checks. The shared [check documentation](https://github.com/grantrayner/abqari/tree/609d654002830ed0fd1ef0de570c892d71cb3113/actions/render-static) explains coverage and evidence.
+on `main` to repeat production checks. The shared [check documentation](https://github.com/grantrayner/abqari/tree/f82877c43f3a0d010ecdd294f0ddccd932e0e08f/actions/render-static) explains coverage and evidence.
