@@ -810,7 +810,7 @@ module Abqari
     def rewrite_bundle_urls(html, page)
       base = page.url
 
-      html.gsub(/(<(?:img|a)\s+[^>]*?(?:src|href)=")([^"]+)/) do
+      html.gsub(/(<(?:img|a)\s++[^>]*?(?:src|href)=")([^"]+)/) do
         prefix = ::Regexp.last_match(1)
         url    = ::Regexp.last_match(2)
 

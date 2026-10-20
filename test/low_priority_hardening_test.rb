@@ -130,6 +130,19 @@ class ImporterYamlScalarTest < Minitest::Test
     ["tab\there", "carriage\rreturn", "null\0byte"].each { |raw| assert_round_trips(raw) }
   end
 
+  def test_backslashes_quotes_and_replacement_metacharacters_round_trip
+    ['Has: C:\\folder\\file', 'Has: \\"quoted\\"', 'Has: \\1\\&\\`',
+     "Hello\\\"\npermalink: /../../evil", "Has: \\\\"].each do |raw|
+      assert_round_trips(raw)
+    end
+  end
+
+  def test_unicode_yaml_line_breaks_remain_inside_one_scalar
+    ["\u0085", "\u2028", "\u2029"].each do |separator|
+      assert_round_trips("Hello#{separator}permalink: /../../evil")
+    end
+  end
+
   def test_ordinary_values_are_not_gratuitously_quoted
     assert_equal 'plain title', scalar_for('plain title')
   end

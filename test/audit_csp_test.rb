@@ -147,6 +147,47 @@ class AuditCspTest < Minitest::Test
     assert_empty run_audit
   end
 
+  def test_browser_valid_script_end_tags_are_audited
+    headers(BASE_CSP)
+    ["</script >", "</script\t>", '</SCRIPT ignored>'].each do |closing|
+      @findings.clear
+      page('index.html', "<script>blocked()</script>".sub('</script>', closing))
+      assert_match(/1 inline <script> blocked/, run_audit.first&.dig(:message).to_s, closing)
+    end
+  end
+
+  def test_script_comments_and_quoted_tag_delimiters_preserve_hash_input
+    body = 'const example = "<!-- keep -->";'
+    headers("#{BASE_CSP} #{sha(body)}")
+    page('index.html', %(<script data-example=">">#{body}</script >))
+
+    assert_empty run_audit
+  end
+
+  def test_unquoted_event_and_style_attributes_are_audited
+    headers(BASE_CSP)
+    page('index.html', '<button onclick=go() style=color:red>Go</button>')
+
+    messages = run_audit.map { |finding| finding[:message] }
+    assert messages.any? { |message| message.include?('inline event handler') }
+    assert messages.any? { |message| message.include?('style attribute') }
+  end
+
+  def test_comments_and_template_contents_do_not_execute
+    headers(BASE_CSP)
+    page('index.html', '<!-- <script>comment()</script> --!>' \
+                       '<template><script>inert()</script><b onclick=go()>x</b></template>')
+
+    assert_empty run_audit
+  end
+
+  def test_attribute_entities_are_decoded_exactly_once
+    headers("default-src 'self'; style-src 'self' 'unsafe-hashes' #{sha('x=&gt;')}")
+    page('index.html', '<p style="x=&amp;gt;">x</p>')
+
+    assert_empty run_audit
+  end
+
   # --- which policy applies -----------------------------------------
 
   def test_no_headers_file_or_no_csp_means_nothing_to_check

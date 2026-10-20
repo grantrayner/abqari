@@ -121,7 +121,8 @@ module Abqari
 
       minified = stripped
                  .gsub(/\s+/, ' ')
-                 .gsub(/\s*([{};,>])\s*/, '\1')
+                 # The previous pass leaves at most one ASCII space.
+                 .gsub(/ ?([{};,>]) ?/, '\1')
                  .gsub(';}', '}')
       minified = trim(minified)
 

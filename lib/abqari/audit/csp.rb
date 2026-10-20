@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 require 'base64'
-require 'cgi'
 require 'digest'
+require_relative '../html'
 
 module Abqari
   class Audit
@@ -114,33 +114,28 @@ module Abqari
       # Each piece of inline code as `[kind, content, script_type]`, where
       # content is exactly what the browser hashes.
       def inline_code(html)
-        html = html.gsub(/<!--.*?-->/m, '')
         code = []
+        Html.document(html).css('*').each do |node|
+          next if node.ancestors.any? { |parent| parent.name == 'template' }
 
-        html.scan(%r{<script\b([^>]*)>(.*?)</script>}mi).each do |attrs, body|
-          next if attribute(attrs, 'src')
+          if node.name == 'script' && !node.key?('src')
+            type = node['type']&.strip&.downcase
+            if type.nil? || type.empty? || EXECUTABLE_TYPES.include?(type)
+              code << [:script, node.content, type]
+            end
+          elsif node.name == 'style'
+            code << [:style, node.content]
+          end
 
-          type = attribute(attrs, 'type')&.strip&.downcase
-          next unless type.nil? || type.empty? || EXECUTABLE_TYPES.include?(type)
+          # The parser already decodes attributes once, as the browser
+          # does. Decoding again changes the bytes used for CSP hashes.
+          node.attributes.each do |name, attribute|
+            next unless name == 'style' || name.match?(/\Aon[a-z]+\z/)
 
-          code << [:script, body, type]
-        end
-        html.scan(%r{<style\b[^>]*>(.*?)</style>}mi).each { |(body)| code << [:style, body] }
-
-        # Attributes, with script and style bodies removed first so a
-        # string inside a script that looks like markup isn't counted.
-        tags_only = html.gsub(%r{<(script|style)\b[^>]*>.*?</\1>}mi, '')
-        tags_only.scan(/<[a-zA-Z][^>]*>/).each do |tag|
-          tag.scan(/\s(on[a-z]+|style)\s*=\s*(?:"([^"]*)"|'([^']*)')/i).each do |name, dq, sq|
-            code << [name.casecmp?('style') ? :style_attr : :script_attr, CGI.unescapeHTML(dq || sq)]
+            code << [name == 'style' ? :style_attr : :script_attr, attribute.value]
           end
         end
         code
-      end
-
-      def attribute(attrs, name)
-        match = attrs.match(/\b#{name}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
-        match && (match[1] || match[2] || match[3])
       end
 
       # Mirrors the CSP spec's inline checks: a hash or nonce in the list

@@ -173,7 +173,9 @@ module Abqari
     def post_process_html(html, page: nil)
       return html unless enabled?
 
-      html.gsub(/<img\s+([^>]*?)>/m) do |match|
+      # Whitespace belongs to the delimiter, not to the attributes.
+      # Possessive quantifiers prevent overlapping backtracking paths.
+      html.gsub(/<img\s++([^>]*+)>/m) do |match|
         attrs = ::Regexp.last_match(1)
         src = attrs[/src="([^"]+)"/, 1]
         next match unless src
