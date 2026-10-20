@@ -11,7 +11,7 @@ optional overrides), while the engine — layouts, themes, helpers, asset
 pipeline — lives in the dependency. Forking the engine is also
 supported for users who want to own all the code.
 
-> **Status:** v1.3.0 — see
+> **Status:** v1.3.1 — see
 > [CHANGELOG.md](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md).
 > Distributed via RubyGems (`gem install abqari`) and as a Bundler
 > path/git source. The API follows [semver](https://semver.org/) from
@@ -176,7 +176,7 @@ Test that it worked:
 abqari version
 ```
 
-You should see a version number, e.g. `abqari 1.3.0`. If you get
+You should see a version number, e.g. `abqari 1.3.1`. If you get
 `command not found`, see [Troubleshooting](#troubleshooting) below.
 
 ### Step 3 — Create your first site
@@ -472,7 +472,7 @@ end
 Or — pin to a git ref while tracking pre-release work:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.3.0'
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.3.1'
 ```
 
 Install the libvips C library once (hard dep for the image pipeline):
@@ -2573,7 +2573,7 @@ changes to your site. To track a fork or an unreleased branch
 instead, swap the line for a git source:
 
 ```ruby
-gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.3.0'
+gem 'abqari', git: 'https://github.com/grantrayner/abqari.git', tag: 'v1.3.1'
 ```
 
 The cadence: read [CHANGELOG.md](https://github.com/grantrayner/abqari/blob/main/CHANGELOG.md) before each upgrade,
