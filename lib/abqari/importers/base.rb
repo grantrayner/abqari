@@ -285,7 +285,7 @@ module Abqari
         # been written straight through, turning one mapping entry into
         # two. Importer input is a third-party export, so this is
         # attacker-shaped. Escape them into their YAML forms instead.
-        if str.match?(/[\x00-\x1F\x7F]/)
+        if str.match?(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/)
           return %("#{escape_yaml_double_quoted(str)}")
         end
 
@@ -301,13 +301,18 @@ module Abqari
       # quotes, then the control characters that have named escapes,
       # then anything else remaining as \uXXXX.
       def escape_yaml_double_quoted(str)
-        str
-          .gsub('\\', '\\\\\\\\')
-          .gsub('"', '\\"')
-          .gsub("\n", '\\n')
-          .gsub("\r", '\\r')
-          .gsub("\t", '\\t')
-          .gsub(/[\x00-\x1F\x7F]/) { |c| format('\\u%04X', c.ord) }
+        # A block returns literal replacement bytes: String#gsub's
+        # replacement-string backslash rules cannot reinterpret them.
+        str.gsub(/[\\"\u0000-\u001F\u007F-\u009F\u2028\u2029]/) do |char|
+          case char
+          when '\\' then '\\\\'
+          when '"'  then '\\"'
+          when "\n" then '\\n'
+          when "\r" then '\\r'
+          when "\t" then '\\t'
+          else format('\\u%04X', char.ord)
+          end
+        end
       end
 
       def block_array(key, items)

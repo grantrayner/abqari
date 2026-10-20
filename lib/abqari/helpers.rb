@@ -5,6 +5,7 @@ require 'date'
 require 'json'
 require 'time'
 require 'uri'
+require_relative 'html'
 
 module Abqari
   module Helpers
@@ -161,7 +162,7 @@ end
     # `data-heading-content`, so each heading silently added several
     # phantom "words" to the structured data search engines read.
     def word_count(text)
-      text.to_s.gsub(/<[^>]+>/, ' ').scan(/\S+/).length
+      Html.text(text, separator: ' ').scan(/\S+/).length
     end
 
     # Format a date or time. Default format is "1 January 2026"
@@ -224,7 +225,7 @@ end
     end
 
     def excerpt(text, words: 50, omission: '…')
-      stripped = text.to_s.gsub(/<[^>]+>/, '').strip
+      stripped = Html.text(text).strip
       arr = stripped.split(/\s+/)
       return stripped if arr.length <= words
 
@@ -232,7 +233,7 @@ end
     end
 
     def reading_time(text, wpm: 200)
-      stripped = text.to_s.gsub(/<[^>]+>/, '')
+      stripped = Html.text(text)
       word_count = stripped.split(/\s+/).length
       # Clamp wpm to ≥1 (a `wpm: 0` would divide to Infinity → FloatDomainError)
       # and the result to ≥1 minute (empty text shouldn't read "0 min read").

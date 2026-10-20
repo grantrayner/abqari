@@ -36,9 +36,8 @@ class CspInlineScriptsTest < Minitest::Test
   private
 
   def inline_scripts(html)
-    html.scan(%r{<script(\s[^>]*)?>(.*?)</script>}m)
-        .map { |attrs, body| [attrs.to_s, body] }
-        .reject { |attrs, _| attrs.include?(' src=') }
-        .reject { |attrs, _| DATA_TYPES.any? { |t| attrs.include?(t) } }
+    Abqari::Html.document(html).css('script')
+          .reject { |node| node.key?('src') || DATA_TYPES.include?(node['type'].to_s.strip.downcase) }
+          .map { |node| [node['type'].to_s, node.content] }
   end
 end

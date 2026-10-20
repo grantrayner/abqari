@@ -32,10 +32,18 @@ class HomeWorkshopPhotoModulesTest < Minitest::Test
     @home_page = @site.pages.find { |p| p.url == '/' }
     refute_nil @home_page, 'fixture home page must exist at /'
     @original_home = @site.config['home']&.dup
+    # Rendering tests need an upcoming workshop after the example
+    # content's calendar dates have passed. Restore shared data below.
+    @workshop = @site.collection('workshops').max_by do |workshop|
+      workshop.frontmatter['date_to'] || workshop.frontmatter['date_from'] || Date.new(1)
+    end
+    @original_dates = @workshop.frontmatter.slice('date_from', 'date_to')
+    @workshop.frontmatter.merge!('date_from' => Date.today + 7, 'date_to' => Date.today + 9)
   end
 
   def teardown
     @site.config['home'] = @original_home
+    @workshop.frontmatter.merge!(@original_dates)
   end
 
   def render_module(module_name, module_cfg)
@@ -46,7 +54,9 @@ class HomeWorkshopPhotoModulesTest < Minitest::Test
     # explanatory comments at the top (documenting toggle values like
     # "Leica", "digital", "In-person") that would otherwise trip
     # `refute_match` checks for the rendered absence of those words.
-    html.gsub(/<!--[\s\S]*?-->/, '')
+    fragment = Abqari::Html.fragment(html)
+    fragment.xpath('.//comment()').each(&:remove)
+    fragment.to_html
   end
 
   # ============================================================

@@ -38,10 +38,12 @@ Reporting a vulnerability:
 
 ## Design principles
 
-1. **Minimal dependencies.** Seven small runtime gems — three
-   (`commonmarker`, `erubi`, `ruby-vips`) do the work on every build;
-   the rest cover syntax highlighting, the dev server, and CSV/Base64
-   handling. Content importing needs one more (`reverse_markdown`),
+1. **Minimal dependencies.** Eight runtime gems cover Markdown,
+   auto-escaped templates, images, HTML5 parsing, syntax highlighting,
+   the dev server, and CSV/Base64 handling. `nokolexbor` reads HTML for
+   CSP audits and text extraction, with no transitive runtime dependencies
+   and precompiled packages for the supported desktop/Linux platforms.
+   Content importing needs one more (`reverse_markdown`),
    deliberately left out of the runtime set so a normal install doesn't
    pull in nokogiri for a feature it never uses.
 2. **Ruby-first.** ERB templates, real Ruby in views.
@@ -946,6 +948,11 @@ and on `Abqari::RenderContext`, available everywhere ERB runs.
 | `excerpt(text, words:)` | `excerpt(post.content, words: 30)` |
 | `reading_time(text, wpm:)` | `reading_time(post.body)` → `"4 min read"` |
 | `slugify(text)` | `slugify('Hello World!')` → `"hello-world"` |
+
+`excerpt`, `word_count` and `reading_time` parse HTML and decode entities;
+comments and script/style/template contents do not count as visible text.
+An excerpt is plain text, not sanitized HTML. Render it with `<%= excerpt(...) %>`
+so template auto-escaping remains in force.
 
 **Time**
 

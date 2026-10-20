@@ -24,13 +24,15 @@ collaborator who already has commit access:
 | `themes/**/*`             | Trusted     | CSS + ERB partials shipped with the engine or the site. |
 | `plugins/**/*.rb`         | Trusted     | Loaded and executed with full Ruby access at Site construction (see `docs/plugins.md`). |
 | Folio API (`folio.foliobooks.app` or self-hosted) | Bounded | Build-time HTTP. Size-capped and timed out. |
+| Third-party content exports (`bin/import`) | Untrusted | Slugs, frontmatter, filenames and remote image URLs are attacker-shaped. |
+| Webmention payloads | Untrusted | Sender-controlled author names, avatars and URLs. |
 | Google Fonts CSS / woff2  | Bounded     | Build-time HTTP. Size-capped and timed out. |
 | Visitor browsers (HTML output) | Untrusted | Anything we emit must survive being read by any UA. |
 
-The engine **does not** accept untrusted input at build time. There is
-no submission endpoint, no comments pipeline, no markdown coming in
-from a third-party SaaS. Every protection in the codebase follows
-from this assumption.
+Templates, plugins and owner-controlled config remain trusted Ruby
+inputs. Imported content, webmentions and network responses do not gain
+that trust merely because the engine processes them during a build.
+See the shipped `SECURITY.md` for the reporting policy and invariants.
 
 If you ever route untrusted markdown, HTML, ERB, or YAML through the
 engine — for example by accepting reviews from Folio and rendering them
@@ -45,6 +47,22 @@ Even under the trusted-author model, build-time inputs can still go
 wrong by accident (a typo in a permalink, a runaway upstream API, a
 symlink that points at the wrong directory). The engine defends
 against the cases where the cost of getting it wrong is high.
+
+### HTML parsing and text helpers
+
+- `Html` uses Lexbor's HTML5 parser for browser tag/comment/attribute
+  rules. `Audit::Csp` reads actual script/style contents, including valid
+  whitespace in closing tags, and decoded quoted or unquoted attributes.
+  Comment-like text in scripts remains part of the CSP hash input;
+  inert template descendants are not executable page content.
+- Text helpers extract plain text and leave output escaping to the
+  existing Erubi auto-escape boundary. They are not HTML sanitizers and
+  must not be emitted through a raw interpolation for untrusted input.
+- The gem requires Ruby >=3.3. The CI matrix covers MRI 3.3, 3.4 and
+  4.0, including clean slim-container installs. Flagged overlapping
+  whitespace expressions in image/URL rewrites are possessive and CSS
+  minification bounds its whitespace after normalization; safety does
+  not depend on running an unsupported older Ruby interpreter.
 
 ### Path safety
 

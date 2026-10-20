@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- HTML5 parsing uses `nokolexbor`, one runtime dependency with no
+  transitive runtime gems. The clean-container CI matrix validates its
+  precompiled packages on Ruby 3.3, 3.4 and 4.0.
+- Workshop rendering tests keep an upcoming fixture in memory instead
+  of expiring when the example workshop dates pass.
+
+### Fixed
+
+- **CSP audits could miss browser-valid inline scripts and handlers.**
+  Regex parsing skipped whitespace in closing tags and unquoted
+  attributes, and could change script contents while removing comments.
+  HTML5 parsing now preserves browser hash input, decodes attributes
+  once and ignores inert template contents. Audit tests use the same
+  tag rules, including uppercase and comment edge cases.
+- **Excerpts and reading statistics now read HTML as HTML.** Quoted
+  delimiters, entities, comments and non-visible script/style/template
+  content are handled by a parser rather than a stripping regex.
+  Extracted text still requires normal template escaping.
+- **Imported titles retain quotes, backslashes and Unicode YAML line
+  breaks without changing the frontmatter structure.** Escaping is a
+  single literal-replacement pass, with round-trip regression coverage.
+- **HTML rewrites and CSS minification avoid overlapping whitespace
+  matches.** Image and bundle URL rewrites retain their output while
+  regex matching no longer needs to reconsider delimiter whitespace.
 
 ## [1.3.0] — 2026-10-11
 

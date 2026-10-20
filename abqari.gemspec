@@ -86,6 +86,10 @@ Gem::Specification.new do |spec|
   # pinned explicitly so the gem still works under Bundler's frozen mode.
   spec.add_dependency 'csv',             '~> 3.3'
   spec.add_dependency 'erubi',           '~> 1.13'
+  # HTML5 parsing for CSP audits and text extraction. Unlike the
+  # nokogiri/racc chain, this has no transitive runtime dependencies;
+  # its precompiled gems are checked by the clean-slim CI matrix.
+  spec.add_dependency 'nokolexbor',      '~> 0.8.0'
   spec.add_dependency 'rouge',           '~> 4.0'
   # ruby-vips: native libvips bindings for the image pipeline. The gem
   # is small pure-FFI Ruby; the install footprint is the libvips C
