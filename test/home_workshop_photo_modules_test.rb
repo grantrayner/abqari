@@ -152,7 +152,7 @@ class HomeWorkshopPhotoModulesTest < Minitest::Test
     # Expect "City, Country" — one entry, comma-joined, NOT split
     # by the bullet that separates distinct meta facts.
     assert_match(/,\s*\w/, meta, 'city + country should combine with a comma')
-    refute_match(/&middot;/, meta, 'only one fact in the line → no bullet')
+    refute_match(/&middot;|·/, meta, 'only one fact in the line → no bullet')
   end
 
   def test_latest_photo_show_city_only_drops_country

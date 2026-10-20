@@ -11,9 +11,9 @@ first. The findings table at the bottom links to the relevant code.
 
 ## 1. Trust model
 
-Abqari is a **single-author** static site generator. Every input it
-processes is assumed to come from the site owner or a trusted
-collaborator who already has commit access:
+Abqari is a **single-author** static site generator. Owner-controlled
+configuration and executable templates are trusted; third-party exports
+and network payloads are not. The boundaries are:
 
 | Input source              | Trust level | Notes |
 |---------------------------|-------------|-------|
