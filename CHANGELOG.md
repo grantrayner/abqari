@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- Static-site CI can opt into the runner's installed Chrome with
+  `browser-channel: chrome`, avoiding a second browser download while retaining
+  every local and production security check. Existing consumers keep Chromium.
 
 ## [1.3.1] — 2026-10-20
 

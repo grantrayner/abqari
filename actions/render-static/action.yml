@@ -7,6 +7,9 @@ inputs:
   check-production:
     description: Also check the public production site; use false for pull requests
     default: 'true'
+  browser-channel:
+    description: 'chromium (downloaded) or chrome (already installed on the runner)'
+    default: chromium
 runs:
   using: composite
   steps:
@@ -21,15 +24,21 @@ runs:
       shell: bash
       env:
         ACTION_ROOT: ${{ github.action_path }}
+        BROWSER_CHANNEL: ${{ inputs.browser-channel }}
       run: |
         npm ci --ignore-scripts --prefix "$ACTION_ROOT"
-        "$ACTION_ROOT/node_modules/.bin/playwright" install --with-deps chromium
+        case "$BROWSER_CHANNEL" in
+          chromium) "$ACTION_ROOT/node_modules/.bin/playwright" install --with-deps chromium ;;
+          chrome) google-chrome --version ;;
+          *) echo 'Unsupported browser-channel; use chromium or chrome' >&2; exit 1 ;;
+        esac
 
     - name: Check the built site under its expected headers
       shell: bash
       env:
         RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
         ACTION_ROOT: ${{ github.action_path }}
+        RENDER_CHECK_BROWSER: ${{ inputs.browser-channel }}
       run: node "$ACTION_ROOT/checkout_checks.mjs" local
 
     - name: Check public production headers and checkout paths
@@ -38,6 +47,7 @@ runs:
       env:
         RENDER_DEPLOY_CONFIG: ${{ inputs.config }}
         ACTION_ROOT: ${{ github.action_path }}
+        RENDER_CHECK_BROWSER: ${{ inputs.browser-channel }}
       run: node "$ACTION_ROOT/checkout_checks.mjs" live
 
     - name: Save check evidence
