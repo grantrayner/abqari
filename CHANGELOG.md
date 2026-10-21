@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `browser-channel: chrome`, avoiding a second browser download while retaining
   every local and production security check. Existing consumers keep Chromium.
 
+### Fixed
+
+- Keep the opt-in GitHub Pages deployment compatible with enforced Actions
+  SHA pinning by upgrading the artifact wrapper and its pinned internal upload.
+  Preserve generated hidden files, including `.well-known`, in the Pages artifact.
+
 ## [1.3.1] — 2026-10-20
 
 Upgrade to correct CSP-audit parsing, HTML text extraction and importer
