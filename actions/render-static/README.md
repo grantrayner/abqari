@@ -37,10 +37,19 @@ Consumers pin the action to a full commit SHA. GitHub tokens have only
 `contents: read`; no Actions secrets are required. Source and fixtures are
 public configuration, not credentials.
 
+On a runner that already has Google Chrome (such as GitHub's Ubuntu x64
+image), set `browser-channel: chrome` to reuse it and avoid browser downloads
+and operating-system dependency installation. Both local and live checks,
+including CSP enforcement and checkout flows, still run. Missing Chrome or
+an unsupported channel fails the job. The default remains downloaded Chromium
+for existing consumers and runners without Chrome.
+
 Run the Ruby policy tests, Node policy tests, and browser gate self-test with:
 
 ```
 bundle exec ruby actions/render-static/test/header_policy_test.rb
 node --test actions/render-static/test/policy.test.mjs
+node --test actions/render-static/test/browser_options.test.mjs
 node actions/render-static/test/browser_gate.mjs
+RENDER_CHECK_BROWSER=chrome node actions/render-static/test/browser_gate.mjs
 ```

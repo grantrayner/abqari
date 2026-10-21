@@ -4,6 +4,7 @@ import { readFile, mkdir, writeFile, stat, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { chromium } from 'playwright';
 import { matchesPath, safeUrl, headerMismatches } from './policy.mjs';
+import { browserOptions } from './browser_options.mjs';
 
 const config = JSON.parse(await readFile(process.env.RENDER_DEPLOY_CONFIG || 'deploy/render.json', 'utf8'));
 const plan = JSON.parse(await readFile('deployment-evidence/plan.json', 'utf8'));
@@ -47,7 +48,7 @@ if (mode === 'local') {
   localOrigin = `http://127.0.0.1:${server.address().port}`;
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch(browserOptions(process.env.RENDER_CHECK_BROWSER));
 const results = [];
 const failures = [];
 const redact = text => text.replace(/https?:\/\/[^\s'";]+/g, url => {

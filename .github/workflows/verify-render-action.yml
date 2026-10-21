@@ -22,6 +22,11 @@ jobs:
           node-version: '22'
       - run: bundle exec ruby actions/render-static/test/header_policy_test.rb
       - run: node --test actions/render-static/test/policy.test.mjs
+      - run: node --test actions/render-static/test/browser_options.test.mjs
       - run: npm ci --ignore-scripts --prefix actions/render-static
       - run: actions/render-static/node_modules/.bin/playwright install --with-deps chromium
       - run: node actions/render-static/test/browser_gate.mjs
+      - name: Verify the same CSP gate using the runner's Chrome
+        env:
+          RENDER_CHECK_BROWSER: chrome
+        run: node actions/render-static/test/browser_gate.mjs
