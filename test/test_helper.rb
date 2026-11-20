@@ -34,18 +34,20 @@ if ENV['COVERAGE']
   KEY_COVERAGE_THRESHOLD = 85.0
 
   SimpleCov.start do
-    add_filter '/test/'
-    add_filter '/vendor/'
-    add_group 'Core',         'lib/abqari/site.rb'
-    add_group 'Pages',        'lib/abqari/page.rb'
-    add_group 'Rendering',    %w[lib/abqari/render_context lib/abqari/renderer.rb
+    skip '/test/'
+    skip '/vendor/'
+    group 'Core',         'lib/abqari/site.rb'
+    group 'Pages',        'lib/abqari/page.rb'
+    # SimpleCov 1.x matches whole path segments; include both files and directories.
+    group 'Rendering',    %w[lib/abqari/render_context.rb lib/abqari/render_context
+                                 lib/abqari/renderer.rb
                                  lib/abqari/erbi_template.rb]
-    add_group 'Audit',        'lib/abqari/audit'
-    add_group 'Safety',       %w[lib/abqari/path_safe.rb lib/abqari/http_safe.rb
+    group 'Audit',        %w[lib/abqari/audit.rb lib/abqari/audit]
+    group 'Safety',       %w[lib/abqari/path_safe.rb lib/abqari/http_safe.rb
                                  lib/abqari/site_config.rb]
-    add_group 'Pipelines',    %w[lib/abqari/asset_pipeline.rb lib/abqari/image_pipeline.rb
+    group 'Pipelines',    %w[lib/abqari/asset_pipeline.rb lib/abqari/image_pipeline.rb
                                  lib/abqari/font_pipeline.rb lib/abqari/bundle_assets.rb]
-    add_group 'Artifacts',    %w[lib/abqari/sitemap.rb lib/abqari/feed.rb lib/abqari/robots.rb
+    group 'Artifacts',    %w[lib/abqari/sitemap.rb lib/abqari/feed.rb lib/abqari/robots.rb
                                  lib/abqari/headers_file.rb lib/abqari/manifest.rb
                                  lib/abqari/llms_txt.rb lib/abqari/og_image_generator.rb
                                  lib/abqari/security_txt.rb lib/abqari/redirects.rb
