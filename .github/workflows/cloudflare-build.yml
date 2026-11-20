@@ -1,0 +1,32 @@
+name: Verify Cloudflare Ruby build
+on:
+  pull_request:
+    paths:
+      - '.cloudflare/build.sh'
+      - '.github/workflows/cloudflare-build.yml'
+      - '.ruby-version'
+      - 'Gemfile'
+      - 'Gemfile.lock'
+  push:
+    branches: [main]
+    paths:
+      - '.cloudflare/build.sh'
+      - '.github/workflows/cloudflare-build.yml'
+      - '.ruby-version'
+      - 'Gemfile'
+      - 'Gemfile.lock'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install image dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d
+      - name: Build with the patched portable Ruby
+        run: bash .cloudflare/build.sh
