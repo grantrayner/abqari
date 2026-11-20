@@ -4,6 +4,7 @@ on:
     paths:
       - '.cloudflare/build.sh'
       - '.github/workflows/cloudflare-build.yml'
+      - 'wrangler.jsonc'
       - '.ruby-version'
       - 'Gemfile'
       - 'Gemfile.lock'
@@ -12,6 +13,7 @@ on:
     paths:
       - '.cloudflare/build.sh'
       - '.github/workflows/cloudflare-build.yml'
+      - 'wrangler.jsonc'
       - '.ruby-version'
       - 'Gemfile'
       - 'Gemfile.lock'
@@ -30,3 +32,5 @@ jobs:
           sudo apt-get install -y libvips42 libheif1 libheif-plugin-aomenc libheif-plugin-libde265 libheif-plugin-dav1d
       - name: Build with the patched portable Ruby
         run: bash .cloudflare/build.sh
+      - name: Validate the existing Worker deployment
+        run: npx --yes wrangler@4.165.0 deploy --dry-run
