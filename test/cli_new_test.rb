@@ -4,6 +4,7 @@ require_relative 'test_helper'
 require 'abqari/cli'
 require 'tmpdir'
 require 'fileutils'
+require 'yaml'
 
 # `abqari new <projectname>` — bootstrap a fresh Abqari site by recursive-
 # copying the skeleton template with ERB token substitution.
@@ -92,6 +93,33 @@ class CliNewTest < Minitest::Test
     run_new('mysite')
     assert File.exist?('mysite/.ruby-version'), 'scaffold must pin a Ruby version'
     assert_equal RUBY_VERSION, File.read('mysite/.ruby-version', encoding: 'UTF-8').strip
+  end
+
+  def test_generated_deploy_workflows_keep_the_tested_action_pins
+    run_new('mysite')
+    tested_actions = Dir[File.join(Abqari::ROOT, '.github', 'workflows', '*.yml')].flat_map do |path|
+      YAML.load_file(path).fetch('jobs').values.flat_map { |job| job.fetch('steps', []) }
+          .filter_map { |step| step['uses'] }
+    end
+    %w[deploy-cloudflare.yml deploy-github-pages.yml deploy-render.yml].each do |name|
+      generated = YAML.load_file("mysite/.github/workflows/#{name}")
+      generated.fetch('jobs').each_value do |job|
+        job.fetch('steps', []).filter_map { |step| step['uses'] }.each do |action|
+          assert_match %r{\A[\w-]+/[\w-]+@[0-9a-f]{40}\z}, action
+          assert_includes tested_actions, action, "#{name} ships an action the project no longer tests"
+        end
+      end
+    end
+  end
+
+  def test_generated_pages_workflow_preserves_hidden_site_files
+    run_new('mysite')
+    workflow = YAML.load_file('mysite/.github/workflows/deploy-github-pages.yml')
+    upload = workflow.fetch('jobs').fetch('build').fetch('steps').find do |step|
+      step.fetch('uses', '').start_with?('actions/upload-pages-artifact@')
+    end
+    assert_equal '_site', upload.fetch('with').fetch('path')
+    assert_equal true, upload.fetch('with').fetch('include-hidden-files')
   end
 
   def test_no_template_suffix_in_output

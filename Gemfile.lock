@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    abqari (1.3.1)
+    abqari (1.3.2)
       base64 (~> 0.2)
       commonmarker (~> 2.4)
       csv (~> 3.3)
@@ -90,7 +90,7 @@ DEPENDENCIES
   simplecov (~> 1.0)
 
 CHECKSUMS
-  abqari (1.3.1)
+  abqari (1.3.2)
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bundler-audit (0.9.3) sha256=81c8766c71e47d0d28a0f98c7eed028539f21a6ea3cd8f685eb6f42333c9b4e9
   commonmarker (2.10.1-aarch64-linux) sha256=3ab9e7027d2350364bdc541680cc28e21011b2950abf7d08ac29093fa691bdc3
