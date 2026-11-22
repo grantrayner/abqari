@@ -18,7 +18,7 @@ group :development do
   # loaded in-process.
   gem 'bundler-audit', '~> 0.9', require: false
   gem 'listen', '~> 3.10'    # FS events for the dev-server watcher (optional)
-  gem 'minitest', '~> 5.0'
+  gem 'minitest', '~> 6.1'
   # reverse_markdown is an OPTIONAL runtime dependency (see the gemspec
   # for why it isn't declared there) — but the engine's own test suite
   # exercises the importers, so it's needed to develop against.
