@@ -1,3 +1,4 @@
+import { waitForFolioPurchaseLink } from './folio_purchase_link.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, stat, realpath } from 'node:fs/promises';
@@ -130,8 +131,7 @@ async function shopify(context, test, violations) {
 
 async function folio(context, test, violations) {
   const page = await openPage(context, test.path, violations);
-  const link = page.locator(`a[href="${test.buy_url}"]`);
-  assert.equal(await link.count(), 1, 'Configured Folio purchase link is missing or duplicated');
+  const link = await waitForFolioPurchaseLink(page, test.buy_url);
   const buy = new URL(await link.getAttribute('href'), origin);
   assert.equal(buy.origin, test.checkout_origin, 'Unexpected Folio purchase origin');
   const [checkout] = await Promise.all([context.waitForEvent('page'), link.click()]);
